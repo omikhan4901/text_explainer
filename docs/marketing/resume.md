@@ -16,8 +16,11 @@ downloads until they exist.
 - Implemented selection capture through Windows UI Automation with a clipboard fallback
   that snapshots and restores every clipboard format, and a non-activating popup that
   never steals focus.
-- Wrote 99 Rust tests and 9 front-end tests, including end-to-end engine tests against a
-  stand-in llama.cpp server, gated in GitHub Actions on Linux and Windows.
+- Built an evaluation harness that runs a 28-passage corpus through candidate models in
+  parallel GitHub Actions jobs; chose Gemma 4 E2B as default (6 s median per rewrite on a
+  4-core CPU, 3.9 GB, fewest dropped facts), replacing a slower first choice.
+- Wrote 109 Rust tests, 10 front-end tests and 38 Playwright journey and WCAG 2.2 AA
+  checks, gated in GitHub Actions on Linux and Windows with an installer built per push.
 
 **Keywords (ATS):** Rust, Tauri, TypeScript, React, Tailwind CSS, Radix UI, llama.cpp,
 GGUF, local LLM inference, prompt engineering, constrained decoding (GBNF), Win32 API,

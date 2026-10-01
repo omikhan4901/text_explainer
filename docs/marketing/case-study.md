@@ -21,11 +21,11 @@ anything leaving the computer. It must not get in the way of the work you are do
 ## What I did
 
 - **Chose the model by evidence, not habit.** The first idea was Phi-3 Mini; by 2026 it
-  was two generations behind. I compared current small models (Qwen3.5, Gemma 4, LFM2.5)
-  on what matters for this job: following instructions, memory on an 8 GB laptop, and
-  speed on a CPU. A GitHub Actions workflow pulls real file sizes and SHA-256 hashes from
-  Hugging Face, so the catalog and every download are verified. The final default is
-  decided by an evaluation harness, not by benchmarks someone else ran.
+  was two generations behind. I built an evaluation harness that runs 28 realistic
+  passages through each candidate (Qwen3.5, Gemma 4, LFM2.5) exactly as the app does and
+  measures speed, memory, reading-grade drop, facts kept, chatter and language drift, on
+  free GitHub runners. A probe workflow pins every model file's size and SHA-256 from
+  Hugging Face, so the catalog and every download are verified.
 - **Stopped the model drifting into another language at the token level.** Small models,
   Qwen in particular, sometimes switch to Chinese mid-answer. Instead of only asking
   nicely in the prompt, every request carries a generated GBNF grammar that makes
@@ -50,9 +50,16 @@ anything leaving the computer. It must not get in the way of the work you are do
 
 ## Results so far
 
-- 99 Rust tests and 9 front-end tests, run on every push on Linux and on a real Windows
-  runner, including end-to-end tests of the model engine against a stand-in llama.cpp
-  server (process start, streaming, crash restart, language-drift retry).
+- **The default model was chosen by measurement.** On a 4-core CPU with no GPU, Gemma 4
+  E2B rewrote passages in a median of 6 seconds at 16.9 tokens per second using 3.9 GB of
+  memory, lowered the reading grade by 9 to 13 levels, and kept facts best of the four
+  models tested. The first guess, Qwen3.5 4B, was half as fast and dropped drug doses
+  from a discharge letter ([full results](../models.md)).
+- **The evaluation changed the product**: the default model, the meaning check's rules
+  (fewer false alarms on contract terms and shortened names), and the engine's memory use.
+- 109 Rust tests, 10 front-end unit tests and 38 Playwright checks (journeys plus WCAG
+  2.2 AA scans in light and dark), run on every push on Linux and on a real Windows
+  runner that also builds the installer.
 - The Windows app is type-checked and linted from Linux with a small cross-check script,
   so most mistakes are caught before the Windows build runs.
 

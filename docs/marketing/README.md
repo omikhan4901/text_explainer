@@ -12,6 +12,5 @@ Everything here describes what is built and tested today. Numbers come from
 Screenshots are in `docs/screenshots/`. Until the Windows release, they are of the real
 interface running in a browser against the app's built-in mock, not of the installed app.
 
-**Not yet true, so not claimed anywhere:** a public release, users or downloads, the
-default model's measured speed and quality on a real laptop (the eval in milestone 5
-produces these), the dictionary for single words (milestone 4), macOS or Linux.
+**Not yet true, so not claimed anywhere:** a public release, users or downloads, speed on
+a real laptop (the measured numbers are from a 4-vCPU CI runner; say so), macOS or Linux.
