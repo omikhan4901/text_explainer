@@ -1,0 +1,40 @@
+[workspace]
+resolver = "3"
+members = ["crates/core", "crates/win", "src-tauri"]
+# The Tauri app only builds on Windows (CI); everything else builds and tests anywhere.
+default-members = ["crates/core", "crates/win"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+authors = ["Mehboob Ehsan Khan"]
+repository = "https://github.com/omikhan4901/text_explainer"
+rust-version = "1.90"
+
+[workspace.dependencies]
+te-core = { path = "crates/core" }
+te-win = { path = "crates/win" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "time", "sync", "io-util", "net", "fs"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "stream", "json", "http2"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+futures-util = "0.3"
+rusqlite = { version = "0.40", features = ["bundled"] }
+sha2 = "0.10"
+tracing = "0.1"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
