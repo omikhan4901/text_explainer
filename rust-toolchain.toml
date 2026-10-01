@@ -1,0 +1,6 @@
+# One Rust version everywhere (local, Linux CI, Windows CI), so new lints never surprise CI.
+[toolchain]
+channel = "1.99.0"
+components = ["clippy", "rustfmt"]
+targets = ["x86_64-pc-windows-msvc"]
+profile = "minimal"

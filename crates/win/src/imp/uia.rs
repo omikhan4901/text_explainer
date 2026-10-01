@@ -121,7 +121,7 @@ unsafe fn read_rects(array: *mut SAFEARRAY) -> Option<Rect> {
         SafeArrayAccessData(array, &mut data).ok()?;
         let values = core::slice::from_raw_parts(data as *const f64, n);
         let mut out: Option<Rect> = None;
-        for q in values.chunks_exact(4) {
+        for q in values.as_chunks::<4>().0 {
             let r = Rect::new(
                 q[0] as i32,
                 q[1] as i32,

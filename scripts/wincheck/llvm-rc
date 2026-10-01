@@ -1,0 +1,11 @@
+#!/bin/sh
+# Stand-in resource compiler for scripts/wincheck.sh: writes an empty .res (type-checking only).
+next=""
+for a in "$@"; do
+  if [ "$next" = 1 ]; then : > "$a"; next=""; continue; fi
+  case "$a" in
+    /fo|-fo|/FO|-FO) next=1 ;;
+    /fo*|-fo*) out="${a#???}"; : > "$out" ;;
+  esac
+done
+exit 0

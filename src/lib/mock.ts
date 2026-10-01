@@ -74,6 +74,11 @@ const SYSTEM = (style: string) =>
 
 let settings: Settings = structuredClone(DEFAULT_SETTINGS);
 const installed = new Set<string>();
+// `?state=ready` starts as if set up already (for screenshots of the settings pages).
+if (typeof location !== "undefined" && new URLSearchParams(location.search).get("state") === "ready") {
+  installed.add("qwen3.5-4b");
+  settings = { ...settings, first_run_done: true, model: { kind: "catalog", id: "qwen3.5-4b" } };
+}
 const handlers = new Map<string, Set<Handler>>();
 let downloadTimer: ReturnType<typeof setInterval> | undefined;
 let downloading: string | null = null;

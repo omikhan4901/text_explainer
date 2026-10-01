@@ -8,6 +8,8 @@ dir="$(cd "$(dirname "$0")" && pwd)"
 export CC_x86_64_pc_windows_msvc="$dir/wincheck/fakecc"
 export AR_x86_64_pc_windows_msvc="$dir/wincheck/fakelib"
 export CARGO_TARGET_DIR="$dir/../target/wincheck"
+# Tauri compiles a Windows resource file; the stand-in llvm-rc skips that.
+export PATH="$dir/wincheck:$PATH"
 sub="$1"
 shift
 exec cargo "$sub" --target x86_64-pc-windows-msvc "$@"
