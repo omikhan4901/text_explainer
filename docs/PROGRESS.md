@@ -37,9 +37,11 @@ real machine, any issue in `docs/testing/windows.md`).
 - Prompt cache: capped at 1024 MiB after measuring off / 256 / 1024 / 2048 MiB (turning it
   off made the first words 4 to 7 s slower; 256 MiB was too small for Qwen3.5 4B).
 - Dictionary lookup: about 60 microseconds (budget 50 ms).
-- Memory without a model (Windows runner, main window open, app plus 8 WebView2
-  processes): 143 MB private, 382 MB working set summed over the processes (shared
-  WebView2 pages count once per process). Budget 150 MB: within it by private memory.
+- Memory without a model (Windows runner, app plus 8 WebView2 processes): 146 MB
+  private, about 385 MB working set summed over the processes (shared WebView2 pages
+  count once per process), the same with the main window open and when started in the
+  tray at login (the hidden settings window is still loaded). Budget 150 MB: within it
+  by private memory, narrowly.
 - First words (budget 2 s, default model, 4-core runner): 2.2 s median on Linux, 2.5 s
   on Windows, so just over budget; a paragraph's instructions dominate on a CPU.
 - The Windows CI job builds and uploads the NSIS installer on every push to main, then
