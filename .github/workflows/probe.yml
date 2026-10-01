@@ -2,6 +2,11 @@ name: Probe model and engine sources
 
 on:
   workflow_dispatch:
+    inputs:
+      only_engine:
+        description: Only list llama.cpp releases
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -14,3 +19,4 @@ jobs:
       - run: python3 scripts/ci/probe_sources.py
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          ONLY_ENGINE: ${{ inputs.only_engine && '1' || '' }}

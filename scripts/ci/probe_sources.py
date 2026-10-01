@@ -20,7 +20,7 @@ def get(url, token=None):
 
 
 def main():
-    for term in SEARCHES:
+    for term in ([] if os.environ.get("ONLY_ENGINE") else SEARCHES):
         print(f"\n### search: {term}")
         try:
             repos = get(f"https://huggingface.co/api/models?search={term}&filter=gguf&limit=40")
@@ -43,11 +43,11 @@ def main():
                     print(f"    {path}  size={f.get('size')}  sha256={lfs.get('oid')}")
                 elif path.startswith("mmproj") or path in ("LICENSE", "README.md"):
                     pass
-    print("\n### llama.cpp latest release")
-    rel = get("https://api.github.com/repos/ggml-org/llama.cpp/releases/latest", os.environ.get("GITHUB_TOKEN"))
-    print("tag", rel["tag_name"], "published", rel["published_at"])
-    for a in rel["assets"]:
-        if "win" in a["name"]:
+    print("\n### llama.cpp recent releases")
+    rels = get("https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=4", os.environ.get("GITHUB_TOKEN"))
+    for rel in rels:
+        print("tag", rel["tag_name"], "published", rel["published_at"], "assets", len(rel["assets"]))
+        for a in rel["assets"]:
             print(f"  {a['name']}  size={a['size']}  digest={a.get('digest')}")
 
 
