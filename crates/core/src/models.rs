@@ -46,7 +46,6 @@ impl CatalogModel {
 }
 
 const MB: u64 = 1024 * 1024;
-const GB: u64 = 1024 * MB;
 
 /// Whether a model leaves enough memory for the browser or document being read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -188,6 +187,8 @@ pub fn recommend(total_ram_bytes: u64) -> &'static CatalogModel {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const GB: u64 = 1024 * MB;
 
     #[test]
     fn catalog_is_well_formed() {

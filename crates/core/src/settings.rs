@@ -215,14 +215,16 @@ mod tests {
     fn round_trips() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.json");
-        let mut s = Settings::default();
-        s.level = Level::Simpler;
-        s.model = ModelChoice::Endpoint {
-            base_url: "http://127.0.0.1:11434/v1".into(),
-            model: "qwen3.5:4b".into(),
-            api_key: None,
+        let s = Settings {
+            level: Level::Simpler,
+            model: ModelChoice::Endpoint {
+                base_url: "http://127.0.0.1:11434/v1".into(),
+                model: "qwen3.5:4b".into(),
+                api_key: None,
+            },
+            output: OutputChoice::Fixed("bn".into()),
+            ..Default::default()
         };
-        s.output = OutputChoice::Fixed("bn".into());
         s.save(&path).unwrap();
         assert_eq!(Settings::load(&path), s);
         assert!(!path.with_extension("json.tmp").exists());
