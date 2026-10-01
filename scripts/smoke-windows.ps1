@@ -47,6 +47,11 @@ function Measure-AppMemory($procId, $label) {
   $ws = ($procs | Measure-Object WorkingSet64 -Sum).Sum / 1MB
   $private = ($procs | Measure-Object PrivateMemorySize64 -Sum).Sum / 1MB
   Write-Host ("Memory without a model, {0}: {1:N0} MB private, {2:N0} MB working set, {3} processes" -f $label, $private, $ws, $procs.Count)
+  foreach ($p in $procs) {
+    $cmd = ($all | Where-Object { $_.ProcessId -eq $p.Id }).CommandLine
+    $kind = if ($cmd -match '--type=([\w-]+)') { $Matches[1] } else { 'main' }
+    Write-Host ("  {0,-22} {1,-16} {2,5:N0} MB private" -f $p.ProcessName, $kind, ($p.PrivateMemorySize64 / 1MB))
+  }
 }
 
 # Starts the app, waits for its "started" line, checks it, and measures it.
