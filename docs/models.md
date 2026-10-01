@@ -37,6 +37,20 @@ compare speeds within a run, not across runs. Answers are sampled (temperature 0
 the fact counts move a little too: across the four runs with the improved meaning check,
 Gemma 4 E2B was flagged in 1 to 3 answers of 56 and Qwen3.5 4B in 2 to 6.
 
+## On Windows
+
+The same evaluation on a Windows runner (4 CPU threads), with the llama.cpp build the
+installer bundles, run 7:
+
+| Model | Memory (peak working set) | Speed | Whole answer (median) | First words (median) | Answers missing a fact | Invented numbers | Wrong language |
+|---|---|---|---|---|---|---|---|
+| Gemma 4 E2B | 2.66 GB | 15.4 tok/s | 6.7 s | 2.5 s | 1 of 56 | 0 | 0 |
+| Qwen3.5 2B | 2.09 GB | 15.8 tok/s | 4.8 s | 1.5 s | 5 of 56 | 0 | 0 |
+
+Windows reports memory as the working set, which leaves out parts of the model file it
+hasn't kept in memory, so it reads lower than the Linux figures above. The app's "fits
+your memory" hints use the higher Linux figures.
+
 ## What the numbers mean
 
 - **Gemma 4 E2B is the default.** It computes like a 2B model, so it is as fast as the
@@ -78,4 +92,5 @@ middle of a lease is the kind of failure that loses trust for good.
 Actions → **Model evaluation** → Run workflow, with a list of catalog model ids. Each model
 runs on its own free runner in parallel; results appear in the run summary and as
 artifacts (every answer, for reading them yourself). "Extra llama-server arguments" are
-appended to the app's own, to compare engine settings on the same passages.
+appended to the app's own, to compare engine settings on the same passages. Choose the
+Windows runner to run the models with the exact engine build the app ships.

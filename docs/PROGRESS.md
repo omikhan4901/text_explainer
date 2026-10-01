@@ -31,6 +31,9 @@ real machine, any issue in `docs/testing/windows.md`).
   Gemma 4 E2B 17.3 tok/s, 5.8 s median per answer (first words after 2.2 s), 3.9 GB
   peak memory, reading grade down 9.2 levels (Plain) and 12.2 (Simpler), facts flagged
   in 1 to 3 of 56 answers across runs.
+- On a Windows runner, with the engine build the installer bundles: Gemma 4 E2B 15.4 tok/s,
+  6.7 s median per answer (first words 2.5 s), 1 of 56 answers flagged, no wrong
+  language; Qwen3.5 2B 15.8 tok/s, 4.8 s.
 - Prompt cache: capped at 1024 MiB after measuring off / 256 / 1024 / 2048 MiB (turning it
   off made the first words 4 to 7 s slower; 256 MiB was too small for Qwen3.5 4B).
 - Dictionary lookup: about 60 microseconds (budget 50 ms).
