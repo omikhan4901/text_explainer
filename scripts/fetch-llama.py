@@ -67,21 +67,21 @@ def windows() -> int:
 
 
 def linux() -> int:
+    import shutil
+    import tempfile
+
     data = fetch(LINUX_ASSET, LINUX_SHA256)
-    LINUX_DEST.mkdir(parents=True, exist_ok=True)
-    kept = []
-    with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as t:
-        for m in t.getmembers():
-            name = pathlib.PurePosixPath(m.name).name
-            if not m.isfile() or not (name == "llama-server" or ".so" in name):
-                continue
-            target = LINUX_DEST / name
-            target.write_bytes(t.extractfile(m).read())
-            target.chmod(0o755)
-            kept.append(name)
-    if "llama-server" not in kept:
-        raise SystemExit("llama-server not found in the archive")
-    print(f"Kept {len(kept)} files in {LINUX_DEST}: {', '.join(sorted(kept))}")
+    with tempfile.TemporaryDirectory() as tmp:
+        with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as t:
+            t.extractall(tmp, filter="data")
+        servers = list(pathlib.Path(tmp).rglob("llama-server"))
+        if not servers:
+            raise SystemExit("llama-server not found in the archive")
+        # The libraries sit next to the server (some as symlinks); keep them together.
+        if LINUX_DEST.exists():
+            shutil.rmtree(LINUX_DEST)
+        shutil.copytree(servers[0].parent, LINUX_DEST, symlinks=True)
+    print(f"llama.cpp {VERSION} Linux build in {LINUX_DEST}: {', '.join(sorted(p.name for p in LINUX_DEST.iterdir()))}")
     return 0
 
 

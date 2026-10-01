@@ -209,7 +209,7 @@ async fn evaluate(
     engine.set_ready_timeout(Duration::from_secs(600));
     let started = Instant::now();
     if let Err(e) = engine.ensure_ready().await {
-        panic!("{} failed to start: {e}", model.id);
+        panic!("{} failed to start: {e} ({e:?})", model.id);
     }
     let load_ms = started.elapsed().as_millis() as u64;
     let stop = Arc::new(AtomicBool::new(false));
