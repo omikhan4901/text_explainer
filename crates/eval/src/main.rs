@@ -11,6 +11,8 @@
 //! Usage:
 //!   te-eval --server PATH --models-dir DIR --model ID[,ID] --corpus FILE --out DIR
 //!           [--levels plain,simpler] [--drift-subset N] [--download]
+//!           [--server-args "--cache-ram 1024"]  (appended to the app's own llama-server
+//!           arguments, as the app's "Extra engine arguments" setting is; later ones win)
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -84,6 +86,7 @@ struct Args {
     drift_subset: usize,
     download: bool,
     dictionary: Option<PathBuf>,
+    server_args: Vec<String>,
 }
 
 fn parse_args() -> Args {
@@ -119,6 +122,9 @@ fn parse_args() -> Args {
             .unwrap_or(12),
         download: argv.iter().any(|a| a == "--download"),
         dictionary: get("--dictionary").map(PathBuf::from),
+        server_args: get("--server-args")
+            .map(|a| a.split_whitespace().map(String::from).collect())
+            .unwrap_or_default(),
     }
 }
 
@@ -180,7 +186,13 @@ async fn main() {
         let summary = evaluate(&args, model, &path, &corpus).await;
         summaries.push(summary);
     }
-    let md = markdown(&summaries);
+    let mut md = markdown(&summaries);
+    if !args.server_args.is_empty() {
+        md.push_str(&format!(
+            "\nExtra engine arguments: `{}`\n",
+            args.server_args.join(" ")
+        ));
+    }
     println!("{md}");
     if let Ok(path) = std::env::var("GITHUB_STEP_SUMMARY") {
         let _ = std::fs::OpenOptions::new()
@@ -207,7 +219,7 @@ async fn evaluate(
         ctx: 4096,
         threads: None,
         log: Some(args.out.join(format!("{}-server.log", model.id))),
-        extra_args: vec![],
+        extra_args: args.server_args.clone(),
     }));
     engine.set_ready_timeout(Duration::from_secs(600));
     let started = Instant::now();

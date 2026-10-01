@@ -13,6 +13,9 @@ on:
       levels:
         description: Reading levels to test
         default: plain,simpler
+      server_args:
+        description: Extra llama-server arguments, appended to the app's own (later ones win)
+        default: ""
 
 permissions:
   contents: read
@@ -55,6 +58,7 @@ jobs:
       - name: Evaluate ${{ matrix.model }}
         env:
           LD_LIBRARY_PATH: ${{ github.workspace }}/target/llama-linux
+          SERVER_ARGS: ${{ inputs.server_args }}
         run: >
           target/release/te-eval
           --server target/llama-linux/llama-server
@@ -65,6 +69,7 @@ jobs:
           --levels ${{ inputs.levels }}
           --dictionary src-tauri/resources/dictionary.sqlite
           --download
+          --server-args "$SERVER_ARGS"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
