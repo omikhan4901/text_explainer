@@ -21,3 +21,6 @@ pub fn tls_init() {
         let _ = rustls::crypto::ring::default_provider().install_default();
     });
 }
+pub mod download;
+pub mod models;
+pub mod settings;

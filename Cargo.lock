@@ -3995,6 +3995,7 @@ dependencies = [
 name = "te-win"
 version = "0.1.0"
 dependencies = [
+ "serde",
  "thiserror 2.0.21",
  "tracing",
  "windows",
