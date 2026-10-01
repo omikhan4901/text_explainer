@@ -28,8 +28,11 @@ real machine, any issue in `docs/testing/windows.md`).
   server), 10 front-end unit tests, 38 Playwright checks (19 journeys and WCAG 2.2 AA
   scans, each in light and dark).
 - Model evaluation (4-vCPU GitHub runner, no GPU, 56 rewrites per model; `docs/models.md`):
-  Gemma 4 E2B 16.9 tok/s, 6.0 s median per answer, 3.9 GB peak memory, reading grade
-  down 9.1 levels (Plain) and 12.7 (Simpler), facts flagged in 4 of 56 answers.
+  Gemma 4 E2B 17.3 tok/s, 5.8 s median per answer (first words after 2.2 s), 3.9 GB
+  peak memory, reading grade down 9.2 levels (Plain) and 12.2 (Simpler), facts flagged
+  in 1 to 3 of 56 answers across runs.
+- Prompt cache: capped at 1024 MiB after measuring off / 256 / 1024 / 2048 MiB (turning it
+  off made the first words 4 to 7 s slower; 256 MiB was too small for Qwen3.5 4B).
 - Dictionary lookup: about 60 microseconds (budget 50 ms).
 - The Windows CI job builds and uploads the NSIS installer on every push to main, then
   smoke-tests it: silent install, the bundled llama-server runs, the app starts and finds
@@ -53,6 +56,7 @@ real machine, any issue in `docs/testing/windows.md`).
 - Gemma 4 E4B is in the "Best" tier, not "Balanced": its file is 4.2 GB (per-layer
   embeddings), too heavy alongside a browser on 8 GB.
 - Default model: Gemma 4 E2B, by the evaluation (as fast as the 2B models, kept facts
-  best). Qwen3.5 4B was the first guess; it is half as fast on a CPU.
+  best). Qwen3.5 4B was the first guess; it generates about a third slower on a CPU and
+  needs the most memory.
 - LFM2.5 1.2B stays in the catalog, labelled as fast but unreliable with facts.
 - Rust pinned to 1.99.0 (`rust-toolchain.toml`) so local and CI lints match.

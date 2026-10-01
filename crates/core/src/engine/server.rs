@@ -25,7 +25,7 @@ pub struct ServerConfig {
 
 impl ServerConfig {
     /// Upper bound of llama-server's prompt cache, in MiB.
-    pub const CACHE_RAM_MIB: u32 = 256;
+    pub const CACHE_RAM_MIB: u32 = 1024;
 
     pub fn args(&self, port: u16, api_key: &str) -> Vec<String> {
         let mut args = vec![
@@ -48,10 +48,11 @@ impl ServerConfig {
             "--reasoning-budget".into(),
             "0".into(),
             "--no-webui".into(),
-            // A small host-memory prompt cache. Without it the instructions are re-read on
-            // every request (the default models use sliding-window or recurrent layers,
-            // which the slot can't partly reuse): 4 to 7 s slower per answer in the
-            // evaluation. The default (8 GB) is too much to allow on an 8 GB laptop.
+            // A bounded host-memory prompt cache. Without one the instructions are re-read
+            // on every request (the catalog's models use sliding-window or recurrent
+            // layers, which the slot can't partly reuse). Measured on the evaluation:
+            // 256 MiB is too small for Qwen3.5 4B (16.7 s to the first words); 1024 MiB
+            // brings it to 2.4 s with no more peak memory than the 8 GB default.
             "--cache-ram".into(),
             Self::CACHE_RAM_MIB.to_string(),
         ];
@@ -238,7 +239,7 @@ mod tests {
         assert!(joined.contains("--ctx-size 4096"));
         assert!(joined.contains("--threads 4"));
         assert!(joined.contains("--no-webui"));
-        assert!(joined.contains("--cache-ram 256"));
+        assert!(joined.contains("--cache-ram 1024"));
         assert!(joined.ends_with("--mlock"));
     }
 

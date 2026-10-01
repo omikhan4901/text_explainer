@@ -17,8 +17,9 @@ downloads until they exist.
   that snapshots and restores every clipboard format, and a non-activating popup that
   never steals focus.
 - Built an evaluation harness that runs a 28-passage corpus through candidate models in
-  parallel GitHub Actions jobs; chose Gemma 4 E2B as default (6 s median per rewrite on a
-  4-core CPU, 3.9 GB, fewest dropped facts), replacing a slower first choice.
+  parallel GitHub Actions jobs; chose Gemma 4 E2B as default (about 6 s median per rewrite
+  on a 4-core CPU, 3.9 GB, fewest dropped facts), replacing a slower first choice, and
+  sized the engine's prompt cache by measurement (first words 4x faster than with it off).
 - Wrote 109 Rust tests, 10 front-end tests and 38 Playwright journey and WCAG 2.2 AA
   checks, gated in GitHub Actions on Linux and Windows with an installer built per push.
 

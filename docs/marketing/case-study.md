@@ -51,12 +51,15 @@ anything leaving the computer. It must not get in the way of the work you are do
 ## Results so far
 
 - **The default model was chosen by measurement.** On a 4-core CPU with no GPU, Gemma 4
-  E2B rewrote passages in a median of 6 seconds at 16.9 tokens per second using 3.9 GB of
-  memory, lowered the reading grade by 9 to 13 levels, and kept facts best of the four
-  models tested. The first guess, Qwen3.5 4B, was half as fast and dropped drug doses
-  from a discharge letter ([full results](../models.md)).
+  E2B rewrote passages in a median of about 6 seconds (first words after about 2) at 17
+  tokens per second using 3.9 GB of memory, lowered the reading grade by 9 to 12 levels,
+  and kept facts best of the four models tested. The first guess, Qwen3.5 4B, was slower,
+  used more memory and, in the first run, dropped drug doses from a discharge letter
+  ([full results](../models.md)).
 - **The evaluation changed the product**: the default model, the meaning check's rules
-  (fewer false alarms on contract terms and shortened names), and the engine's memory use.
+  (fewer false alarms on contract terms and shortened names), and the engine's prompt
+  cache, sized by measurement after a memory-saving idea made answers 4 to 7 seconds
+  slower.
 - 109 Rust tests, 10 front-end unit tests and 38 Playwright checks (journeys plus WCAG
   2.2 AA scans in light and dark), run on every push on Linux and on a real Windows
   runner that also builds the installer.

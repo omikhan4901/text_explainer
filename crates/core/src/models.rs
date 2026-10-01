@@ -112,8 +112,8 @@ pub const CATALOG: &[CatalogModel] = &[
         sha256: "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
         license: "Apache 2.0",
         license_url: "https://www.apache.org/licenses/LICENSE-2.0",
-        note: "Good rewrites, about half as fast as Gemma 4 E2B on a CPU.",
-        measured_peak_mib: 4844,
+        note: "Good rewrites; slower than Gemma 4 E2B on a CPU and needs more memory.",
+        measured_peak_mib: 4854,
     },
     CatalogModel {
         id: "qwen3.5-2b",
@@ -129,7 +129,7 @@ pub const CATALOG: &[CatalogModel] = &[
         license: "Apache 2.0",
         license_url: "https://www.apache.org/licenses/LICENSE-2.0",
         note: "Light on memory and quick; drops details more often.",
-        measured_peak_mib: 2191,
+        measured_peak_mib: 2181,
     },
     CatalogModel {
         id: "lfm2.5-1.2b",
