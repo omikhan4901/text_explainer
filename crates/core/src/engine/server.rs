@@ -83,6 +83,11 @@ impl LlamaServer {
         if !config.model.is_file() {
             return Err(EngineError::MissingModel(config.model.clone()));
         }
+        // Absolute paths: the server runs in its own folder (for its DLLs), so relative
+        // paths would point somewhere else. (`absolute` avoids Windows `\\?\` paths.)
+        let mut config = config;
+        config.exe = std::path::absolute(&config.exe).map_err(EngineError::Io)?;
+        config.model = std::path::absolute(&config.model).map_err(EngineError::Io)?;
         let port = free_port()?;
         let api_key = random_key();
 

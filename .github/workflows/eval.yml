@@ -1,0 +1,66 @@
+name: Model evaluation
+
+# Runs eval/corpus.jsonl through real models with the app's own prompts, grammar and
+# checks, one free runner per model. Results go to the job summary and an artifact;
+# docs/models.md records them.
+
+on:
+  workflow_dispatch:
+    inputs:
+      models:
+        description: Catalog model ids, comma-separated
+        default: qwen3.5-4b,gemma-4-e2b,qwen3.5-2b,lfm2.5-1.2b
+      levels:
+        description: Reading levels to test
+        default: plain,simpler
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      models: ${{ steps.models.outputs.models }}
+    steps:
+      - id: models
+        env:
+          MODELS: ${{ inputs.models }}
+        run: python3 -c "import json,os; print('models=' + json.dumps([m.strip() for m in os.environ['MODELS'].split(',') if m.strip()]))" >> "$GITHUB_OUTPUT"
+
+  eval:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        model: ${{ fromJSON(needs.plan.outputs.models) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.99.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Fetch the pinned llama.cpp Linux build
+        run: python3 scripts/fetch-llama.py --linux
+      - name: Build the evaluator
+        run: cargo build --release -p te-eval
+      - name: Evaluate ${{ matrix.model }}
+        env:
+          LD_LIBRARY_PATH: ${{ github.workspace }}/target/llama-linux
+        run: >
+          target/release/te-eval
+          --server target/llama-linux/llama-server
+          --models-dir models
+          --model ${{ matrix.model }}
+          --corpus eval/corpus.jsonl
+          --out eval-results
+          --levels ${{ inputs.levels }}
+          --download
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-${{ matrix.model }}
+          path: eval-results/
+          retention-days: 30

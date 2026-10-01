@@ -161,6 +161,9 @@ async fn run_inner(
     );
     let grammar = engine.supports_grammar().then(|| allowed.grammar());
 
+    // The reading-grade formula is calibrated for English only.
+    let english =
+        kind == SelectionKind::Passage && language::detect(&source).is_some_and(|l| l.code == "en");
     let parts: Vec<String> = match kind {
         SelectionKind::Passage => text::chunk(&source, req.part_words),
         _ => vec![source.clone()],
@@ -169,7 +172,7 @@ async fn run_inner(
         kind,
         source: source.clone(),
         truncated,
-        grade_before: (kind == SelectionKind::Passage)
+        grade_before: english
             .then(|| readability::grade(&source).map(|r| r.grade))
             .flatten(),
         parts: parts.len(),
@@ -244,7 +247,9 @@ async fn run_inner(
     let text = finished_parts.join("\n\n");
     let (grade_after, report) = match kind {
         SelectionKind::Passage => (
-            readability::grade(&text).map(|r| r.grade),
+            english
+                .then(|| readability::grade(&text).map(|r| r.grade))
+                .flatten(),
             meaning::check(&source, &text),
         ),
         _ => (None, meaning::Report::default()),

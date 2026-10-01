@@ -1,8 +1,8 @@
 [workspace]
 resolver = "3"
-members = ["crates/core", "crates/win", "src-tauri"]
+members = ["crates/core", "crates/win", "crates/eval", "src-tauri"]
 # The Tauri app only builds on Windows (CI); everything else builds and tests anywhere.
-default-members = ["crates/core", "crates/win"]
+default-members = ["crates/core", "crates/win", "crates/eval"]
 
 [workspace.package]
 version = "0.1.0"

@@ -1,40 +1,53 @@
-"""Downloads the pinned llama.cpp Windows CPU build, checks its SHA-256, and puts
-llama-server.exe and its DLLs in src-tauri/resources/llama/ for bundling.
+"""Downloads the pinned llama.cpp build and checks its SHA-256.
 
-The pin comes from the probe workflow (.github/workflows/probe.yml). To update llama.cpp,
-run the probe, then change VERSION, ASSET and SHA256 here and test with the eval."""
+Default: the Windows CPU build; llama-server.exe and its DLLs go to
+src-tauri/resources/llama/ for bundling with the app.
+
+--linux: the Linux build into target/llama-linux/ (for the model evaluation workflow,
+which runs on Linux runners).
+
+The pins come from the probe workflow (.github/workflows/probe.yml). To update llama.cpp,
+run the probe, change VERSION and the hashes here, and re-run the evaluation."""
 
 import hashlib
 import io
 import pathlib
 import sys
+import tarfile
 import urllib.request
 import zipfile
 
 VERSION = "b11323"
-ASSET = f"llama-{VERSION}-bin-win-cpu-x64.zip"
-SHA256 = "bc984e5e0f0337f89c2364cbc24274c31a4ba83f9e8ceb497abb85b8d5046a95"
-URL = f"https://github.com/ggml-org/llama.cpp/releases/download/{VERSION}/{ASSET}"
+WINDOWS_ASSET = f"llama-{VERSION}-bin-win-cpu-x64.zip"
+WINDOWS_SHA256 = "bc984e5e0f0337f89c2364cbc24274c31a4ba83f9e8ceb497abb85b8d5046a95"
+LINUX_ASSET = f"llama-{VERSION}-bin-ubuntu-x64.tar.gz"
+LINUX_SHA256 = "6b8801b592f19d838a0c5e6bbf6282f8f0788d8c99561b98cc4cd3ef558346f5"
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-DEST = ROOT / "src-tauri" / "resources" / "llama"
+WINDOWS_DEST = ROOT / "src-tauri" / "resources" / "llama"
+LINUX_DEST = ROOT / "target" / "llama-linux"
 
 
-def main() -> int:
-    stamp = DEST / "VERSION"
-    if stamp.exists() and stamp.read_text().strip() == VERSION and (DEST / "llama-server.exe").exists():
-        print(f"llama.cpp {VERSION} already in {DEST}")
-        return 0
-    print(f"Downloading {URL}")
-    req = urllib.request.Request(URL, headers={"User-Agent": "text-explainer-build"})
+def fetch(asset: str, sha: str) -> bytes:
+    url = f"https://github.com/ggml-org/llama.cpp/releases/download/{VERSION}/{asset}"
+    print(f"Downloading {url}")
+    req = urllib.request.Request(url, headers={"User-Agent": "text-explainer-build"})
     with urllib.request.urlopen(req, timeout=300) as r:
         data = r.read()
     got = hashlib.sha256(data).hexdigest()
-    if got != SHA256:
-        print(f"SHA-256 mismatch: got {got}, expected {SHA256}", file=sys.stderr)
-        return 1
-    DEST.mkdir(parents=True, exist_ok=True)
-    for old in DEST.iterdir():
+    if got != sha:
+        raise SystemExit(f"SHA-256 mismatch for {asset}: got {got}, expected {sha}")
+    return data
+
+
+def windows() -> int:
+    stamp = WINDOWS_DEST / "VERSION"
+    if stamp.exists() and stamp.read_text().strip() == VERSION and (WINDOWS_DEST / "llama-server.exe").exists():
+        print(f"llama.cpp {VERSION} already in {WINDOWS_DEST}")
+        return 0
+    data = fetch(WINDOWS_ASSET, WINDOWS_SHA256)
+    WINDOWS_DEST.mkdir(parents=True, exist_ok=True)
+    for old in WINDOWS_DEST.iterdir():
         if old.name != "README.md":
             old.unlink()
     kept = []
@@ -44,15 +57,33 @@ def main() -> int:
             if info.is_dir() or not name:
                 continue
             if name == "llama-server.exe" or name.lower().endswith(".dll") or name.upper().startswith("LICENSE"):
-                (DEST / name).write_bytes(z.read(info))
+                (WINDOWS_DEST / name).write_bytes(z.read(info))
                 kept.append(name)
     if "llama-server.exe" not in kept:
-        print("llama-server.exe not found in the archive", file=sys.stderr)
-        return 1
+        raise SystemExit("llama-server.exe not found in the archive")
     stamp.write_text(VERSION + "\n")
     print(f"Kept {len(kept)} files: {', '.join(sorted(kept))}")
     return 0
 
 
+def linux() -> int:
+    data = fetch(LINUX_ASSET, LINUX_SHA256)
+    LINUX_DEST.mkdir(parents=True, exist_ok=True)
+    kept = []
+    with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as t:
+        for m in t.getmembers():
+            name = pathlib.PurePosixPath(m.name).name
+            if not m.isfile() or not (name == "llama-server" or ".so" in name):
+                continue
+            target = LINUX_DEST / name
+            target.write_bytes(t.extractfile(m).read())
+            target.chmod(0o755)
+            kept.append(name)
+    if "llama-server" not in kept:
+        raise SystemExit("llama-server not found in the archive")
+    print(f"Kept {len(kept)} files in {LINUX_DEST}: {', '.join(sorted(kept))}")
+    return 0
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(linux() if "--linux" in sys.argv else windows())
