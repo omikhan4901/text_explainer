@@ -55,8 +55,22 @@ try {
   # Still running a few seconds later (no delayed panic in the tray or watchers).
   Start-Sleep -Seconds 5
   if ($proc.HasExited) { throw "The app exited after startup with $($proc.ExitCode)" }
+
+  # Memory with the main window open and no model loaded: the app plus its WebView2
+  # processes (the plan's budget is 150 MB). Reported, not enforced: runners vary.
+  $all = Get-CimInstance Win32_Process
+  $tree = @($proc.Id)
+  do {
+    $more = $all | Where-Object { $tree -contains $_.ParentProcessId -and $tree -notcontains $_.ProcessId }
+    $tree += @($more | ForEach-Object { $_.ProcessId })
+  } while ($more)
+  $procs = $tree | ForEach-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue }
+  $ws = ($procs | Measure-Object WorkingSet64 -Sum).Sum / 1MB
+  $private = ($procs | Measure-Object PrivateMemorySize64 -Sum).Sum / 1MB
+  Write-Host ("Memory without a model: {0:N0} MB working set, {1:N0} MB private, {2} processes" -f $ws, $private, $procs.Count)
   Write-Host "Smoke test passed"
 } finally {
   if (Test-Path $log) { Write-Host "--- app.log ---"; Get-Content $log | Write-Host }
   if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+  Get-Process msedgewebview2 -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 }
