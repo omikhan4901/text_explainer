@@ -20,6 +20,11 @@ npm run --silent test
 step "web: build (the app embeds it)"
 npx vite build --logLevel warn
 
+if [ "${E2E:-0}" = "1" ]; then
+  step "web: journeys and WCAG 2.2 AA checks (Playwright, light and dark)"
+  npx playwright test
+fi
+
 if [ ! -f src-tauri/resources/dictionary.sqlite ]; then
   step "dictionary: build (bundled with the app)"
   python3 scripts/build-dictionary.py

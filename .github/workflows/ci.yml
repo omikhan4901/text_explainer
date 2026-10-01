@@ -33,7 +33,10 @@ jobs:
           targets: x86_64-pc-windows-msvc
       - uses: Swatinem/rust-cache@v2
       - run: npm ci
+      - run: npx playwright install --with-deps chromium
       - run: scripts/check.sh
+        env:
+          E2E: "1"
 
   windows:
     name: Windows app (lint, test, installer)

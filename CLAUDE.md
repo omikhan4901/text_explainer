@@ -12,7 +12,9 @@ The plan is `docs/IMPLEMENTATION_PLAN.md`; progress and the next step are in
   `git -c user.name=omikhan4901 -c user.email=mehboobehsankhan@gmail.com commit ...`
 - Work on and push to `main` only. Small conventional commits (`feat:`, `fix:`, `test:`,
   `docs:`, `chore:`, `refactor:`).
-- **Run `scripts/check.sh` before every push** and gate the push on its exit code. It runs
+- **Run `scripts/check.sh` before every push** and gate the push on its exit code
+  (`E2E=1` adds the Playwright journeys and accessibility checks; CI always runs them;
+  locally use `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium` if Playwright can't find Chromium). It runs
   what the Linux CI job runs. The Windows app (`src-tauri`) only builds on the Windows CI
   job: after pushing, check that job and fix it before moving on. Never leave `main` red.
 - Never spend the owner's money: standard GitHub runners only (the repo is public, so they
@@ -52,3 +54,5 @@ The plan is `docs/IMPLEMENTATION_PLAN.md`; progress and the next step are in
 - This is a portfolio project: keep `docs/marketing/` current, and only claim what is built
   and measured.
 - Tests are rigorous and edge-case heavy but fast.
+- Never `pkill -f`/`pgrep -f` a pattern that appears in your own command line (it kills the
+  shell).

@@ -63,10 +63,10 @@ export function ReadingPage() {
             />
           </Field>
           <Field label={t.size}>
-            <Range value={a.font_size} min={12} max={24} step={1} format={(v) => `${v}px`} onChange={(font_size) => setA({ font_size })} />
+            <Range label={t.size} value={a.font_size} min={12} max={24} step={1} format={(v) => `${v}px`} onChange={(font_size) => setA({ font_size })} />
           </Field>
           <Field label={t.spacing}>
-            <Range value={a.line_height} min={1.2} max={2.2} step={0.1} format={(v) => v.toFixed(1)} onChange={(line_height) => setA({ line_height })} />
+            <Range label={t.spacing} value={a.line_height} min={1.2} max={2.2} step={0.1} format={(v) => v.toFixed(1)} onChange={(line_height) => setA({ line_height })} />
           </Field>
           <Field label={t.theme}>
             <Segmented<Theme>
@@ -106,11 +106,12 @@ export function ReadingPage() {
   );
 }
 
-function Range({ value, min, max, step, format, onChange }: { value: number; min: number; max: number; step: number; format: (v: number) => string; onChange: (v: number) => void }) {
+function Range({ label, value, min, max, step, format, onChange }: { label: string; value: number; min: number; max: number; step: number; format: (v: number) => string; onChange: (v: number) => void }) {
   return (
     <span className="flex items-center gap-3">
       <input
         type="range"
+        aria-label={label}
         min={min}
         max={max}
         step={step}

@@ -108,8 +108,9 @@ function OwnModel() {
 function Tuning() {
   const { settings, update } = useData();
   const [args, setArgs] = useState(settings.extra_server_args.join(" "));
-  const numberSelect = <K extends keyof Settings>(key: K, options: [number | null, string][], value: number | null) => (
+  const numberSelect = <K extends keyof Settings>(key: K, label: string, options: [number | null, string][], value: number | null) => (
     <select
+      aria-label={label}
       className={inputClass}
       value={value === null ? "" : String(value)}
       onChange={(e) => void update({ [key]: e.target.value === "" ? null : Number(e.target.value) } as Partial<Settings>)}
@@ -127,17 +128,18 @@ function Tuning() {
       <p className="-mt-2 mb-2 text-sm text-muted">{t.advancedLead}</p>
       <div className="divide-y divide-border">
         <Field label={t.temperature} hint={t.temperatureHint}>
-          <Slider value={settings.temperature} min={0} max={1.5} step={0.05} onChange={(v) => void update({ temperature: v })} />
+          <Slider label={t.temperature} value={settings.temperature} min={0} max={1.5} step={0.05} onChange={(v) => void update({ temperature: v })} />
         </Field>
         <Field label={t.topP}>
-          <Slider value={settings.top_p} min={0.1} max={1} step={0.05} onChange={(v) => void update({ top_p: v })} />
+          <Slider label={t.topP} value={settings.top_p} min={0.1} max={1} step={0.05} onChange={(v) => void update({ top_p: v })} />
         </Field>
         <Field label={t.context} hint={t.contextHint}>
-          {numberSelect("context_size", [[2048, "2,048"], [4096, "4,096"], [8192, "8,192"], [16384, "16,384"]], settings.context_size)}
+          {numberSelect("context_size", t.context, [[2048, "2,048"], [4096, "4,096"], [8192, "8,192"], [16384, "16,384"]], settings.context_size)}
         </Field>
         <Field label={t.threads}>
           {numberSelect(
             "threads",
+            t.threads,
             [[null, t.threadsAuto], ...[2, 4, 6, 8, 12, 16].map((n) => [n, String(n)] as [number, string])],
             settings.threads,
           )}
@@ -145,12 +147,14 @@ function Tuning() {
         <Field label={t.idle}>
           {numberSelect(
             "idle_unload_minutes",
+            t.idle,
             [[0, t.idleNever], ...[5, 10, 30, 60].map((m) => [m, t.idleMinutes(m)] as [number, string])],
             settings.idle_unload_minutes,
           )}
         </Field>
         <Field label={t.serverArgs} hint={t.serverArgsHint}>
           <input
+            aria-label={t.serverArgs}
             className={`${inputClass} w-64 font-mono`}
             value={args}
             onChange={(e) => setArgs(e.target.value)}
@@ -163,12 +167,13 @@ function Tuning() {
   );
 }
 
-function Slider({ value, min, max, step, onChange }: { value: number; min: number; max: number; step: number; onChange: (v: number) => void }) {
+function Slider({ label, value, min, max, step, onChange }: { label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void }) {
   const [local, setLocal] = useState(value);
   return (
     <span className="flex items-center gap-3">
       <input
         type="range"
+        aria-label={label}
         min={min}
         max={max}
         step={step}

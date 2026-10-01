@@ -13,3 +13,5 @@ src-tauri/resources/WORDNET-LICENSE.txt
 eval-results/
 .DS_Store
 *.log
+test-results/
+playwright-report/
