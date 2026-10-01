@@ -105,6 +105,16 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     if !settings.first_run_done || !launched_at_login {
         show_main(&handle);
     }
+
+    // The Windows CI smoke test waits for this line.
+    let state = handle.state::<AppState>();
+    tracing::info!(
+        version = %handle.package_info().version,
+        engine_found = state.paths.llama_server.is_file(),
+        dictionary = state.dictionary.lock().is_ok_and(|d| d.is_some()),
+        hotkey_registered = state.hotkey.lock().is_ok_and(|h| h.is_some()),
+        "Text Explainer started"
+    );
     Ok(())
 }
 
