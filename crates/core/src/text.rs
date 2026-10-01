@@ -166,9 +166,7 @@ pub fn is_list_item(line: &str) -> bool {
     let numeric = marker.chars().all(|c| c.is_ascii_digit());
     let letter = marker.len() == 1 && marker.chars().all(|c| c.is_ascii_lowercase());
     let rest = &t[marker.len()..];
-    (numeric || letter)
-        && (rest.starts_with(". ") || rest.starts_with(") "))
-        && rest.len() > 2
+    (numeric || letter) && (rest.starts_with(". ") || rest.starts_with(") ")) && rest.len() > 2
 }
 
 fn collapse_spaces(s: &str) -> String {
@@ -227,10 +225,7 @@ pub fn truncate(s: &str, max_chars: usize) -> (&str, bool) {
     if s.chars().count() <= max_chars {
         return (s, false);
     }
-    let byte_limit = s
-        .char_indices()
-        .nth(max_chars)
-        .map_or(s.len(), |(i, _)| i);
+    let byte_limit = s.char_indices().nth(max_chars).map_or(s.len(), |(i, _)| i);
     let head = &s[..byte_limit];
     let cut = head
         .rfind("\n\n")
@@ -260,7 +255,7 @@ pub fn sentence_spans(s: &str) -> Vec<std::ops::Range<usize>> {
     let chars: Vec<(usize, char)> = s.char_indices().collect();
     let mut i = 0;
     while i < chars.len() {
-        let (pos, c) = chars[i];
+        let c = chars[i].1;
         let is_break = match c {
             '\n' => {
                 // A line break ends a sentence in lists and headings.
@@ -291,7 +286,6 @@ pub fn sentence_spans(s: &str) -> Vec<std::ops::Range<usize>> {
                 continue;
             }
         }
-        let _ = pos;
         i += 1;
     }
     if !s[start..].trim().is_empty() {
@@ -458,7 +452,10 @@ mod tests {
         assert_eq!(classify("ubiquitous"), SelectionKind::Word);
         assert_eq!(classify("“ubiquitous,”"), SelectionKind::Word);
         assert_eq!(classify("habeas corpus"), SelectionKind::Phrase);
-        assert_eq!(classify("res ipsa loquitur doctrine"), SelectionKind::Phrase);
+        assert_eq!(
+            classify("res ipsa loquitur doctrine"),
+            SelectionKind::Phrase
+        );
         assert_eq!(classify("It rained."), SelectionKind::Passage);
         assert_eq!(
             classify("the party of the first part hereinafter"),
@@ -492,7 +489,10 @@ mod tests {
 
     #[test]
     fn line_breaks_end_sentences() {
-        assert_eq!(sentences("Heading\nBody text here."), vec!["Heading", "Body text here."]);
+        assert_eq!(
+            sentences("Heading\nBody text here."),
+            vec!["Heading", "Body text here."]
+        );
     }
 
     #[test]
@@ -532,7 +532,11 @@ mod tests {
 
     #[test]
     fn truncates_at_a_paragraph_or_sentence_end() {
-        let text = format!("{}\n\n{}", "First paragraph here. ".repeat(10).trim(), "Second. ".repeat(50));
+        let text = format!(
+            "{}\n\n{}",
+            "First paragraph here. ".repeat(10).trim(),
+            "Second. ".repeat(50)
+        );
         let (head, cut) = truncate(&text, 300);
         assert!(cut);
         assert!(head.ends_with('.'));

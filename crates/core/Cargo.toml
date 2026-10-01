@@ -17,6 +17,8 @@ futures-util.workspace = true
 rusqlite.workspace = true
 sha2.workspace = true
 tracing.workspace = true
+rustls.workspace = true
+getrandom = "0.3"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
