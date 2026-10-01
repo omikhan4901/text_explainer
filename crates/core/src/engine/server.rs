@@ -55,6 +55,9 @@ impl ServerConfig {
     }
 }
 
+/// Called with the process id right after llama-server starts.
+pub type SpawnHook = dyn Fn(u32) + Send + Sync;
+
 pub struct LlamaServer {
     child: tokio::process::Child,
     target: Target,
@@ -64,6 +67,16 @@ pub struct LlamaServer {
 impl LlamaServer {
     /// Starts the server and waits until the model is loaded.
     pub async fn start(config: ServerConfig, ready_timeout: Duration) -> Result<Self, EngineError> {
+        Self::start_with(config, ready_timeout, None).await
+    }
+
+    /// Like `start`, calling `on_spawn` with the process id as soon as it exists (before
+    /// the model has loaded), e.g. to tie it to the app's lifetime.
+    pub async fn start_with(
+        config: ServerConfig,
+        ready_timeout: Duration,
+        on_spawn: Option<&SpawnHook>,
+    ) -> Result<Self, EngineError> {
         if !config.exe.is_file() {
             return Err(EngineError::MissingEngine(config.exe.clone()));
         }
@@ -100,6 +113,9 @@ impl LlamaServer {
             cmd.creation_flags(0x0800_0000);
         }
         let child = cmd.spawn().map_err(EngineError::Io)?;
+        if let (Some(hook), Some(pid)) = (on_spawn, child.id()) {
+            hook(pid);
+        }
         let target = Target {
             base_url: format!("http://127.0.0.1:{port}"),
             api_key: Some(api_key),

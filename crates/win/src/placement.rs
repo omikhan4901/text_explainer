@@ -76,6 +76,49 @@ pub fn place(anchor: Rect, size: (i32, i32), work: Rect, gap: i32) -> (i32, i32)
     (x, y.clamp(work.top, (work.bottom - h).max(work.top)))
 }
 
+/// Which side of the selection the card sits on. Chosen once when the card opens (for
+/// its largest size) so it doesn't jump as text streams in and it grows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Side {
+    /// Below the selection; the card grows downwards.
+    Below,
+    /// Above the selection; the card grows upwards.
+    Above,
+    /// Neither fits: pinned to the bottom of the screen.
+    Bottom,
+}
+
+pub fn choose_side(anchor: Rect, max_height: i32, work: Rect, gap: i32) -> Side {
+    let h = max_height.min(work.height());
+    if anchor.bottom + gap + h <= work.bottom {
+        Side::Below
+    } else if anchor.top - gap - h >= work.top {
+        Side::Above
+    } else {
+        Side::Bottom
+    }
+}
+
+/// Top-left corner for a card of `size` on a fixed `side` of `anchor`.
+pub fn place_on_side(
+    anchor: Rect,
+    size: (i32, i32),
+    work: Rect,
+    gap: i32,
+    side: Side,
+) -> (i32, i32) {
+    let (w, h) = (size.0.min(work.width()), size.1.min(work.height()));
+    let x = anchor
+        .left
+        .clamp(work.left, (work.right - w).max(work.left));
+    let y = match side {
+        Side::Below => anchor.bottom + gap,
+        Side::Above => anchor.top - gap - h,
+        Side::Bottom => work.bottom - h,
+    };
+    (x, y.clamp(work.top, (work.bottom - h).max(work.top)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -127,6 +170,32 @@ mod tests {
         let work = Rect::new(0, 0, 400, 300);
         let (x, y) = place(Rect::point(10, 10), (440, 500), work, 8);
         assert_eq!((x, y), (0, 0));
+    }
+
+    #[test]
+    fn sides_are_kept_while_the_card_grows() {
+        let sel = Rect::new(300, 700, 700, 720);
+        // Max card 400 tall doesn't fit below (720+8+400 > 1040) but fits above.
+        let side = choose_side(sel, 400, WORK, 8);
+        assert_eq!(side, Side::Above);
+        // Small at first, then taller: the bottom edge stays put above the selection.
+        let (_, y1) = place_on_side(sel, (440, 120), WORK, 8, side);
+        let (_, y2) = place_on_side(sel, (440, 300), WORK, 8, side);
+        assert_eq!(y1 + 120, 692);
+        assert_eq!(y2 + 300, 692);
+        let below = choose_side(Rect::new(0, 100, 10, 120), 400, WORK, 8);
+        assert_eq!(below, Side::Below);
+        assert_eq!(
+            place_on_side(Rect::new(0, 100, 10, 120), (440, 200), WORK, 8, below).1,
+            128
+        );
+    }
+
+    #[test]
+    fn full_screen_selection_uses_the_bottom() {
+        let sel = Rect::new(0, 10, 1900, 1030);
+        assert_eq!(choose_side(sel, 400, WORK, 8), Side::Bottom);
+        assert_eq!(place_on_side(sel, (440, 200), WORK, 8, Side::Bottom).1, 840);
     }
 
     #[test]

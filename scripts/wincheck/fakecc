@@ -1,0 +1,8 @@
+#!/bin/sh
+# Stand-in C compiler for scripts/wincheck.sh: writes empty objects (type-checking only).
+for a in "$@"; do
+  case "$a" in
+    -Fo*|/Fo*) out="${a#???}"; out="${out#:}"; : > "$out" ;;
+  esac
+done
+exit 0

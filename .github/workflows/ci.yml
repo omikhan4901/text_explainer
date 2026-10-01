@@ -50,6 +50,8 @@ jobs:
       - run: npm ci
       - name: Build the front end (the app embeds it)
         run: npx vite build --logLevel warn
+      - name: Fetch the pinned llama.cpp build (bundled with the app)
+        run: python scripts/fetch-llama.py
       - name: Lint the whole workspace
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Test the whole workspace

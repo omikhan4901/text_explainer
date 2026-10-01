@@ -1,0 +1,8 @@
+#!/bin/sh
+# Stand-in archiver for scripts/wincheck.sh: writes an empty archive (type-checking only).
+for a in "$@"; do
+  case "$a" in
+    -OUT:*|/OUT:*|-out:*|/out:*) out="${a#*:}"; printf '!<arch>\n' > "$out" ;;
+  esac
+done
+exit 0

@@ -236,6 +236,23 @@ fn read_text() -> Result<Option<String>, Error> {
     }
 }
 
+/// Puts text on the clipboard (the card's Copy button: the card never has focus, so the
+/// web clipboard API isn't available to it).
+pub fn set_text(text: &str) -> Result<(), Error> {
+    SUPPRESS_UNTIL_MS.store(now_ms() + 300, Ordering::SeqCst);
+    let owner = OwnerWindow::new()?;
+    let _open = Open::new(Some(owner.0))?;
+    let mut units: Vec<u16> = text.encode_utf16().collect();
+    units.push(0);
+    let bytes: Vec<u8> = units.iter().flat_map(|u| u.to_le_bytes()).collect();
+    // SAFETY: the clipboard is open and owned by `owner`.
+    unsafe {
+        EmptyClipboard().map_err(os)?;
+        set_bytes(CF_UNICODETEXT, &bytes);
+    }
+    Ok(())
+}
+
 /// Puts the snapshot back when dropped, so it happens even on errors.
 struct RestoreOnDrop {
     snapshot: Snapshot,

@@ -273,6 +273,23 @@ async fn a_server_that_fails_to_start_reports_its_log() {
 }
 
 #[tokio::test]
+async fn the_spawn_hook_sees_every_start() {
+    let dir = tempfile::tempdir().unwrap();
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let sink = seen.clone();
+    let mut engine = Engine::new(Backend::Local(config(&dir)));
+    engine.set_spawn_hook(move |pid| sink.lock().unwrap().push(pid));
+    engine.ensure_ready().await.unwrap();
+    let pid = engine.server_pid().unwrap();
+    engine.unload().await;
+    engine.ensure_ready().await.unwrap();
+    let seen = seen.lock().unwrap().clone();
+    assert_eq!(seen.len(), 2);
+    assert_eq!(seen[0], pid);
+    engine.unload().await;
+}
+
+#[tokio::test]
 async fn restarts_after_a_crash() {
     let dir = tempfile::tempdir().unwrap();
     let mut engine = Engine::new(Backend::Local(config(&dir)));

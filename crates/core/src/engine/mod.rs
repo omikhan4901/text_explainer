@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 pub use client::{Client, Completion, Sampling, Target, Timings};
-pub use server::{LlamaServer, ServerConfig};
+pub use server::{LlamaServer, ServerConfig, SpawnHook};
 
 use crate::prompt::Message;
 
@@ -20,7 +20,7 @@ pub enum EngineError {
     MissingModel(PathBuf),
     #[error("no model is set up yet")]
     NoModel,
-    #[error("the model engine stopped (exit code {code:?})")]
+    #[error("the model engine stopped unexpectedly{}", exit_suffix(.code))]
     Exited { code: Option<i32>, log_tail: String },
     #[error("the model took more than {seconds} s to load")]
     StartTimeout { seconds: u64, log_tail: String },
@@ -32,6 +32,11 @@ pub enum EngineError {
     Model(String),
     #[error(transparent)]
     Io(#[from] std::io::Error),
+}
+
+fn exit_suffix(code: &Option<i32>) -> String {
+    code.map(|c| format!(" (exit code {c})"))
+        .unwrap_or_default()
 }
 
 impl EngineError {
@@ -61,6 +66,7 @@ pub struct Engine {
     client: Client,
     last_used: Instant,
     ready_timeout: Duration,
+    on_spawn: Option<Box<server::SpawnHook>>,
 }
 
 impl Engine {
@@ -71,6 +77,7 @@ impl Engine {
             client: Client::new(),
             last_used: Instant::now(),
             ready_timeout: Duration::from_secs(120),
+            on_spawn: None,
         }
     }
 
@@ -122,7 +129,12 @@ impl Engine {
                 if let Some(dead) = self.server.take() {
                     dead.stop().await;
                 }
-                let server = LlamaServer::start(config.clone(), self.ready_timeout).await?;
+                let server = LlamaServer::start_with(
+                    config.clone(),
+                    self.ready_timeout,
+                    self.on_spawn.as_deref(),
+                )
+                .await?;
                 let target = server.target().clone();
                 self.server = Some(server);
                 Ok(target)
@@ -157,6 +169,11 @@ impl Engine {
         if let Some(server) = self.server.take() {
             server.stop().await;
         }
+    }
+
+    /// Runs `hook` with the process id each time llama-server is started.
+    pub fn set_spawn_hook(&mut self, hook: impl Fn(u32) + Send + Sync + 'static) {
+        self.on_spawn = Some(Box::new(hook));
     }
 
     pub fn set_ready_timeout(&mut self, timeout: Duration) {

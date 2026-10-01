@@ -10,7 +10,7 @@ mod window;
 use std::sync::mpsc;
 use std::time::Duration;
 
-pub use clipboard::DoubleCopyWatcher;
+pub use clipboard::{DoubleCopyWatcher, set_text as set_clipboard_text};
 pub use hook::ClickOutsideWatcher;
 pub use system::{kill_with_app, memory};
 pub use window::{

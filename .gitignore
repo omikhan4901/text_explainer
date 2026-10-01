@@ -5,7 +5,8 @@ target/
 *.sqlite
 !crates/dictgen/tests/fixtures/*.sqlite
 src-tauri/gen/
-src-tauri/resources/llama/
+src-tauri/resources/llama/*
+!src-tauri/resources/llama/README.md
 src-tauri/resources/dictionary.sqlite
 eval-results/
 .DS_Store
