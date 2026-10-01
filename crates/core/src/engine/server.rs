@@ -24,6 +24,9 @@ pub struct ServerConfig {
 }
 
 impl ServerConfig {
+    /// Upper bound of llama-server's prompt cache, in MiB.
+    pub const CACHE_RAM_MIB: u32 = 256;
+
     pub fn args(&self, port: u16, api_key: &str) -> Vec<String> {
         let mut args = vec![
             "--model".into(),
@@ -45,10 +48,12 @@ impl ServerConfig {
             "--reasoning-budget".into(),
             "0".into(),
             "--no-webui".into(),
-            // No extra host-memory prompt cache: with one slot, its own cache already
-            // keeps the shared instructions, and the extra cache grows to gigabytes.
+            // A small host-memory prompt cache. Without it the instructions are re-read on
+            // every request (the default models use sliding-window or recurrent layers,
+            // which the slot can't partly reuse): 4 to 7 s slower per answer in the
+            // evaluation. The default (8 GB) is too much to allow on an 8 GB laptop.
             "--cache-ram".into(),
-            "0".into(),
+            Self::CACHE_RAM_MIB.to_string(),
         ];
         if let Some(t) = self.threads {
             args.push("--threads".into());
@@ -233,6 +238,7 @@ mod tests {
         assert!(joined.contains("--ctx-size 4096"));
         assert!(joined.contains("--threads 4"));
         assert!(joined.contains("--no-webui"));
+        assert!(joined.contains("--cache-ram 256"));
         assert!(joined.ends_with("--mlock"));
     }
 
