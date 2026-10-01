@@ -134,7 +134,7 @@ function ExplainView({ state, level, pinned, onPin }: { state: Explaining; level
       <Header pinned={pinned} onPin={onPin} copyText={state.done && !state.error ? text : ""}>
         {isTerm ? (
           <span className="truncate font-semibold" title={state.source}>
-            {state.source}
+            {bareTerm(state.source)}
           </span>
         ) : (
           <Segmented<Level>
@@ -194,6 +194,11 @@ function ExplainView({ state, level, pinned, onPin }: { state: Explaining; level
       )}
     </>
   );
+}
+
+/** “Ubiquitous,” → Ubiquitous */
+export function bareTerm(s: string): string {
+  return s.trim().replace(/^[^\p{L}\p{M}\p{N}]+|[^\p{L}\p{M}\p{N}]+$/gu, "");
 }
 
 /** A word: its meaning here (from the model) above the dictionary senses. */

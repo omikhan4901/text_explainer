@@ -88,6 +88,7 @@ export interface AppInfo {
   model_loaded: boolean;
   downloading: string | null;
   paused: boolean;
+  hotkey_active: boolean;
   default_prompts: { simpler: string; plain: string; clearer: string };
 }
 

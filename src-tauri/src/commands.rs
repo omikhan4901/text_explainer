@@ -87,6 +87,8 @@ pub struct AppInfo {
     model_loaded: bool,
     downloading: Option<String>,
     paused: bool,
+    /// False when the shortcut couldn't be registered (another app has it).
+    hotkey_active: bool,
     /// The built-in prompts, shown in the prompt editor.
     default_prompts: DefaultPrompts,
 }
@@ -144,6 +146,7 @@ pub async fn app_info(state: State<'_, AppState>) -> CmdResult<AppInfo> {
             .as_ref()
             .map(|(id, _)| id.clone()),
         paused: state.paused.load(Ordering::SeqCst),
+        hotkey_active: state.hotkey.lock().expect("hotkey lock").is_some(),
         default_prompts: DefaultPrompts {
             simpler: named(Level::Simpler).replace("English", "{language}"),
             plain: named(Level::Plain).replace("English", "{language}"),

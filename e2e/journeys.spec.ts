@@ -42,3 +42,10 @@ test("settings: a new shortcut is recorded from the keyboard", async ({ page }) 
   await page.keyboard.press("Control+Alt+KeyR");
   await expect(page.getByText("R", { exact: true })).toBeVisible();
 });
+
+test("home warns when another app owns the shortcut", async ({ page }) => {
+  await page.goto("/index.html?state=ready&hotkey=taken");
+  await expect(page.getByRole("alert")).toContainText("Another app is already using Ctrl+Shift+Space.");
+  await page.getByRole("button", { name: "Choose another shortcut" }).click();
+  await expect(page.getByRole("heading", { name: "Shortcuts" })).toBeVisible();
+});

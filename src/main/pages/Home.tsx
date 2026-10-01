@@ -31,6 +31,14 @@ export function HomePage({ go }: { go: (p: PageId) => void }) {
   return (
     <>
       <PageTitle>{t.title}</PageTitle>
+      {!info.hotkey_active && (
+        <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-warn-soft px-4 py-3 text-sm text-warn-text">
+          <span>{t.hotkeyTaken(settings.hotkey)}</span>
+          <button type="button" onClick={() => go("shortcuts")} className="font-semibold underline-offset-2 hover:underline">
+            {t.hotkeyTakenAction}
+          </button>
+        </div>
+      )}
       <div className="grid gap-4 md:grid-cols-5">
         <div className={`rounded-[var(--radius-card)] p-6 md:col-span-3 ${ready && !info.paused ? "bg-accent text-on-accent" : "border border-border bg-surface"}`}>
           <p className="text-sm font-semibold opacity-90">{ready ? (info.paused ? t.paused : t.ready) : t.needsModel}</p>

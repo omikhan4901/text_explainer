@@ -83,6 +83,8 @@ export const en = {
       "Notwithstanding any provision of this Agreement to the contrary, the Lessee shall remit payment of the monthly rent of $1,200 no later than the 5th day of each calendar month, failing which a late fee equivalent to 5% of the outstanding amount shall accrue.",
     explainSample: "Explain this paragraph",
     privacy: "Everything stays on this computer. Nothing you read is sent anywhere.",
+    hotkeyTaken: (hotkey: string) => `Another app is already using ${hotkey}.`,
+    hotkeyTakenAction: "Choose another shortcut",
   },
   model: {
     title: "Model",

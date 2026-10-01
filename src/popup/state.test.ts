@@ -1,3 +1,4 @@
+import { bareTerm } from "./Popup";
 import { answerText, gradeBadge, initialState, isStreaming, reduce, type CardState, type Explaining } from "./state";
 import type { ExplainEvent, PopupEvent } from "../lib/types";
 
@@ -90,4 +91,10 @@ test("dictionary entries attach to the current request", () => {
   expect(s.dictionary?.lemma).toBe("mouse");
   expect(s.kind).toBe("word");
   expect(s.source).toBe("mouse");
+});
+
+test("terms are shown without surrounding punctuation", () => {
+  expect(bareTerm("“Ubiquitous,”")).toBe("Ubiquitous");
+  expect(bareTerm("(habeas corpus).")).toBe("habeas corpus");
+  expect(bareTerm("ভাড়া।")).toBe("ভাড়া");
 });
