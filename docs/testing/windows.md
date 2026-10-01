@@ -1,7 +1,8 @@
 # Testing on a real Windows machine
 
-CI builds, lints and unit-tests the app on Windows, but some things only a person at a
-real desktop can check. This takes about 15 minutes. Note anything that fails (with the
+CI builds, lints and unit-tests the app on Windows, then installs the installer, runs the
+bundled model engine and starts the app (`scripts/smoke-windows.ps1`). Some things only a
+person at a real desktop can check. This takes about 15 minutes. Note anything that fails (with the
 app's log: tray icon → Settings → About → Open logs folder) and it will be fixed.
 
 ## Install

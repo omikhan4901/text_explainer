@@ -31,7 +31,9 @@ real machine, any issue in `docs/testing/windows.md`).
   Gemma 4 E2B 16.9 tok/s, 6.0 s median per answer, 3.9 GB peak memory, reading grade
   down 9.1 levels (Plain) and 12.7 (Simpler), facts flagged in 4 of 56 answers.
 - Dictionary lookup: about 60 microseconds (budget 50 ms).
-- The Windows CI job builds and uploads the NSIS installer on every push to main.
+- The Windows CI job builds and uploads the NSIS installer on every push to main, then
+  smoke-tests it: silent install, the bundled llama-server runs, the app starts and finds
+  its engine and dictionary.
 
 ## Blocked on the owner
 
