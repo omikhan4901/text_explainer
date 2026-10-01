@@ -58,6 +58,9 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         let _ = click_app.run_on_main_thread(move || popup::close(&app));
     });
 
+    let dictionary = te_core::dictionary::Dictionary::open(&paths.dictionary)
+        .map_err(|e| tracing::warn!("dictionary unavailable: {e}"))
+        .ok();
     app.manage(AppState {
         paths,
         settings: Mutex::new(settings.clone()),
@@ -71,6 +74,7 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         hotkey: Mutex::new(None),
         click_watcher,
         download: Mutex::new(None),
+        dictionary: Mutex::new(dictionary),
     });
 
     popup::prepare(&handle);

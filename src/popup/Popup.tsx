@@ -157,7 +157,9 @@ function ExplainView({ state, level, pinned, onPin }: { state: Explaining; level
       </Header>
 
       <div className="min-h-0 overflow-y-auto px-4 py-3" aria-live="polite" aria-busy={!state.done}>
-        {state.error ? (
+        {isTerm && state.dictionary ? (
+          <TermView state={state} text={text} streaming={streaming} />
+        ) : state.error ? (
           <ErrorBlock message={state.error.message} detail={state.error.detail} />
         ) : text ? (
           <Reading text={text} streaming={streaming} />
@@ -194,6 +196,47 @@ function ExplainView({ state, level, pinned, onPin }: { state: Explaining; level
   );
 }
 
+/** A word: its meaning here (from the model) above the dictionary senses. */
+function TermView({ state, text, streaming }: { state: Explaining; text: string; streaming: boolean }) {
+  const entry = state.dictionary!;
+  // No Open → explain events at all means there's no model: dictionary only.
+  const modelAnswering = state.started;
+  return (
+    <div className="space-y-4">
+      {modelAnswering && (
+        <section>
+          <h3 className="mb-1 font-sans text-xs font-semibold tracking-wide text-muted uppercase">{t.inThisText}</h3>
+          {state.error ? (
+            <p className="text-sm text-danger-text">{state.error.message}</p>
+          ) : text ? (
+            <Reading text={text} streaming={streaming} />
+          ) : (
+            <Skeleton lines={1} />
+          )}
+        </section>
+      )}
+      <section>
+        <h3 className="mb-1.5 font-sans text-xs font-semibold tracking-wide text-muted uppercase">{t.dictionary}</h3>
+        <ol className="space-y-2 text-sm">
+          {entry.senses.slice(0, 4).map((sense, i) => (
+            <li key={i} className="leading-snug">
+              <span className="mr-1.5 text-xs text-muted italic">{sense.pos}</span>
+              {sense.definition}
+              {sense.example && <span className="block text-muted">“{sense.example}”</span>}
+              {sense.synonyms.length > 0 && (
+                <span className="block text-xs text-muted">
+                  {t.also} {sense.synonyms.join(", ")}
+                </span>
+              )}
+            </li>
+          ))}
+        </ol>
+      </section>
+      {!modelAnswering && <p className="text-xs text-muted">{t.noModelForWords}</p>}
+    </div>
+  );
+}
+
 /** The answer, in the reading font, paragraph by paragraph. */
 export function Reading({ text, streaming }: { text: string; streaming: boolean }) {
   const paragraphs = text.split(/\n{2,}/);
@@ -211,10 +254,10 @@ export function Reading({ text, streaming }: { text: string; streaming: boolean 
   );
 }
 
-function Skeleton() {
+function Skeleton({ lines = 3 }: { lines?: number }) {
   return (
     <div className="space-y-2.5 py-1" aria-label={t.thinking}>
-      {[92, 100, 76].map((w, i) => (
+      {[92, 100, 76].slice(0, lines).map((w, i) => (
         <div key={i} className="h-2.5 animate-pulse rounded-full bg-surface-2" style={{ width: `${w}%` }} />
       ))}
     </div>

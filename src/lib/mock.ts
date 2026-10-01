@@ -204,11 +204,20 @@ async function playDemo(name: string) {
   emit("te://popup", { type: "open", id } satisfies PopupEvent);
   if (name === "no_model") return emit("te://popup", { type: "no_model" });
   if (name === "no_selection") return emit("te://popup", { type: "no_selection", hotkey: settings.hotkey });
-  if (name === "word") {
+  if (name === "word" || name === "word_offline") {
+    emit("te://popup", {
+      type: "dictionary",
+      id,
+      entry: {
+        lemma: "ubiquitous",
+        senses: [{ pos: "adjective", definition: "being present everywhere at once", example: "ubiquitous computing", synonyms: ["omnipresent"] }],
+      },
+    } satisfies PopupEvent);
+    if (name === "word_offline") return;
     send({ type: "started", kind: "word", source: "ubiquitous", truncated: false, grade_before: null, parts: 1, language: "English" });
     await sleep(500);
     if (id !== demoId) return;
-    const text = "Found everywhere, or seeming to be everywhere at the same time.";
+    const text = "Smartphones are found almost everywhere in daily life.";
     send({ type: "part_done", part: 0, text });
     send({ type: "done", text, grade_after: null, report: { missing: [], added: [] }, timings: null, elapsed_ms: 480 });
     return;

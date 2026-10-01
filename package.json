@@ -45,6 +45,8 @@
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.71.0",
     "vite": "^8.3.2",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "wink-lexicon": "^2.2.0",
+    "wordnet-db": "^3.1.14"
   }
 }

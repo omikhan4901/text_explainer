@@ -135,8 +135,21 @@ export type ExplainEvent =
     }
   | { type: "error"; message: string; detail: string | null };
 
+export interface Sense {
+  pos: "noun" | "verb" | "adjective" | "adverb";
+  definition: string;
+  example: string | null;
+  synonyms: string[];
+}
+
+export interface DictionaryEntry {
+  lemma: string;
+  senses: Sense[];
+}
+
 export type PopupEvent =
   | { type: "open"; id: number }
+  | { type: "dictionary"; id: number; entry: DictionaryEntry }
   | { type: "explain"; id: number; event: ExplainEvent }
   | { type: "no_selection"; hotkey: string }
   | { type: "no_model" }

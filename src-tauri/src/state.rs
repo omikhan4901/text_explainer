@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use tauri::async_runtime::JoinHandle;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_global_shortcut::Shortcut;
+use te_core::dictionary::Dictionary;
 use te_core::download::Cancel;
 use te_core::engine::{Backend, Engine, ServerConfig};
 use te_core::models;
@@ -18,6 +19,7 @@ pub struct Paths {
     pub models: PathBuf,
     pub logs: PathBuf,
     pub llama_server: PathBuf,
+    pub dictionary: PathBuf,
 }
 
 impl Paths {
@@ -33,6 +35,7 @@ impl Paths {
                 .join("resources")
                 .join("llama")
                 .join("llama-server.exe"),
+            dictionary: resources.join("resources").join("dictionary.sqlite"),
         })
     }
 
@@ -71,6 +74,8 @@ pub struct AppState {
     pub hotkey: Mutex<Option<Shortcut>>,
     pub click_watcher: ClickOutsideWatcher,
     pub download: Mutex<Option<(String, Cancel)>>,
+    /// WordNet, for single words (None if the file is missing).
+    pub dictionary: Mutex<Option<Dictionary>>,
 }
 
 impl AppState {

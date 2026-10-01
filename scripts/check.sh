@@ -20,6 +20,11 @@ npm run --silent test
 step "web: build (the app embeds it)"
 npx vite build --logLevel warn
 
+if [ ! -f src-tauri/resources/dictionary.sqlite ]; then
+  step "dictionary: build (bundled with the app)"
+  python3 scripts/build-dictionary.py
+fi
+
 step "rust: format"
 cargo fmt --all --check
 

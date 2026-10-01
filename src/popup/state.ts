@@ -1,5 +1,5 @@
 // What the reading card shows, driven by events from the app. Pure so it's easy to test.
-import type { PopupEvent, Report, SelectionKind } from "../lib/types";
+import type { DictionaryEntry, PopupEvent, Report, SelectionKind } from "../lib/types";
 
 export interface Explaining {
   view: "explain";
@@ -19,6 +19,8 @@ export interface Explaining {
   error: { message: string; detail: string | null } | null;
   elapsedMs: number | null;
   tokensPerSecond: number | null;
+  /** The bundled dictionary's entry, for single words and short terms. */
+  dictionary: DictionaryEntry | null;
 }
 
 export type CardState =
@@ -48,6 +50,7 @@ function fresh(id: number): Explaining {
     error: null,
     elapsedMs: null,
     tokensPerSecond: null,
+    dictionary: null,
   };
 }
 
@@ -63,6 +66,10 @@ export function reduce(state: CardState, event: PopupEvent): CardState {
       return { view: "capture_failed", message: event.message };
     case "settings":
       return state;
+    case "dictionary":
+      if (state.view !== "explain" || state.id !== event.id) return state;
+      // Without a model the entry is the whole answer, so the card isn't waiting.
+      return { ...state, dictionary: event.entry, kind: state.started ? state.kind : "word", source: state.source || event.entry.lemma };
     case "explain": {
       // Events from an earlier request (still finishing) are ignored.
       if (state.view !== "explain" || state.id !== event.id) return state;

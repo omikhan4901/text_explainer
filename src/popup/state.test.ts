@@ -83,3 +83,11 @@ test("other views", () => {
   });
   expect(reduce(initialState, { type: "settings" })).toBe(initialState);
 });
+
+test("dictionary entries attach to the current request", () => {
+  const entry = { lemma: "mouse", senses: [{ pos: "noun" as const, definition: "a small rodent", example: null, synonyms: [] }] };
+  const s = run([{ type: "open", id: 7 }, { type: "dictionary", id: 7, entry }, { type: "dictionary", id: 6, entry: { ...entry, lemma: "old" } }]) as Explaining;
+  expect(s.dictionary?.lemma).toBe("mouse");
+  expect(s.kind).toBe("word");
+  expect(s.source).toBe("mouse");
+});

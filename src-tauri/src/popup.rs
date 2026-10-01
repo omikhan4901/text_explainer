@@ -31,6 +31,11 @@ pub enum PopupEvent {
         id: u64,
         event: Event,
     },
+    /// The dictionary entry for a selected word (arrives before the model's answer).
+    Dictionary {
+        id: u64,
+        entry: te_core::dictionary::Entry,
+    },
     NoSelection {
         hotkey: String,
     },

@@ -7,6 +7,7 @@ use std::sync::atomic::Ordering;
 use tauri::{AppHandle, Manager};
 use te_core::engine::{Backend, Sampling};
 use te_core::explain::{self, Event, Request};
+use te_core::text::{self, SelectionKind};
 use te_win::Rect;
 
 use crate::popup::{self, PopupEvent};
@@ -69,15 +70,34 @@ pub fn run(app: &AppHandle) {
     };
     let settings = state.settings();
     let backend = state.backend(&settings);
-    if backend == Backend::None {
-        popup::emit(app, PopupEvent::NoModel);
-        return;
-    }
     let id = state.request_id.fetch_add(1, Ordering::SeqCst) + 1;
     if let Some(previous) = state.task.lock().expect("task lock").take() {
         previous.abort();
     }
+
+    // Single words and short terms: the dictionary answers at once.
+    let cleaned = text::clean(&last.text);
+    let entry = match text::classify(&cleaned) {
+        SelectionKind::Word | SelectionKind::Phrase => state
+            .dictionary
+            .lock()
+            .expect("dictionary lock")
+            .as_ref()
+            .and_then(|d| d.lookup(&cleaned)),
+        _ => None,
+    };
+    if backend == Backend::None && entry.is_none() {
+        popup::emit(app, PopupEvent::NoModel);
+        return;
+    }
     popup::emit(app, PopupEvent::Open { id });
+    if let Some(entry) = entry {
+        popup::emit(app, PopupEvent::Dictionary { id, entry });
+    }
+    if backend == Backend::None {
+        // No model yet: the dictionary entry is the whole answer.
+        return;
+    }
 
     let engine = state.engine.clone();
     let app2 = app.clone();

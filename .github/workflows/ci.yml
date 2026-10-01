@@ -8,7 +8,8 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # On main every run finishes (the Windows build is slow); PR runs replace each other.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -52,6 +53,8 @@ jobs:
         run: npx vite build --logLevel warn
       - name: Fetch the pinned llama.cpp build (bundled with the app)
         run: python scripts/fetch-llama.py
+      - name: Build the dictionary (bundled with the app)
+        run: python scripts/build-dictionary.py
       - name: Lint the whole workspace
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Test the whole workspace
