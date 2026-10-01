@@ -1,0 +1,16 @@
+name: Probe model and engine sources
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: python3 scripts/ci/probe_sources.py
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
