@@ -36,6 +36,20 @@ fn common_lookups_work_and_are_fast() {
     for word in ["anaemia", "colour", "organised", "haematology", "centre"] {
         assert!(d.lookup(word).is_some(), "{word} not found");
     }
+    // Capitalised contract terms are ordinary words; places and companies aren't.
+    for word in [
+        "Lessee",
+        "Agreement",
+        "Work",
+        "Goods",
+        "Supplier",
+        "Schedule",
+    ] {
+        assert!(d.is_common_word(word), "{word} should be a common word");
+    }
+    for word in ["Cambridge", "England", "Wednesday"] {
+        assert!(!d.is_common_word(word), "{word} should be a proper noun");
+    }
     // Budget: an entry in under 50 ms (the card shows it before the model answers).
     let start = Instant::now();
     for _ in 0..100 {

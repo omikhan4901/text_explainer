@@ -42,6 +42,12 @@ jobs:
         with:
           toolchain: 1.99.0
       - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Build the dictionary (the meaning check uses it, as in the app)
+        run: npm ci && python3 scripts/build-dictionary.py
       - name: Fetch the pinned llama.cpp Linux build
         run: python3 scripts/fetch-llama.py --linux
       - name: Build the evaluator
@@ -57,6 +63,7 @@ jobs:
           --corpus eval/corpus.jsonl
           --out eval-results
           --levels ${{ inputs.levels }}
+          --dictionary src-tauri/resources/dictionary.sqlite
           --download
       - uses: actions/upload-artifact@v4
         if: always()

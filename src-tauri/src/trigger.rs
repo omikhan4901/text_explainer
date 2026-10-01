@@ -98,6 +98,20 @@ pub fn run(app: &AppHandle) {
         // No model yet: the dictionary entry is the whole answer.
         return;
     }
+    // Capitalised ordinary words ("Lessee", "Agreement") aren't names for the meaning check.
+    let common_words: Vec<String> = state
+        .dictionary
+        .lock()
+        .expect("dictionary lock")
+        .as_ref()
+        .map(|d| {
+            te_core::meaning::single_word_names(&cleaned)
+                .into_iter()
+                .filter(|w| d.is_common_word(w))
+                .map(|w| w.to_lowercase())
+                .collect()
+        })
+        .unwrap_or_default();
 
     let engine = state.engine.clone();
     let app2 = app.clone();
@@ -116,6 +130,7 @@ pub fn run(app: &AppHandle) {
                 max_tokens: 512,
             },
             part_words: 180,
+            common_words,
         };
         let emitter = app2.clone();
         let mut emit = move |event: Event| popup::emit(&emitter, PopupEvent::Explain { id, event });

@@ -45,6 +45,10 @@ impl ServerConfig {
             "--reasoning-budget".into(),
             "0".into(),
             "--no-webui".into(),
+            // No extra host-memory prompt cache: with one slot, its own cache already
+            // keeps the shared instructions, and the extra cache grows to gigabytes.
+            "--cache-ram".into(),
+            "0".into(),
         ];
         if let Some(t) = self.threads {
             args.push("--threads".into());

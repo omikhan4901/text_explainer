@@ -97,6 +97,22 @@ impl Dictionary {
         None
     }
 
+    /// True when the word (or its base form) is an ordinary word, not only a proper noun:
+    /// "lessee" and "agreement" are, "cambridge" isn't. Used by the meaning check so
+    /// capitalised contract terms aren't mistaken for names.
+    pub fn is_common_word(&self, word: &str) -> bool {
+        let word = normalise(word);
+        let Ok(mut stmt) = self
+            .conn
+            .prepare_cached("SELECT 1 FROM senses WHERE lemma = ?1 AND proper = 0 LIMIT 1")
+        else {
+            return false;
+        };
+        self.candidates(&word)
+            .iter()
+            .any(|c| stmt.exists(params![c]).unwrap_or(false))
+    }
+
     /// The word and its American spelling, each followed by its irregular base forms and
     /// rule-based base forms.
     fn candidates(&self, word: &str) -> Vec<String> {
@@ -217,16 +233,18 @@ pub(crate) mod tests {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(
             r#"
-            CREATE TABLE senses (lemma TEXT, pos TEXT, rank INTEGER, definition TEXT, examples TEXT, synonyms TEXT);
+            CREATE TABLE senses (lemma TEXT, pos TEXT, rank INTEGER, definition TEXT, examples TEXT, synonyms TEXT, proper INTEGER DEFAULT 0);
             CREATE TABLE forms (form TEXT, lemma TEXT, pos TEXT);
-            INSERT INTO senses VALUES ('ubiquitous','a',0,'being present everywhere at once','["ubiquitous computing"]','["omnipresent"]');
-            INSERT INTO senses VALUES ('mouse','n',0,'any of numerous small rodents','[]','[]');
-            INSERT INTO senses VALUES ('study','v',0,'consider in detail','[]','["analyze"]');
-            INSERT INTO senses VALUES ('study','n',0,'a detailed critical inspection','[]','["survey"]');
-            INSERT INTO senses VALUES ('run','v',0,'move fast by using one''s feet','["Don''t run!"]','[]');
-            INSERT INTO senses VALUES ('go','v',0,'change location; move','[]','["travel"]');
-            INSERT INTO senses VALUES ('habeas corpus','n',0,'a writ ordering a prisoner to be brought before a judge','[]','[]');
-            INSERT INTO senses VALUES ('big','a',0,'above average in size','[]','["large"]');
+            INSERT INTO senses (lemma, pos, rank, definition, examples, synonyms) VALUES ('ubiquitous','a',0,'being present everywhere at once','["ubiquitous computing"]','["omnipresent"]');
+            INSERT INTO senses (lemma, pos, rank, definition, examples, synonyms) VALUES ('mouse','n',0,'any of numerous small rodents','[]','[]');
+            INSERT INTO senses (lemma, pos, rank, definition, examples, synonyms) VALUES ('study','v',0,'consider in detail','[]','["analyze"]');
+            INSERT INTO senses (lemma, pos, rank, definition, examples, synonyms) VALUES ('study','n',0,'a detailed critical inspection','[]','["survey"]');
+            INSERT INTO senses (lemma, pos, rank, definition, examples, synonyms) VALUES ('run','v',0,'move fast by using one''s feet','["Don''t run!"]','[]');
+            INSERT INTO senses (lemma, pos, rank, definition, examples, synonyms) VALUES ('go','v',0,'change location; move','[]','["travel"]');
+            INSERT INTO senses (lemma, pos, rank, definition, examples, synonyms) VALUES ('habeas corpus','n',0,'a writ ordering a prisoner to be brought before a judge','[]','[]');
+            INSERT INTO senses (lemma, pos, rank, definition, examples, synonyms) VALUES ('big','a',0,'above average in size','[]','["large"]');
+            INSERT INTO senses VALUES ('lessee','n',0,'a tenant who holds a lease','[]','[]',0);
+            INSERT INTO senses VALUES ('cambridge','n',0,'a city in eastern England','[]','[]',1);
             INSERT INTO forms VALUES ('mice','mouse','n');
             INSERT INTO forms VALUES ('went','go','v');
             "#,
@@ -266,6 +284,15 @@ pub(crate) mod tests {
         assert_eq!(american("oestrogen"), "estrogen");
         assert_eq!(american("four"), "four", "short stems are left alone");
         assert_eq!(american("rise"), "rise");
+    }
+
+    #[test]
+    fn tells_common_words_from_proper_nouns() {
+        let d = fixture();
+        assert!(d.is_common_word("Lessee"));
+        assert!(d.is_common_word("studies"));
+        assert!(!d.is_common_word("Cambridge"));
+        assert!(!d.is_common_word("Qwertyuiop"));
     }
 
     #[test]

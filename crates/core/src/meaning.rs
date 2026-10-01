@@ -40,6 +40,22 @@ impl Report {
 }
 
 pub fn check(source: &str, rewrite: &str) -> Report {
+    check_with(source, rewrite, &|_| false)
+}
+
+/// Single capitalised words in `source` that the check would treat as names. The app
+/// looks them up in the dictionary and passes the common ones (contract terms like
+/// "Lessee" or "Agreement") back through `check_with` so they aren't flagged.
+pub fn single_word_names(source: &str) -> Vec<String> {
+    names(source)
+        .into_iter()
+        .filter(|n| !n.contains(' '))
+        .collect()
+}
+
+/// Like `check`, skipping single-word "names" for which `is_common_word` (given the
+/// lowercase word) is true.
+pub fn check_with(source: &str, rewrite: &str, is_common_word: &dyn Fn(&str) -> bool) -> Report {
     let src_numbers = numbers(source);
     let out_numbers = numbers(rewrite);
     let out_values: Vec<f64> = out_numbers.iter().flat_map(|n| n.values.clone()).collect();
@@ -62,7 +78,20 @@ pub fn check(source: &str, rewrite: &str) -> Report {
             .split_whitespace()
             .filter(|w| !CONNECTORS.contains(&w.to_lowercase().as_str()))
             .collect();
-        if !words.iter().all(|w| out_lower.contains(&w.to_lowercase())) {
+        if words.len() == 1 && is_common_word(&words[0].to_lowercase()) {
+            continue;
+        }
+        let found = |w: &&str| out_lower.contains(&w.to_lowercase());
+        let all = words.iter().all(found);
+        // "United Kingdom" → "UK", "World Health Organization" → "WHO".
+        let initials: String = words.iter().filter_map(|w| w.chars().next()).collect();
+        let by_initials = words.len() >= 2 && contains_word(rewrite, &initials);
+        // A long name may be shortened to its distinctive last word: "the University of
+        // Cambridge" → "Cambridge" (but "the Bank of England" → "the bank" is not enough).
+        let last = words.last().copied().unwrap_or_default();
+        let by_last = words.len() >= 2 && found(&last) && !is_common_word(&last.to_lowercase());
+        let kept = all || by_last;
+        if !(kept || by_initials) {
             missing.insert(Fact::Name(name));
         }
     }
@@ -170,6 +199,10 @@ const SMALL: &[(&str, f64)] = &[
     ("dozen", 12.0),
 ];
 
+const IDIOMATIC: &[&str] = &[
+    "zero", "one", "first", "second", "third", "half", "double", "twice", "dozen",
+];
+
 fn small_word(w: &str) -> Option<f64> {
     let w = w.to_lowercase();
     if let Some(&(_, v)) = SMALL.iter().find(|(s, _)| *s == w) {
@@ -204,10 +237,13 @@ fn numbers(text: &str) -> Vec<Number> {
                     i += 1;
                 }
             }
+            // "first request", "one of", "scales to zero", "half the time": words like
+            // these are usually idiom, not a quantity the reader needs.
+            let idiom = !text.contains(' ') && IDIOMATIC.contains(&text.to_lowercase().as_str());
             out.push(Number {
                 text,
                 values: vec![v],
-                required: vec![v],
+                required: if idiom { vec![] } else { vec![v] },
                 is_word: true,
             });
             i += 1;
@@ -393,6 +429,10 @@ const CONNECTORS: &[&str] = &[
     "of", "the", "and", "for", "de", "la", "van", "von", "da", "del", "&",
 ];
 
+/// Words that may join the parts of one name ("Bank of England"). Not "the" or "and":
+/// "this Agreement and the Lessee" is two terms, not one name.
+const JOINERS: &[&str] = &["of", "for", "de", "la", "van", "von", "da", "del", "&"];
+
 /// Words often capitalised mid-sentence that aren't names worth checking.
 const NOT_NAMES: &[&str] = &[
     "I", "I'm", "I've", "I'd", "I'll", "Mr", "Mrs", "Ms", "Dr", "Prof", "Sir", "Madam", "The",
@@ -424,7 +464,7 @@ fn names(text: &str) -> BTreeSet<String> {
                     break;
                 }
                 let name_word = is_capitalised(next) && !NOT_NAMES.contains(&next);
-                let connector = CONNECTORS.contains(&next)
+                let connector = JOINERS.contains(&next)
                     && tokens
                         .get(j + 1)
                         .is_some_and(|t| is_capitalised(clean_token(t)))
@@ -586,6 +626,57 @@ mod tests {
     fn names_are_case_insensitive_and_possessives_are_fine() {
         let src = "We met with Microsoft's lawyers in Seattle.";
         assert!(missing(src, "We met lawyers from Microsoft in seattle.").is_empty());
+    }
+
+    #[test]
+    fn shortened_names_and_initials_count_as_kept() {
+        let src = "Applicants who have lived in the United Kingdom for 12 months may apply.";
+        assert!(
+            missing(
+                src,
+                "People who have lived in the UK for 12 months may apply."
+            )
+            .is_empty()
+        );
+        let src = "Researchers at the University of Cambridge reported it in 2025.";
+        assert!(missing(src, "Cambridge researchers reported it in 2025.").is_empty());
+        assert_eq!(
+            missing(src, "Researchers reported it in 2025."),
+            vec!["University of Cambridge"]
+        );
+    }
+
+    #[test]
+    fn idiomatic_number_words_are_not_required() {
+        let src = "The service scales to zero, and the first request after that is slow.";
+        assert!(
+            missing(
+                src,
+                "The service stops when idle, and the next request is slow."
+            )
+            .is_empty()
+        );
+        // Real quantities in words still are.
+        assert_eq!(
+            missing("Pay within thirty days.", "Pay soon."),
+            vec!["thirty"]
+        );
+    }
+
+    #[test]
+    fn common_words_capitalised_as_defined_terms_can_be_skipped() {
+        let src = "Under this Agreement the Lessee pays Microsoft monthly.";
+        let out = "The tenant pays monthly.";
+        let common = |w: &str| matches!(w, "agreement" | "lessee");
+        let m: Vec<String> = check_with(src, out, &common)
+            .missing
+            .iter()
+            .map(|f| f.text().to_string())
+            .collect();
+        assert_eq!(m, vec!["Microsoft"]);
+        let mut singles = single_word_names(src);
+        singles.sort();
+        assert_eq!(singles, vec!["Agreement", "Lessee", "Microsoft"]);
     }
 
     #[test]

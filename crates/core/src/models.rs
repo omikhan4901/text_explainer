@@ -32,12 +32,19 @@ pub struct CatalogModel {
     pub license_url: &'static str,
     /// A short, honest note shown in the catalog.
     pub note: &'static str,
+    /// Peak memory measured by the evaluation (`docs/models.md`), in MiB; 0 if not measured.
+    pub measured_peak_mib: u64,
 }
 
 impl CatalogModel {
-    /// Rough memory needed while loaded: weights plus context cache and runtime.
+    /// Memory needed while loaded: the evaluation's measured peak, or an estimate
+    /// (weights plus half again for the context cache and runtime).
     pub fn ram_needed_bytes(&self) -> u64 {
-        self.size_bytes + 900 * MB
+        if self.measured_peak_mib > 0 {
+            self.measured_peak_mib * MB
+        } else {
+            self.size_bytes + self.size_bytes / 2
+        }
     }
 
     pub fn fit(&self, total_ram_bytes: u64) -> Fit {
@@ -71,25 +78,11 @@ pub fn fit(needed: u64, total: u64) -> Fit {
     }
 }
 
-/// The default when nothing else is known; the eval (`docs/models.md`) decides it.
-pub const DEFAULT_MODEL: &str = "qwen3.5-4b";
+/// The default when nothing else is known, chosen by the evaluation (`docs/models.md`):
+/// as fast as the 2B models on a CPU, and it kept facts best.
+pub const DEFAULT_MODEL: &str = "gemma-4-e2b";
 
 pub const CATALOG: &[CatalogModel] = &[
-    CatalogModel {
-        id: "qwen3.5-4b",
-        name: "Qwen3.5 4B",
-        maker: "Alibaba Qwen",
-        tier: Tier::Balanced,
-        params: "4B",
-        quant: "Q4_K_M",
-        file_name: "Qwen3.5-4B-Q4_K_M.gguf",
-        url: "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf",
-        size_bytes: 2_740_937_888,
-        sha256: "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
-        license: "Apache 2.0",
-        license_url: "https://www.apache.org/licenses/LICENSE-2.0",
-        note: "Strong instruction following for its size; many languages.",
-    },
     CatalogModel {
         id: "gemma-4-e2b",
         name: "Gemma 4 E2B",
@@ -103,7 +96,24 @@ pub const CATALOG: &[CatalogModel] = &[
         sha256: "e531007218dfab990486a5de7676a6932d6ea8dea233d1f698d7c21cf8a16889",
         license: "Apache 2.0",
         license_url: "https://www.apache.org/licenses/LICENSE-2.0",
-        note: "Built for laptops and phones; quantisation-aware trained.",
+        note: "Fastest of the balanced models here and the best at keeping facts in our tests.",
+        measured_peak_mib: 4024,
+    },
+    CatalogModel {
+        id: "qwen3.5-4b",
+        name: "Qwen3.5 4B",
+        maker: "Alibaba Qwen",
+        tier: Tier::Balanced,
+        params: "4B",
+        quant: "Q4_K_M",
+        file_name: "Qwen3.5-4B-Q4_K_M.gguf",
+        url: "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf",
+        size_bytes: 2_740_937_888,
+        sha256: "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+        license: "Apache 2.0",
+        license_url: "https://www.apache.org/licenses/LICENSE-2.0",
+        note: "Good rewrites, about half as fast as Gemma 4 E2B on a CPU.",
+        measured_peak_mib: 4844,
     },
     CatalogModel {
         id: "qwen3.5-2b",
@@ -118,7 +128,8 @@ pub const CATALOG: &[CatalogModel] = &[
         sha256: "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223",
         license: "Apache 2.0",
         license_url: "https://www.apache.org/licenses/LICENSE-2.0",
-        note: "About twice as fast as the 4B; simpler rewrites.",
+        note: "Light on memory and quick; drops details more often.",
+        measured_peak_mib: 2191,
     },
     CatalogModel {
         id: "lfm2.5-1.2b",
@@ -133,7 +144,8 @@ pub const CATALOG: &[CatalogModel] = &[
         sha256: "b1b3de114215d9507409a662a501a631095a479a419584e8a2ded6304b19b4f5",
         license: "LFM Open License v1.0",
         license_url: "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct/blob/main/LICENSE",
-        note: "Very fast on any CPU. Free for personal use and smaller companies; check the license.",
+        note: "Very fast, but often drops or changes facts and is English only in practice. Free for personal use and smaller companies; check the license.",
+        measured_peak_mib: 1372,
     },
     CatalogModel {
         id: "gemma-4-e4b",
@@ -149,6 +161,7 @@ pub const CATALOG: &[CatalogModel] = &[
         license: "Apache 2.0",
         license_url: "https://www.apache.org/licenses/LICENSE-2.0",
         note: "Higher quality, larger download; best with 12 GB of RAM or more.",
+        measured_peak_mib: 0,
     },
     CatalogModel {
         id: "qwen3.5-9b",
@@ -164,6 +177,7 @@ pub const CATALOG: &[CatalogModel] = &[
         license: "Apache 2.0",
         license_url: "https://www.apache.org/licenses/LICENSE-2.0",
         note: "The most capable here; needs 16 GB of RAM and is slower on CPU.",
+        measured_peak_mib: 0,
     },
 ];
 

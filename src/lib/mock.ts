@@ -61,10 +61,10 @@ function model(
 }
 
 const MODELS: ModelInfo[] = [
-  model("qwen3.5-4b", "Qwen3.5 4B", "Alibaba Qwen", "balanced", "4B", 2_740_937_888, "Apache 2.0", "Strong instruction following for its size; many languages."),
-  model("gemma-4-e2b", "Gemma 4 E2B", "Google", "balanced", "2B effective", 2_620_370_976, "Apache 2.0", "Built for laptops and phones; quantisation-aware trained."),
-  model("qwen3.5-2b", "Qwen3.5 2B", "Alibaba Qwen", "fast", "2B", 1_280_835_840, "Apache 2.0", "About twice as fast as the 4B; simpler rewrites."),
-  model("lfm2.5-1.2b", "LFM2.5 1.2B", "Liquid AI", "fastest", "1.2B", 730_895_168, "LFM Open License v1.0", "Very fast on any CPU. Free for personal use and smaller companies; check the license."),
+  model("gemma-4-e2b", "Gemma 4 E2B", "Google", "balanced", "2B effective", 2_620_370_976, "Apache 2.0", "Fastest of the balanced models here and the best at keeping facts in our tests."),
+  model("qwen3.5-4b", "Qwen3.5 4B", "Alibaba Qwen", "balanced", "4B", 2_740_937_888, "Apache 2.0", "Good rewrites, about half as fast as Gemma 4 E2B on a CPU."),
+  model("qwen3.5-2b", "Qwen3.5 2B", "Alibaba Qwen", "fast", "2B", 1_280_835_840, "Apache 2.0", "Light on memory and quick; drops details more often."),
+  model("lfm2.5-1.2b", "LFM2.5 1.2B", "Liquid AI", "fastest", "1.2B", 730_895_168, "LFM Open License v1.0", "Very fast, but often drops or changes facts and is English only in practice. Free for personal use and smaller companies; check the license."),
   model("gemma-4-e4b", "Gemma 4 E4B", "Google", "best", "4B effective", 4_215_695_776, "Apache 2.0", "Higher quality, larger download; best with 12 GB of RAM or more."),
   model("qwen3.5-9b", "Qwen3.5 9B", "Alibaba Qwen", "best", "9B", 5_680_522_464, "Apache 2.0", "The most capable here; needs 16 GB of RAM and is slower on CPU."),
 ];
@@ -76,8 +76,8 @@ let settings: Settings = structuredClone(DEFAULT_SETTINGS);
 const installed = new Set<string>();
 // `?state=ready` starts as if set up already (for screenshots of the settings pages).
 if (typeof location !== "undefined" && new URLSearchParams(location.search).get("state") === "ready") {
-  installed.add("qwen3.5-4b");
-  settings = { ...settings, first_run_done: true, model: { kind: "catalog", id: "qwen3.5-4b" } };
+  installed.add("gemma-4-e2b");
+  settings = { ...settings, first_run_done: true, model: { kind: "catalog", id: "gemma-4-e2b" } };
 }
 const handlers = new Map<string, Set<Handler>>();
 let downloadTimer: ReturnType<typeof setInterval> | undefined;
@@ -91,7 +91,7 @@ function info(): AppInfo {
   return {
     version: "0.1.0",
     models: MODELS.map((m) => ({ ...m, installed: installed.has(m.id) })),
-    recommended: "qwen3.5-4b",
+    recommended: "gemma-4-e2b",
     total_ram_bytes: 8 * GB,
     languages: [
       { code: "en", name: "English", native: "English" },

@@ -4,7 +4,7 @@ test("first run: download the recommended model, then try it", async ({ page }) 
   await page.goto("/index.html");
   await page.getByRole("button", { name: "Get started" }).click();
   await expect(page.getByText("This computer has 8 GB of memory.")).toBeVisible();
-  await page.getByRole("button", { name: /Download \(2\.6 GB\)/ }).click();
+  await page.getByRole("button", { name: /Download \(2\.4 GB\)/ }).click();
   await expect(page.getByRole("progressbar")).toBeVisible();
   await expect(page.getByText("In use")).toBeVisible({ timeout: 10_000 });
   await page.getByRole("button", { name: "Next" }).click();

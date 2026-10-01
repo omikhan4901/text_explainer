@@ -68,7 +68,8 @@ def main() -> int:
         """
         PRAGMA page_size = 4096;
         CREATE TABLE senses (lemma TEXT NOT NULL, pos TEXT NOT NULL, rank INTEGER NOT NULL,
-                             definition TEXT NOT NULL, examples TEXT NOT NULL, synonyms TEXT NOT NULL);
+                             definition TEXT NOT NULL, examples TEXT NOT NULL, synonyms TEXT NOT NULL,
+                             proper INTEGER NOT NULL);
         CREATE TABLE forms (form TEXT NOT NULL, lemma TEXT NOT NULL, pos TEXT NOT NULL);
         CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
         """
@@ -88,9 +89,12 @@ def main() -> int:
                 for rank, off in enumerate(offsets[:SENSES_PER_POS]):
                     definition, examples, words = data[off]
                     synonyms = [w for w in words if w.lower() != display.lower()][:SYNONYMS]
+                    # WordNet keeps the capital in proper nouns ("Cambridge", not "lessee").
+                    written = next((w for w in words if w.lower() == display.lower()), display)
+                    proper = 1 if written[:1].isupper() else 0
                     db.execute(
-                        "INSERT INTO senses VALUES (?,?,?,?,?,?)",
-                        (display.lower(), pos, rank, definition, json.dumps(examples[:1]), json.dumps(synonyms)),
+                        "INSERT INTO senses VALUES (?,?,?,?,?,?,?)",
+                        (display.lower(), pos, rank, definition, json.dumps(examples[:1]), json.dumps(synonyms), proper),
                     )
                     rows += 1
     forms = exceptions()

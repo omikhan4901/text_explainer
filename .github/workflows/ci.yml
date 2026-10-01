@@ -21,6 +21,7 @@ jobs:
   checks:
     name: Checks (core and front end)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -33,7 +34,9 @@ jobs:
           targets: x86_64-pc-windows-msvc
       - uses: Swatinem/rust-cache@v2
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # The runner image already has the system libraries; --with-deps can hang on apt.
+      - run: npx playwright install chromium
+        timeout-minutes: 5
       - run: scripts/check.sh
         env:
           E2E: "1"
@@ -41,6 +44,7 @@ jobs:
   windows:
     name: Windows app (lint, test, installer)
     runs-on: windows-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

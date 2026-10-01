@@ -41,6 +41,10 @@ pub struct Request {
     pub sampling: Sampling,
     /// Long text is rewritten in parts of about this many words.
     pub part_words: usize,
+    /// Capitalised words in the text that are ordinary words (from the dictionary, see
+    /// `meaning::single_word_names`), lowercase; the meaning check won't treat them as
+    /// names.
+    pub common_words: Vec<String>,
 }
 
 impl Request {
@@ -53,6 +57,7 @@ impl Request {
             custom_prompt: None,
             sampling: Sampling::default(),
             part_words: 180,
+            common_words: Vec::new(),
         }
     }
 }
@@ -250,7 +255,7 @@ async fn run_inner(
             english
                 .then(|| readability::grade(&text).map(|r| r.grade))
                 .flatten(),
-            meaning::check(&source, &text),
+            meaning::check_with(&source, &text, &|w| req.common_words.iter().any(|c| c == w)),
         ),
         _ => (None, meaning::Report::default()),
     };

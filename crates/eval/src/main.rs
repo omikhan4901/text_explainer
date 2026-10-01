@@ -19,6 +19,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
+use te_core::dictionary::Dictionary;
 use te_core::download::{Cancel, Download, download};
 use te_core::engine::{Backend, Engine, Sampling, ServerConfig};
 use te_core::language::{self, AllowedScripts};
@@ -82,6 +83,7 @@ struct Args {
     levels: Vec<Level>,
     drift_subset: usize,
     download: bool,
+    dictionary: Option<PathBuf>,
 }
 
 fn parse_args() -> Args {
@@ -116,6 +118,7 @@ fn parse_args() -> Args {
             .and_then(|n| n.parse().ok())
             .unwrap_or(12),
         download: argv.iter().any(|a| a == "--download"),
+        dictionary: get("--dictionary").map(PathBuf::from),
     }
 }
 
@@ -218,11 +221,15 @@ async fn evaluate(
         watch_rss(pid, stop.clone(), peak.clone());
     }
 
+    let dictionary = args
+        .dictionary
+        .as_deref()
+        .and_then(|p| Dictionary::open(p).ok());
     let mut rows = Vec::new();
     let mut first_request_ms = None;
     for passage in corpus {
         for &level in &args.levels {
-            let row = run_one(&mut engine, passage, level, true).await;
+            let row = run_one(&mut engine, passage, level, true, dictionary.as_ref()).await;
             first_request_ms.get_or_insert(row.total_ms);
             eprintln!(
                 "[{}] {} {:?}: {} ms, ttft {:?} ms, {:.1} tok/s, grade {:?} -> {:?}{}{}",
@@ -252,7 +259,14 @@ async fn evaluate(
     let mut drift_without = 0;
     let trials: Vec<&Passage> = corpus.iter().take(args.drift_subset).collect();
     for passage in &trials {
-        let row = run_one(&mut engine, passage, Level::Plain, false).await;
+        let row = run_one(
+            &mut engine,
+            passage,
+            Level::Plain,
+            false,
+            dictionary.as_ref(),
+        )
+        .await;
         if row.drift {
             drift_without += 1;
             eprintln!(
@@ -307,8 +321,24 @@ async fn evaluate(
     summary
 }
 
-async fn run_one(engine: &mut Engine, passage: &Passage, level: Level, grammar: bool) -> Row {
+async fn run_one(
+    engine: &mut Engine,
+    passage: &Passage,
+    level: Level,
+    grammar: bool,
+    dictionary: Option<&Dictionary>,
+) -> Row {
     let source = text::clean(&passage.text);
+    // The same help the app gives the meaning check: capitalised ordinary words.
+    let common: Vec<String> = dictionary
+        .map(|d| {
+            meaning::single_word_names(&source)
+                .into_iter()
+                .filter(|w| d.is_common_word(w))
+                .map(|w| w.to_lowercase())
+                .collect()
+        })
+        .unwrap_or_default();
     let lang = language::language(&passage.lang).or_else(|| language::detect(&source));
     let out = lang.map_or(OutputLanguage::SameAsText, OutputLanguage::Named);
     let allowed = AllowedScripts::for_request(&source, lang);
@@ -331,7 +361,7 @@ async fn run_one(engine: &mut Engine, passage: &Passage, level: Level, grammar: 
         .expect("chat request");
     let total_ms = start.elapsed().as_millis() as u64;
     let output = filter.finish();
-    let report = meaning::check(&source, &output);
+    let report = meaning::check_with(&source, &output, &|w| common.iter().any(|c| c == w));
     let english = passage.lang == "en";
     let timings = completion.timings.unwrap_or_default();
     Row {
