@@ -128,18 +128,12 @@ fn parse_args() -> Args {
     }
 }
 
-/// Peak resident memory of a process (Linux `/proc`), sampled every 200 ms.
+/// Peak memory of a process (Linux resident set, Windows working set), sampled every 200 ms.
 fn watch_rss(pid: u32, stop: Arc<AtomicBool>, peak: Arc<AtomicU64>) {
     std::thread::spawn(move || {
         while !stop.load(Ordering::SeqCst) {
-            if let Ok(status) = std::fs::read_to_string(format!("/proc/{pid}/status"))
-                && let Some(kb) = status
-                    .lines()
-                    .find(|l| l.starts_with("VmRSS:"))
-                    .and_then(|l| l.split_whitespace().nth(1))
-                    .and_then(|v| v.parse::<u64>().ok())
-            {
-                peak.fetch_max(kb * 1024, Ordering::SeqCst);
+            if let Some(bytes) = te_win::process_memory(pid) {
+                peak.fetch_max(bytes, Ordering::SeqCst);
             }
             std::thread::sleep(Duration::from_millis(200));
         }
@@ -187,6 +181,11 @@ async fn main() {
         summaries.push(summary);
     }
     let mut md = markdown(&summaries);
+    md.push_str(&format!(
+        "\nRan on {} with {} CPU threads.\n",
+        std::env::consts::OS,
+        std::thread::available_parallelism().map_or(0, |n| n.get())
+    ));
     if !args.server_args.is_empty() {
         md.push_str(&format!(
             "\nExtra engine arguments: `{}`\n",

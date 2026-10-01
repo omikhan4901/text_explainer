@@ -12,7 +12,7 @@ use std::time::Duration;
 
 pub use clipboard::{DoubleCopyWatcher, set_text as set_clipboard_text};
 pub use hook::ClickOutsideWatcher;
-pub use system::{kill_with_app, memory};
+pub use system::{kill_with_app, memory, process_memory};
 pub use window::{
     cursor_position, hide_window, prepare_popup_window, show_window_at, work_area_at,
 };

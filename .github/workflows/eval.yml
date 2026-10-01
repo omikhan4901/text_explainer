@@ -13,6 +13,11 @@ on:
       levels:
         description: Reading levels to test
         default: plain,simpler
+      os:
+        description: Runner (Windows uses the same llama.cpp build the app bundles)
+        type: choice
+        options: [ubuntu-latest, windows-latest]
+        default: ubuntu-latest
       server_args:
         description: Extra llama-server arguments, appended to the app's own (later ones win)
         default: ""
@@ -33,8 +38,11 @@ jobs:
 
   eval:
     needs: plan
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.os }}
     timeout-minutes: 300
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
@@ -50,9 +58,13 @@ jobs:
           node-version: 22
           cache: npm
       - name: Build the dictionary (the meaning check uses it, as in the app)
-        run: npm ci && python3 scripts/build-dictionary.py
-      - name: Fetch the pinned llama.cpp Linux build
-        run: python3 scripts/fetch-llama.py --linux
+        run: npm ci && $PY scripts/build-dictionary.py
+        env:
+          PY: ${{ runner.os == 'Windows' && 'python' || 'python3' }}
+      - name: Fetch the pinned llama.cpp build
+        run: $PY scripts/fetch-llama.py ${{ runner.os == 'Windows' && ' ' || '--linux' }}
+        env:
+          PY: ${{ runner.os == 'Windows' && 'python' || 'python3' }}
       - name: Build the evaluator
         run: cargo build --release -p te-eval
       - name: Evaluate ${{ matrix.model }}
@@ -61,7 +73,7 @@ jobs:
           SERVER_ARGS: ${{ inputs.server_args }}
         run: >
           target/release/te-eval
-          --server target/llama-linux/llama-server
+          --server ${{ runner.os == 'Windows' && 'src-tauri/resources/llama/llama-server.exe' || 'target/llama-linux/llama-server' }}
           --models-dir models
           --model ${{ matrix.model }}
           --corpus eval/corpus.jsonl
@@ -73,6 +85,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: eval-${{ matrix.model }}
+          name: eval-${{ matrix.model }}-${{ runner.os }}
           path: eval-results/
           retention-days: 30

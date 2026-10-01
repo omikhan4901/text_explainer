@@ -4247,6 +4247,7 @@ dependencies = [
  "serde",
  "serde_json",
  "te-core",
+ "te-win",
  "tokio",
 ]
 

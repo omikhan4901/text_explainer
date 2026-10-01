@@ -8,8 +8,11 @@ use windows::Win32::System::JobObjects::{
     JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
     SetInformationJobObject,
 };
+use windows::Win32::System::ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
 use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
-use windows::Win32::System::Threading::{OpenProcess, PROCESS_SET_QUOTA, PROCESS_TERMINATE};
+use windows::Win32::System::Threading::{
+    OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_QUOTA, PROCESS_TERMINATE,
+};
 
 use crate::{Error, Memory};
 
@@ -24,6 +27,22 @@ pub fn memory() -> Option<Memory> {
         total_bytes: status.ullTotalPhys,
         available_bytes: status.ullAvailPhys,
     })
+}
+
+/// Memory a process is using now (its working set), in bytes.
+pub fn process_memory(pid: u32) -> Option<u64> {
+    let mut counters = PROCESS_MEMORY_COUNTERS {
+        cb: std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32,
+        ..Default::default()
+    };
+    // SAFETY: opens the process only to read its counters, then closes the handle.
+    unsafe {
+        let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+        let result = GetProcessMemoryInfo(process, &mut counters, counters.cb);
+        let _ = CloseHandle(process);
+        result.ok()?;
+    }
+    Some(counters.WorkingSetSize as u64)
 }
 
 struct Job(HANDLE);

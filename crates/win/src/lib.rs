@@ -52,7 +52,8 @@ pub struct Memory {
 #[cfg(windows)]
 pub use imp::{
     ClickOutsideWatcher, DoubleCopyWatcher, capture_selection, cursor_position, hide_window,
-    kill_with_app, memory, prepare_popup_window, set_clipboard_text, show_window_at, work_area_at,
+    kill_with_app, memory, prepare_popup_window, process_memory, set_clipboard_text,
+    show_window_at, work_area_at,
 };
 
 #[cfg(not(windows))]
@@ -81,6 +82,18 @@ mod stub {
     pub fn memory() -> Option<Memory> {
         None
     }
+    /// Memory a process is using now (resident set, from Linux `/proc`), in bytes.
+    pub fn process_memory(pid: u32) -> Option<u64> {
+        let status = std::fs::read_to_string(format!("/proc/{pid}/status")).ok()?;
+        let kb: u64 = status
+            .lines()
+            .find(|l| l.starts_with("VmRSS:"))?
+            .split_whitespace()
+            .nth(1)?
+            .parse()
+            .ok()?;
+        Some(kb * 1024)
+    }
     pub fn set_clipboard_text(_text: &str) -> Result<(), Error> {
         Err(Error::Unsupported)
     }
@@ -107,3 +120,19 @@ mod stub {
 
 #[cfg(not(windows))]
 pub use stub::*;
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    #[cfg(any(windows, target_os = "linux"))]
+    fn reads_this_process_memory() {
+        let bytes = super::process_memory(std::process::id()).expect("own memory");
+        // A test binary uses at least a megabyte and far less than a terabyte.
+        assert!((1 << 20..1 << 40).contains(&bytes), "{bytes}");
+    }
+
+    #[test]
+    fn unknown_process_has_no_memory() {
+        assert_eq!(super::process_memory(u32::MAX - 1), None);
+    }
+}
