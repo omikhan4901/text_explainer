@@ -27,8 +27,11 @@ The plan is `docs/IMPLEMENTATION_PLAN.md`; progress and the next step are in
   classification, readability scores, the meaning guard, the language guard (GBNF grammar),
   prompts, the llama-server client and process manager, the dictionary, model catalog and
   downloads, settings. Pure Rust, tested on Linux and Windows.
-- `crates/dictgen`: builds `dictionary.sqlite` from WordNet 3.1 (npm `wordnet-db`).
-- `crates/eval`: the model eval harness (`docs/models.md` has the results).
+- `scripts/build-dictionary.py`: builds `dictionary.sqlite` from WordNet 3.1 (npm
+  `wordnet-db`, irregular forms from `wink-lexicon`); `scripts/fetch-llama.py` fetches the
+  pinned llama.cpp build. Both run in CI; neither output is committed.
+- `crates/eval`: the model evaluation harness (`docs/models.md` has the results; run the
+  "Model evaluation" workflow after changing prompts, guards or llama.cpp).
 - `src-tauri`: the Tauri 2 app. Tray, global hotkey, selection capture (UI Automation, then
   a clipboard-safe Ctrl+C fallback), the popup window that never takes focus, IPC commands.
 - `src/`: React + TypeScript + Tailwind v4 + Radix front end. `popup.html` is the reading
