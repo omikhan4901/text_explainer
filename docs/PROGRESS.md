@@ -41,7 +41,10 @@ real machine, any issue in `docs/testing/windows.md`).
   private, about 385 MB working set summed over the processes (shared WebView2 pages
   count once per process), the same with the main window open and when started in the
   tray at login (the hidden settings window is still loaded). Budget 150 MB: within it
-  by private memory, narrowly.
+  by private memory, narrowly. Breakdown: the app itself 6 MB; WebView2's browser 45 MB,
+  GPU 15, utilities 20, crash handler 2; one renderer per window (card, settings) about
+  30 MB each. Creating the settings window only when opened would save about 30 MB; not
+  worth the risk before the first real-machine test.
 - First words (budget 2 s, default model, 4-core runner): 2.2 s median on Linux, 2.5 s
   on Windows, so just over budget; a paragraph's instructions dominate on a CPU.
 - The Windows CI job builds and uploads the NSIS installer on every push to main, then
