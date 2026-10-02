@@ -1,7 +1,8 @@
 # Progress
 
-Current milestone: **M6, polish and release**. The Windows CI job builds the installer;
-next is the owner's first test on a real Windows machine (`docs/testing/windows.md`).
+Current milestone: **M6, polish and release**. Paused on 2 October 2026 as ongoing work:
+everything that can be built and checked without a Windows desktop is done and green in
+CI. Next is the owner's first test on a real Windows machine (`docs/testing/windows.md`).
 
 ## Windows MVP checklist
 
@@ -18,8 +19,17 @@ next is the owner's first test on a real Windows machine (`docs/testing/windows.
 
 ## Next step
 
-Wait for the owner's Windows test results; meanwhile keep polishing (performance on the
-real machine, any issue in `docs/testing/windows.md`).
+When work resumes:
+
+1. The owner installs the latest CI installer and goes through `docs/testing/windows.md`;
+   fix whatever it finds.
+2. Screenshots of the installed app for the README and marketing kit.
+3. Run "Release (draft)" and publish the first release; then post the LinkedIn draft and
+   record the demo video (`docs/marketing/`).
+4. Optional, measured first: create the settings window only when opened (about 30 MB
+   less while the app sits in the tray).
+
+The hourly resume routine is switched off; nothing runs on its own while paused.
 
 ## Numbers (for the marketing kit; measured, not estimated)
 
