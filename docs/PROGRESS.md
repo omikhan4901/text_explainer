@@ -23,7 +23,7 @@ real machine, any issue in `docs/testing/windows.md`).
 
 ## Numbers (for the marketing kit; measured, not estimated)
 
-- Tests: 109 Rust (core, Windows crate and real-dictionary checks, including 13 end-to-end
+- Tests: 111 Rust (core, Windows crate and real-dictionary checks, including 13 end-to-end
   engine tests against a stand-in llama-server and 6 download tests against a flaky local
   server), 10 front-end unit tests, 38 Playwright checks (19 journeys and WCAG 2.2 AA
   scans, each in light and dark).
