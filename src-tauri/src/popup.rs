@@ -13,6 +13,7 @@ use tauri_plugin_opener::OpenerExt;
 use te_core::explain::Event;
 use te_core::sources::{self, WebTab};
 use te_core::text::{self, SelectionKind};
+use te_core::translate::Availability;
 use te_win::{Rect, choose_side, place_on_side};
 
 use crate::state::{AppState, PopupPlacement};
@@ -40,9 +41,13 @@ pub enum PopupEvent {
         query: String,
         /// Web source tabs, in order (empty while "Offline only" is on).
         web: Vec<WebTab>,
+        /// Whether the AI tab can translate this selection into `settings.translate_to`.
+        translate: Availability,
     },
     Explain {
         id: u64,
+        /// The task these events answer, so a switch drops the other task's late events.
+        task: AiTask,
         event: Event,
     },
     /// The dictionary entry for a selected word (arrives before the model's answer).
@@ -69,6 +74,16 @@ pub enum AiMode {
     Running,
     Deferred,
     Off,
+}
+
+/// What the card's AI tab asks for: an explanation at the reading level, or a translation
+/// into the language chosen in Settings.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AiTask {
+    #[default]
+    Explain,
+    Translate,
 }
 
 pub fn emit(app: &AppHandle, event: PopupEvent) {
