@@ -76,6 +76,8 @@ Save a word from the card, hear it read aloud, and export your list to Excel or 
 - **Any local model.** It recommends one that fits your PC, finds models you already have
   (LM Studio, Ollama, Jan, GPT4All, Hugging Face) and works with a local Ollama or LM
   Studio server.
+- **Keeps itself up to date.** It checks for a new version and asks before installing it.
+  Updates are signed, and one that isn't is refused.
 - **Never in your way.** The card doesn't take focus from the app you're reading in. Esc
   or a click elsewhere closes it.
 

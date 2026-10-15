@@ -86,7 +86,9 @@ by security, database and AI engineers before it reaches `main`:
       Latest release
 - [x] Updates (15 October 2026, owner): each build is 0.1.<run number>; with the update
       key in GitHub, builds are signed and installed apps ask, then update themselves.
-      Waiting on the owner to create the key (docs/GUIDE.md, "Updates").
+      Key set by the owner; build 0.1.19 is the first signed one (`latest.json` published,
+      signature checked on the release). Installing an update on a real PC is not verified
+      yet.
 - [x] Website (15 October 2026, owner): one page at plainly.omikhan.com, Next.js in
       `site/`, hosted on Vercel next to omikhan.com. Waiting on the owner to import the
       project and add the subdomain (`site/README.md`).
