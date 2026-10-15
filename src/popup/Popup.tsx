@@ -12,7 +12,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { Tabs } from "radix-ui";
-import { Fragment, useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { LinkButton } from "../components/ui/Button";
 import { IconButton } from "../components/ui/IconButton";
 import { Segmented } from "../components/ui/Segmented";
@@ -140,6 +140,12 @@ export function Popup() {
     if (!onWebTab) void api.webHide();
   }, [onWebTab]);
 
+  const startResize = useCallback(() => setResizing(true), []);
+  const resetSize = useCallback(() => {
+    setResizing(false);
+    void api.setCardSize(null);
+  }, []);
+
   return (
     <div className={sized ? "h-screen w-screen p-3" : "p-3"} style={sized ? undefined : { width: WIDTH + 2 * MARGIN }}>
       <div
@@ -160,45 +166,63 @@ export function Popup() {
         ) : (
           <MessageCard state={state} />
         )}
-        <ResizeGrip
-          onStart={() => setResizing(true)}
-          onReset={() => {
-            setResizing(false);
-            void api.setCardSize(null);
-          }}
-        />
+        <ResizeGrip onStart={startResize} onReset={resetSize} />
       </div>
     </div>
   );
 }
 
-/** Handlers for the card's header: pressing it lets the person drag the card (the app
- * follows the mouse until the button is released). Buttons and tabs in it work as usual. */
-function useCardDrag() {
+/** Pointer handlers that let the person drag the card: the app moves (or resizes) it
+ * to follow the real cursor on every move the page reports, until the button is let go.
+ * Presses on buttons, links and tabs are left alone. */
+function dragHandlers(kind: "move" | "resize", onStart?: () => void) {
+  let frame = 0;
+  let dragging = false;
+  const end = () => {
+    if (!dragging) return;
+    dragging = false;
+    cancelAnimationFrame(frame);
+    frame = 0;
+    void api.popupDragEnd();
+  };
   return {
     onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
       if (e.button !== 0 || (e.target as Element).closest("button, a, input, select, [role=tab]")) return;
       e.preventDefault();
-      void api.popupDrag("move");
+      // Keeps the moves coming while the pointer is outside the window (a resize).
+      e.currentTarget.setPointerCapture(e.pointerId);
+      dragging = true;
+      onStart?.();
+      void api.popupDragStart(kind);
     },
+    onPointerMove: () => {
+      if (!dragging || frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        void api.popupDragMove();
+      });
+    },
+    onPointerUp: end,
+    onPointerCancel: end,
+    onLostPointerCapture: end,
   };
+}
+
+function useCardDrag() {
+  return useMemo(() => dragHandlers("move"), []);
 }
 
 /** The card's bottom right corner: drag to resize (the size is remembered), double-click
  * to fit the card to what it shows again. */
 function ResizeGrip({ onStart, onReset }: { onStart: () => void; onReset: () => void }) {
+  const handlers = useMemo(() => dragHandlers("resize", onStart), [onStart]);
   return (
     <div
       aria-hidden
       title={t.resize}
       data-testid="resize-grip"
       className="absolute right-0 bottom-0 z-10 flex size-4 cursor-nwse-resize items-end justify-end p-[3px] text-border-strong hover:text-muted"
-      onPointerDown={(e) => {
-        if (e.button !== 0) return;
-        e.preventDefault();
-        onStart();
-        void api.popupDrag("resize");
-      }}
+      {...handlers}
       onDoubleClick={onReset}
     >
       <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round">

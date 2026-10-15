@@ -107,6 +107,11 @@ by security, database and AI engineers before it reaches `main`:
       more closing on a click elsewhere, so the pin is gone). Bing still serves its desktop
       page (it reads the browser's hidden "Windows" hint, not the phone identity); the
       owner is fine with that.
+- [x] Third test: dragging and resizing still did nothing (the follow thread asked Windows
+      whether the mouse button was held, which says "no" while another app is in front);
+      now the page reports each move and the app reads the real cursor. The shortcut
+      warning with a dead shortcut: registration at startup can lose a race with the
+      closing copy after an update; it is now retried every 5 seconds.
 - [ ] Not verified on Windows yet: the Look up box's focus and placement, app rules on
       real apps, the Windows voice, export through the save dialog
 

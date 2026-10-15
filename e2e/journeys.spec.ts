@@ -301,7 +301,7 @@ test("the card moves by its header and resizes from its corner; a double-click f
   await page.goto("/popup.html?demo=passage");
   await expect(page.getByText("google.com")).toBeVisible();
   const card = page.getByRole("dialog");
-  const drags = async () => (await mockCalls(page)).filter((c) => c.command === "popup_drag").map((c) => c.args.kind);
+  const drags = async () => (await mockCalls(page)).filter((c) => c.command === "popup_drag_start").map((c) => c.args.kind);
   expect((await card.boundingBox())?.width).toBe(480);
 
   // Pressing the header hands the drag to the app; its tabs and buttons still just work.
@@ -310,10 +310,17 @@ test("the card moves by its header and resizes from its corner; a double-click f
   await expect(page.getByText("bing.com")).toBeVisible();
   expect(await drags()).toEqual(["move"]);
 
-  // Pressing the corner starts a resize (the stand-in app saves the window's size): the card
-  // fills its window from then on.
-  await page.getByTestId("resize-grip").click();
+  // Dragging the corner reports each move and the release (the stand-in app saves the
+  // window's size): the card fills its window from then on.
+  const grip = (await page.getByTestId("resize-grip").boundingBox())!;
+  await page.mouse.move(grip.x + 8, grip.y + 8);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + 60, grip.y + 50, { steps: 4 });
+  await page.mouse.up();
   expect(await drags()).toEqual(["move", "resize"]);
+  const calls = (await mockCalls(page)).map((c) => c.command);
+  expect(calls).toContain("popup_drag_move");
+  expect(calls.lastIndexOf("popup_drag_end")).toBeGreaterThan(calls.lastIndexOf("popup_drag_move"));
   await expect.poll(async () => (await card.boundingBox())?.width).toBe(700 - 24);
   await expect
     .poll(async () => ((await mockCalls(page)).filter((c) => c.command === "web_show").at(-1)?.args.bounds as { width: number }).width)

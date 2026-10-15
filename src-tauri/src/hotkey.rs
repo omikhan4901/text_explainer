@@ -19,18 +19,19 @@ pub fn parse(hotkey: &str) -> Result<Shortcut, String> {
     Ok(shortcut)
 }
 
-/// Replaces the registered shortcut with `hotkey`.
+/// Replaces the registered shortcut with `hotkey`. No lock is held while registering:
+/// that waits for the main thread, which takes the same lock when a shortcut is pressed.
 pub fn apply(app: &AppHandle, hotkey: &str) -> Result<(), String> {
     let shortcut = parse(hotkey)?;
     let state = app.state::<AppState>();
-    let mut current = state.hotkey.lock().expect("hotkey lock");
-    if let Some(old) = current.take() {
+    let old = state.hotkey.lock().expect("hotkey lock").take();
+    if let Some(old) = old {
         let _ = app.global_shortcut().unregister(old);
     }
     if let Err(e) = app.global_shortcut().register(shortcut) {
         return Err(format!("{e} (another app may already use it)"));
     }
-    *current = Some(shortcut);
+    *state.hotkey.lock().expect("hotkey lock") = Some(shortcut);
     Ok(())
 }
 
@@ -47,24 +48,33 @@ pub fn apply_lookup(app: &AppHandle, hotkey: &str) -> Result<(), String> {
     {
         return Err("it's already the shortcut that opens the card".into());
     }
-    let mut current = state.lookup_hotkey.lock().expect("lookup hotkey lock");
-    let old = current.take();
+    // As in `apply`, no lock is held while registering.
+    let old = state
+        .lookup_hotkey
+        .lock()
+        .expect("lookup hotkey lock")
+        .take();
     if let Some(old) = old {
         let _ = app.global_shortcut().unregister(old);
     }
+    let mut now = None;
+    let mut result = Ok(());
     if let Some(s) = shortcut {
-        if let Err(e) = app.global_shortcut().register(s) {
-            // Keep the one that worked, so the saved setting stays true.
-            if let Some(old) = old
-                && app.global_shortcut().register(old).is_ok()
-            {
-                *current = Some(old);
+        match app.global_shortcut().register(s) {
+            Ok(()) => now = Some(s),
+            Err(e) => {
+                // Keep the one that worked, so the saved setting stays true.
+                if let Some(old) = old
+                    && app.global_shortcut().register(old).is_ok()
+                {
+                    now = Some(old);
+                }
+                result = Err(format!("{e} (another app may already use it)"));
             }
-            return Err(format!("{e} (another app may already use it)"));
         }
-        *current = Some(s);
     }
-    Ok(())
+    *state.lookup_hotkey.lock().expect("lookup hotkey lock") = now;
+    result
 }
 
 /// Whether two shortcut strings name the same keys ("Shift+Ctrl+L" and "ctrl+shift+l").

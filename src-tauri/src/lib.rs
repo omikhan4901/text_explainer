@@ -15,7 +15,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use tauri::{AppHandle, Manager, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt as _};
 use te_core::engine::{Backend, Engine};
 use te_core::settings::Settings;
@@ -124,6 +124,7 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     tray::create(&handle)?;
     spawn_idle_unloader(handle.clone());
+    spawn_shortcut_retry(handle.clone());
 
     let launched_at_login = std::env::args().any(|a| a == "--autostart");
     if !settings.first_run_done || !launched_at_login {
@@ -141,6 +142,41 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     );
     updater::init(&handle);
     Ok(())
+}
+
+/// Keeps trying a shortcut that couldn't be registered. Right after an update or a restart,
+/// the copy of the app that is closing can still hold it for a moment, and a single try at
+/// startup then left the shortcut dead until the next restart.
+fn spawn_shortcut_retry(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            let state = app.state::<AppState>();
+            let settings = state.settings();
+            let mut changed = false;
+            if state.hotkey.lock().expect("hotkey lock").is_none()
+                && hotkey::apply(&app, &settings.hotkey).is_ok()
+            {
+                tracing::info!("registered {} on a later try", settings.hotkey);
+                changed = true;
+            }
+            if !settings.lookup_hotkey.trim().is_empty()
+                && state
+                    .lookup_hotkey
+                    .lock()
+                    .expect("lookup hotkey lock")
+                    .is_none()
+                && hotkey::apply_lookup(&app, &settings.lookup_hotkey).is_ok()
+            {
+                tracing::info!("registered {} on a later try", settings.lookup_hotkey);
+                changed = true;
+            }
+            if changed {
+                // The main window's "another app uses this shortcut" notice goes away.
+                let _ = app.emit_to("main", "te://settings", ());
+            }
+        }
+    });
 }
 
 /// Frees the model's memory after the configured idle time.
@@ -214,7 +250,9 @@ pub fn run() {
             commands::delete_model,
             commands::unload_model,
             commands::popup_resize,
-            commands::popup_drag,
+            commands::popup_drag_start,
+            commands::popup_drag_move,
+            commands::popup_drag_end,
             commands::set_card_size,
             commands::popup_close,
             commands::set_level,

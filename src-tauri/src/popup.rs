@@ -5,9 +5,8 @@
 //! area (private, no access to the app, never focused on its own). The person can drag
 //! the card by its header and resize it from its corner; the size is remembered.
 
-use std::sync::OnceLock;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::sync::atomic::Ordering;
+use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
 use tauri::webview::{Color, NewWindowResponse, WebviewBuilder};
@@ -39,8 +38,8 @@ const WEB_USER_AGENT: &str = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebK
 /// The popup's window handle, for the mouse hook's thread (asking Tauri for it there
 /// would wait on the main thread).
 static POPUP_HWND: OnceLock<isize> = OnceLock::new();
-/// A drag (move or resize) is running: the page's size reports wait until it ends.
-static DRAGGING: AtomicBool = AtomicBool::new(false);
+/// The drag in progress, if any: the page's size reports wait until it ends.
+static DRAG: Mutex<Option<Dragging>> = Mutex::new(None);
 
 /// Everything the popup page is told.
 #[derive(Clone, Serialize)]
@@ -173,7 +172,7 @@ pub fn open(app: &AppHandle, selection: Option<Rect>) {
 /// sized fills its window instead, so this only applies to cards sized by their content.
 pub fn resize(app: &AppHandle, width: f64, height: f64) {
     let state = app.state::<AppState>();
-    if DRAGGING.load(Ordering::SeqCst) || state.settings().card_size.is_some() {
+    if DRAG.lock().expect("drag lock").is_some() || state.settings().card_size.is_some() {
         return;
     }
     *state.card_size.lock().expect("card size lock") = (width, height);
@@ -203,90 +202,97 @@ pub enum Drag {
     Resize,
 }
 
-/// Follows the mouse until its button is released: the card moves (or its corner
-/// resizes) by as much as the pointer has moved since the press. Reads the real cursor
-/// position; the page's own mouse coordinates go stale while its window moves. A resize is
-/// saved as the card's size, and a card the person moved stays where they put it.
-pub fn drag(app: &AppHandle, kind: Drag) {
-    let Some(h) = hwnd(app) else { return };
+/// A drag in progress: what it does, where the cursor was pressed and where the card was.
+#[derive(Clone, Copy)]
+struct Dragging {
+    kind: Drag,
+    press: (i32, i32),
+    from: PopupPlacement,
+}
+
+/// The card's header or corner was pressed. The page then reports every mouse move
+/// (`drag_to`) and the release (`drag_end`); the card follows the real cursor position,
+/// since the page's own mouse coordinates go stale while its window moves.
+pub fn drag_start(app: &AppHandle, kind: Drag) {
+    let state = app.state::<AppState>();
+    let Some(from) = *state.popup.lock().expect("popup lock") else {
+        return;
+    };
     let Some(press) = te_win::cursor_position() else {
         return;
     };
-    let state = app.state::<AppState>();
-    let Some(start) = *state.popup.lock().expect("popup lock") else {
+    tracing::info!("card drag: {kind:?}");
+    *DRAG.lock().expect("drag lock") = Some(Dragging { kind, press, from });
+}
+
+/// The mouse moved during a drag: move the card, or resize it from its corner (within the
+/// screen it started on), by as much as the cursor moved since the press.
+pub fn drag_to(app: &AppHandle) {
+    let Some(d) = *DRAG.lock().expect("drag lock") else {
         return;
     };
-    if DRAGGING.swap(true, Ordering::SeqCst) {
+    let (Some(h), Some((cx, cy))) = (hwnd(app), te_win::cursor_position()) else {
         return;
-    }
-    let app = app.clone();
-    let spawned = std::thread::Builder::new()
-        .name("card-drag".into())
-        .spawn(move || {
-            let state = app.state::<AppState>();
-            let px = |css: f64| (css * start.scale).round() as i32;
+    };
+    let (dx, dy) = (cx - d.press.0, cy - d.press.1);
+    let from = d.from.rect;
+    let px = |css: f64| (css * d.from.scale).round() as i32;
+    let rect = match d.kind {
+        Drag::Move => Rect::new(
+            from.left + dx,
+            from.top + dy,
+            from.right + dx,
+            from.bottom + dy,
+        ),
+        Drag::Resize => {
             let (min_w, min_h) = (
                 px(CardSize::MIN.width + 2.0 * MARGIN),
                 px(CardSize::MIN.height + 2.0 * MARGIN),
             );
-            let from = start.rect;
-            let mut rect = from;
-            while te_win::primary_button_down() {
-                let Some((cx, cy)) = te_win::cursor_position() else {
-                    break;
-                };
-                let (dx, dy) = (cx - press.0, cy - press.1);
-                let next = match kind {
-                    Drag::Move => Rect::new(
-                        from.left + dx,
-                        from.top + dy,
-                        from.right + dx,
-                        from.bottom + dy,
-                    ),
-                    // Grows to the right and down, within the screen it started on.
-                    Drag::Resize => Rect::new(
-                        from.left,
-                        from.top,
-                        from.left
-                            + (from.width() + dx)
-                                .clamp(min_w, (start.work.right - from.left).max(min_w)),
-                        from.top
-                            + (from.height() + dy)
-                                .clamp(min_h, (start.work.bottom - from.top).max(min_h)),
-                    ),
-                };
-                if next != rect {
-                    rect = next;
-                    {
-                        let mut popup = state.popup.lock().expect("popup lock");
-                        let Some(p) = popup.as_mut() else { break };
-                        p.placed = true;
-                        p.rect = rect;
-                        watch(&state, p);
-                    }
-                    let _ = te_win::place_window_async(
-                        h,
-                        rect.left,
-                        rect.top,
-                        rect.width(),
-                        rect.height(),
-                    );
-                }
-                std::thread::sleep(Duration::from_millis(8));
+            let work = d.from.work;
+            Rect::new(
+                from.left,
+                from.top,
+                from.left + (from.width() + dx).clamp(min_w, (work.right - from.left).max(min_w)),
+                from.top + (from.height() + dy).clamp(min_h, (work.bottom - from.top).max(min_h)),
+            )
+        }
+    };
+    let state = app.state::<AppState>();
+    let mut popup = state.popup.lock().expect("popup lock");
+    let Some(p) = popup.as_mut() else { return };
+    if p.rect == rect {
+        return;
+    }
+    p.placed = true;
+    p.rect = rect;
+    let _ = te_win::show_window_at(h, rect.left, rect.top, rect.width(), rect.height());
+    watch(&state, p);
+}
+
+/// The button was released: a resized card's size is saved, and the card is told either
+/// way (it stops filling its window if the size didn't change).
+pub fn drag_end(app: &AppHandle) {
+    drag_to(app);
+    let Some(d) = DRAG.lock().expect("drag lock").take() else {
+        return;
+    };
+    if d.kind != Drag::Resize {
+        return;
+    }
+    let state = app.state::<AppState>();
+    let rect = state.popup.lock().expect("popup lock").map(|p| p.rect);
+    match rect {
+        Some(rect) if rect != d.from.rect => {
+            let size = CardSize {
+                width: f64::from(rect.width()) / d.from.scale - 2.0 * MARGIN,
+                height: f64::from(rect.height()) / d.from.scale - 2.0 * MARGIN,
+            };
+            if let Err(e) = save_card_size(app, Some(size)) {
+                tracing::warn!("{e}");
             }
-            DRAGGING.store(false, Ordering::SeqCst);
-            if kind == Drag::Resize && rect != from {
-                let size = CardSize {
-                    width: f64::from(rect.width()) / start.scale - 2.0 * MARGIN,
-                    height: f64::from(rect.height()) / start.scale - 2.0 * MARGIN,
-                };
-                if let Err(e) = save_card_size(&app, Some(size)) {
-                    tracing::warn!("{e}");
-                }
-            }
-        });
-    if spawned.is_err() {
-        DRAGGING.store(false, Ordering::SeqCst);
+        }
+        _ => emit(app, PopupEvent::Settings),
     }
 }
 

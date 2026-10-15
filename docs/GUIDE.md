@@ -29,9 +29,12 @@ A guide to the code for anyone changing it. Keep it true when you change how thi
    app again. It opens at the size the page last reported (`AppState::card_size`): the
    page reports only changes, so starting from a fixed height left a card that kept its
    size cut off. Pressing its header (move) or its bottom right corner (resize) calls
-   `popup_drag`: a thread follows the real cursor until the button is released
-   (`popup::drag`), since the page's own mouse coordinates go stale while its window
-   moves. A moved card stays where it was put; a resized card's size is saved
+   `popup_drag_start`; the page holds the pointer and reports every move
+   (`popup_drag_move`) and the release (`popup_drag_end`), and the app places the window
+   from the real cursor position each time (`popup::drag_to`). Two things that failed on
+   a real PC: the page's own mouse coordinates go stale while its window moves (dragging
+   did nothing), and asking Windows whether the button is held reports "no" while
+   another app is in front, which it always is for a card that never takes focus. A moved card stays where it was put; a resized card's size is saved
    (`settings.card_size`), and from then on the card fills its window instead of the
    window following the card. Double-click the corner to fit it to its content again.
 3. **Tabs** (`trigger.rs`, `crates/core/src/sources.rs`). The `open` event lists the
@@ -162,6 +165,15 @@ checked by `e2e/a11y.spec.ts`.
   (COM initialised on that thread) and speaks each text with `SPF_ASYNC |
   SPF_PURGEBEFORESPEAK | SPF_IS_NOT_XML`, so a new word interrupts the last and text is
   never read as SAPI markup. Windows' own voices, offline; at most 200 characters.
+
+## Shortcuts
+
+`src-tauri/src/hotkey.rs` registers the main shortcut and the Look up box's own. A
+shortcut that can't be registered is tried again every 5 seconds (`spawn_shortcut_retry`
+in `lib.rs`): right after an update or a restart, the copy of the app that is closing can
+still hold it for a moment. Home says when another app uses it. No lock is held while
+registering (it waits for the main thread, which takes the same lock when a shortcut is
+pressed).
 
 ## The model engine
 

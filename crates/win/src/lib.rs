@@ -52,9 +52,8 @@ pub struct Memory {
 #[cfg(windows)]
 pub use imp::{
     ClickOutsideWatcher, DoubleCopyWatcher, capture_selection, cursor_position,
-    foreground_process_name, hide_window, kill_with_app, memory, place_window_async,
-    prepare_popup_window, primary_button_down, process_memory, set_clipboard_text, set_popup_focus,
-    show_window_at, speak, work_area_at,
+    foreground_process_name, hide_window, kill_with_app, memory, prepare_popup_window,
+    process_memory, set_clipboard_text, set_popup_focus, show_window_at, speak, work_area_at,
 };
 
 #[cfg(not(windows))]

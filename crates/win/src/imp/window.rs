@@ -5,12 +5,10 @@ use windows::Win32::Foundation::{HWND, POINT};
 use windows::Win32::Graphics::Gdi::{
     GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromPoint,
 };
-use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON, VK_RBUTTON};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GWL_EXSTYLE, GetCursorPos, GetSystemMetrics, GetWindowLongPtrW, HWND_TOPMOST, SM_SWAPBUTTON,
-    SW_HIDE, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOZORDER, SWP_SHOWWINDOW, SetForegroundWindow,
-    SetWindowLongPtrW, SetWindowPos, ShowWindow, WS_EX_APPWINDOW, WS_EX_NOACTIVATE,
-    WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    GWL_EXSTYLE, GetCursorPos, GetWindowLongPtrW, HWND_TOPMOST, SW_HIDE, SWP_NOACTIVATE,
+    SWP_SHOWWINDOW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, ShowWindow,
+    WS_EX_APPWINDOW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
 };
 
 use crate::{Error, Rect};
@@ -70,38 +68,6 @@ pub fn show_window_at(raw: isize, x: i32, y: i32, w: i32, h: i32) -> Result<(), 
         )
     }
     .map_err(|e| Error::Os(e.message()))
-}
-
-/// Moves and sizes a window (physical pixels) from any thread without waiting for the
-/// window's own thread (`SWP_ASYNCWINDOWPOS`), so a drag can't stall or deadlock on it.
-pub fn place_window_async(raw: isize, x: i32, y: i32, w: i32, h: i32) -> Result<(), Error> {
-    // SAFETY: see `prepare_popup_window`.
-    unsafe {
-        SetWindowPos(
-            hwnd(raw),
-            None,
-            x,
-            y,
-            w,
-            h,
-            SWP_NOACTIVATE | SWP_NOZORDER | SWP_ASYNCWINDOWPOS,
-        )
-    }
-    .map_err(|e| Error::Os(e.message()))
-}
-
-/// Whether the primary mouse button is held down right now (left, or right when the
-/// buttons are swapped in Windows settings).
-pub fn primary_button_down() -> bool {
-    // SAFETY: plain queries with no pointers.
-    unsafe {
-        let vk = if GetSystemMetrics(SM_SWAPBUTTON) != 0 {
-            VK_RBUTTON
-        } else {
-            VK_LBUTTON
-        };
-        GetAsyncKeyState(i32::from(vk.0)) < 0
-    }
 }
 
 pub fn hide_window(raw: isize) {
