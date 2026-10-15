@@ -267,7 +267,7 @@ export const en = {
       "Select a word or a hard passage in any app and press a shortcut. It's searched, looked up or explained by AI on this computer, right next to it.",
     start: "Get started",
     searchFirst: "Search the web first",
-    searchFirstHint: "The card opens on a Google search of what you select, like Definer. Turn this off to keep everything on this computer.",
+    searchFirstHint: "The card opens on a Google search of what you select. Turn this off to keep everything on this computer.",
     example: "The same paragraph at the Plain level.",
     steps: "Steps",
     stepOf: (n: number, total: number) => `Step ${n} of ${total}`,
