@@ -9,6 +9,9 @@
 //! - Text containing `[drift]` is answered in Chinese unless the request carries a
 //!   grammar or a language reminder, like a small model drifting.
 //! - Text containing `[slow]` streams slowly.
+//! - A translation request ("...translate... into X." in the system prompt) is answered
+//!   with a stand-in translation (`fake_translate`); text containing `[echo]` is handed
+//!   back untranslated unless the request carries a language reminder.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -142,9 +145,33 @@ fn chat(stream: &mut TcpStream, body: &[u8], record: Option<&str>) {
             .unwrap_or_else(|| last_user.clone()),
     };
     let slow = text.contains("[slow]");
-    let clean = text.replace("[drift]", "").replace("[slow]", "");
+    let clean = text
+        .replace("[drift]", "")
+        .replace("[slow]", "")
+        .replace("[echo]", "");
+    // A translation request names its target in the system prompt's first line.
+    let system = messages
+        .first()
+        .and_then(|m| m["content"].as_str())
+        .unwrap_or("");
+    let target = system
+        .lines()
+        .next()
+        .filter(|l| l.contains("translat"))
+        .and_then(|l| l.rsplit_once(" into "))
+        .map(|(_, t)| t.trim_end_matches('.').to_string());
     let reply = if text.contains("[drift]") && !constrained && !reminded {
         format!("这是一个测试。{}", clean.trim())
+    } else if let Some(target) = target {
+        if text.contains("[echo]") && !reminded {
+            // Handed back untranslated, like a small model that ignored the task.
+            format!("Here is the translation:\n\n{}", clean.trim())
+        } else {
+            format!(
+                "Here is the translation:\n\n{}",
+                fake_translate(clean.trim(), &target)
+            )
+        }
     } else {
         format!("Sure! Here is a simpler version:\n\n{}", clean.trim())
     };
@@ -172,4 +199,29 @@ fn chat(stream: &mut TcpStream, body: &[u8], record: Option<&str>) {
     });
     let _ = write!(stream, "data: {done}\n\ndata: [DONE]\n\n");
     let _ = stream.flush();
+}
+
+/// A stand-in "translation": every run of Latin letters becomes one filler word in the
+/// target's script, and numbers are kept (in Bangla digits for Bangla), so tests can see
+/// the target script and the number checks at work.
+fn fake_translate(text: &str, target: &str) -> String {
+    let bangla = target.starts_with("Bangla");
+    let filler = if bangla { "অনু" } else { "texto" };
+    let mut out = String::new();
+    let mut in_word = false;
+    for c in text.chars() {
+        if c.is_ascii_alphabetic() {
+            if !in_word {
+                out.push_str(filler);
+            }
+            in_word = true;
+            continue;
+        }
+        in_word = false;
+        match c.to_digit(10) {
+            Some(d) if bangla => out.push(char::from_u32(0x09E6 + d).unwrap_or(c)),
+            _ => out.push(c),
+        }
+    }
+    out
 }

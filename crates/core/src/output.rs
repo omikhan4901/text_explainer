@@ -61,6 +61,9 @@ const PREAMBLE_STARTS: &[&str] = &[
     "the simplified",
     "in plain",
     "in simpler",
+    "translation:",
+    "the translation",
+    "translated text",
 ];
 
 /// "Sure! Here is a simpler version:" and similar first lines.
@@ -208,9 +211,18 @@ mod tests {
             "<think>The user wants…</think>\nThe tenant pays rent.",
             "<think>\n\n</think>\n\nThe tenant pays rent.",
             "The tenant pays rent.\n\nNote: I kept all numbers the same.",
+            "Here is the translation:\n\nThe tenant pays rent.",
+            "Translation: The tenant pays rent.",
+            "The translation into English:\nThe tenant pays rent.",
         ] {
             assert_eq!(clean(raw), "The tenant pays rent.", "{raw:?}");
         }
+        assert_eq!(clean("Translation:\nভাড়াটে ভাড়া দেন।"), "ভাড়াটে ভাড়া দেন।");
+        // A real sentence about translation stays.
+        assert_eq!(
+            clean("Translation services are free for tenants."),
+            "Translation services are free for tenants."
+        );
     }
 
     #[test]
