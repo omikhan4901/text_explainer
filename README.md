@@ -19,7 +19,7 @@ Fully offline, on an ordinary 8 GB laptop with no graphics card.
 **becomes this, next to your cursor:**
 
 <p>
-  <img src="docs/screenshots/card-passage-light.png" alt="The reading card: the lease sentence rewritten in plain language, with the Simpler / Plain / Clearer switch and a Grade 17 → 9 badge" width="440">
+  <img src="docs/screenshots/card-passage-light.png" alt="The reading card: the lease sentence rewritten in plain language, with the Simpler / Plain / Clearer switch and the grade going from 17 to 9" width="440">
   <img src="docs/screenshots/card-passage-dark.png" alt="The same card in dark mode" width="440">
 </p>
 
@@ -27,7 +27,7 @@ Fully offline, on an ordinary 8 GB laptop with no graphics card.
 
 - **Readable rewrites, not definitions.** Long sentences, jargon and acronyms become plain
   language at the level you choose (Simpler, Plain, Clearer), keeping every number, date
-  and name. A badge shows the reading grade before and after.
+  and name. The card shows the reading grade before and after.
 - **Never in your way.** The card appears beside what you're reading without taking focus
   from the app you're in. Esc or a click elsewhere closes it.
 - **Two ways in.** Select text and press the shortcut (Ctrl+Shift+Space by default), or
@@ -35,8 +35,8 @@ Fully offline, on an ordinary 8 GB laptop with no graphics card.
 - **It checks itself.** If a rewrite drops or invents a number, date or name, the card
   says so. Answers can't drift into another language: a grammar constrains the model
   token by token.
-- **Single words get a dictionary.** A WordNet entry appears instantly, with the meaning
-  in context underneath.
+- **Single words get a dictionary.** A WordNet entry appears instantly. Its Explain tab
+  gives the meaning in this text, and the model only runs if you open that tab.
 - **Runs on your machine.** A small open model through llama.cpp. Nothing you read leaves
   your computer.
 - **Your model, your rules.** Pick a model that fits your memory, bring any GGUF file or a
@@ -44,7 +44,7 @@ Fully offline, on an ordinary 8 GB laptop with no graphics card.
 
 <p>
   <img src="docs/screenshots/card-check-light.png" alt="A card warning that 5% was not found in the rewrite" width="440">
-  <img src="docs/screenshots/card-word-dark.png" alt="A single word, ubiquitous: its meaning in this text and the dictionary entry, in dark mode" width="440">
+  <img src="docs/screenshots/card-word-dark.png" alt="A single word, ubiquitous: the card opens on its dictionary entry, with an Explain tab next to it, in dark mode" width="440">
 </p>
 
 ## The app
@@ -53,7 +53,7 @@ A calm settings window: the shortcut, the model, how the card reads. White by de
 dark when the system is.
 
 <p>
-  <img src="docs/screenshots/main-home-light.png" alt="Home: ready status with the shortcut, the model in use, the two ways to use it and a paragraph to try it on" width="440">
+  <img src="docs/screenshots/main-home-light.png" alt="Home: how to use it, a paragraph to try it on, and the model in use; the sidebar shows it is ready" width="440">
   <img src="docs/screenshots/main-model-light.png" alt="Model: the catalog with sizes, licenses and whether each fits this computer's memory" width="440">
 </p>
 <p>

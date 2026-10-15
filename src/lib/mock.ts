@@ -20,7 +20,7 @@ export const DEFAULT_SETTINGS: Settings = {
   idle_unload_minutes: 10,
   prompts: { simpler: null, plain: null, clearer: null },
   extra_server_args: [],
-  appearance: { theme: "system", accent: "plum", reading_font: "plex", font_size: 15, line_height: 1.6 },
+  appearance: { theme: "system", accent: "ink", reading_font: "plex", font_size: 15, line_height: 1.6 },
   start_with_windows: true,
   first_run_done: false,
 };
@@ -164,6 +164,9 @@ async function call<T>(command: string, args: Record<string, unknown> = {}): Pro
       settings = { ...settings, level: args.level as Settings["level"] };
       void playDemo(currentDemo);
       return undefined as T;
+    case "explain_now":
+      if (args.id === demoId) void explainWord(demoId);
+      return undefined as T;
     default:
       return undefined as T;
   }
@@ -202,7 +205,8 @@ async function playDemo(name: string) {
   clearTimeout(demoTimer);
   const id = ++demoId;
   const send = (event: ExplainEvent) => emit("te://popup", { type: "explain", id, event } satisfies PopupEvent);
-  emit("te://popup", { type: "open", id } satisfies PopupEvent);
+  const ai = name === "word_offline" ? "off" : name === "word" ? "deferred" : "running";
+  emit("te://popup", { type: "open", id, ai } satisfies PopupEvent);
   if (name === "no_model") return emit("te://popup", { type: "no_model" });
   if (name === "no_selection") return emit("te://popup", { type: "no_selection", hotkey: settings.hotkey });
   if (name === "word" || name === "word_offline") {
@@ -211,16 +215,12 @@ async function playDemo(name: string) {
       id,
       entry: {
         lemma: "ubiquitous",
-        senses: [{ pos: "adjective", definition: "being present everywhere at once", example: "ubiquitous computing", synonyms: ["omnipresent"] }],
+        senses: [
+          { pos: "adjective", definition: "being present everywhere at once", example: "ubiquitous computing", synonyms: ["omnipresent"] },
+          { pos: "adjective", definition: "seeming to be everywhere, often to the point of being tiresome", example: "the ubiquitous advertising on buses", synonyms: ["pervasive", "universal"] },
+        ],
       },
     } satisfies PopupEvent);
-    if (name === "word_offline") return;
-    send({ type: "started", kind: "word", source: "ubiquitous", truncated: false, grade_before: null, parts: 1, language: "English" });
-    await sleep(500);
-    if (id !== demoId) return;
-    const text = "Smartphones are found almost everywhere in daily life.";
-    send({ type: "part_done", part: 0, text });
-    send({ type: "done", text, grade_after: null, report: { missing: [], added: [] }, timings: null, elapsed_ms: 480 });
     return;
   }
   send({ type: "started", kind: "passage", source: SOURCE, truncated: false, grade_before: 17.4, parts: 1, language: "English" });
@@ -244,6 +244,17 @@ async function playDemo(name: string) {
   send({ type: "part_done", part: 0, text });
   const report = name === "check" ? { missing: [{ kind: "number" as const, text: "5%" }], added: [] } : { missing: [], added: [] };
   send({ type: "done", text, grade_after: settings.level === "simpler" ? 4.9 : settings.level === "plain" ? 8.6 : 11.2, report, timings: { predicted_per_second: 14.2 }, elapsed_ms: 3200 });
+}
+
+/** A word's meaning in its text, once the card's Explain tab asks for it. */
+async function explainWord(id: number) {
+  const send = (event: ExplainEvent) => emit("te://popup", { type: "explain", id, event } satisfies PopupEvent);
+  send({ type: "started", kind: "word", source: "ubiquitous", truncated: false, grade_before: null, parts: 1, language: "English" });
+  await sleep(500);
+  if (id !== demoId) return;
+  const text = "Here it means found almost everywhere: smartphones are part of nearly every moment of daily life.";
+  send({ type: "part_done", part: 0, text });
+  send({ type: "done", text, grade_after: null, report: { missing: [], added: [] }, timings: null, elapsed_ms: 480 });
 }
 
 export const mock = { call, on, playDemo, emit };

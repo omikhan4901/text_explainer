@@ -38,7 +38,12 @@ sources, custom sources, a Look up box, triggers, app and site rules) plus local
 AI Translate and the offline dictionary. Desktop software only, never a browser extension.
 
 - [x] S0 Plan
-- [ ] S1 Tabs and Look up
+- [x] Redesign (15 October 2026): the owner found the Atlas look (copied from the HR app)
+      ugly. New design system: neutral surfaces, near-black controls, one quiet accent
+      (Ink default), Geist and Phosphor icons; text sidebar instead of the icon rail; no
+      hero banner or pill clutter. The card is now tabbed, and a word opens on its
+      Dictionary tab with the model started only if Explain is opened.
+- [ ] S1 Tabs and Look up (tabs done with the redesign; Look up box next)
 - [ ] S2 Web sources
 - [ ] S3 Page sources
 - [ ] S4 AI Translate

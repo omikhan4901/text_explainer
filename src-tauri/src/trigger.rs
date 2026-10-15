@@ -10,7 +10,7 @@ use te_core::explain::{self, Event, Request};
 use te_core::text::{self, SelectionKind};
 use te_win::Rect;
 
-use crate::popup::{self, PopupEvent};
+use crate::popup::{self, AiMode, PopupEvent};
 use crate::state::{AppState, LastRequest};
 
 /// The hotkey was pressed.
@@ -62,7 +62,8 @@ pub fn start(app: &AppHandle, text: String, context: Option<String>, bounds: Opt
 }
 
 /// Explains the last selection with the current settings (also used when the reading
-/// level changes).
+/// level changes). A single word or short term with a dictionary entry opens on that
+/// entry, and the model only starts if the person opens the Explain tab (`explain_now`).
 pub fn run(app: &AppHandle) {
     let state = app.state::<AppState>();
     let Some(last) = state.last.lock().expect("last lock").clone() else {
@@ -90,14 +91,45 @@ pub fn run(app: &AppHandle) {
         popup::emit(app, PopupEvent::NoModel);
         return;
     }
-    popup::emit(app, PopupEvent::Open { id });
+    let ai = match (backend, &entry) {
+        (Backend::None, _) => AiMode::Off,
+        (_, Some(_)) => AiMode::Deferred,
+        (_, None) => AiMode::Running,
+    };
+    popup::emit(app, PopupEvent::Open { id, ai });
     if let Some(entry) = entry {
         popup::emit(app, PopupEvent::Dictionary { id, entry });
     }
-    if backend == Backend::None {
-        // No model yet: the dictionary entry is the whole answer.
+    if ai == AiMode::Running {
+        explain(app, id);
+    }
+}
+
+/// The card's Explain tab was opened on request `id`: start the model if that request is
+/// still the current one.
+pub fn explain_now(app: &AppHandle, id: u64) {
+    let state = app.state::<AppState>();
+    if state.request_id.load(Ordering::SeqCst) != id {
         return;
     }
+    if state.backend(&state.settings()) == Backend::None {
+        return;
+    }
+    explain(app, id);
+}
+
+/// Streams the model's answer for the last selection into the card as request `id`.
+fn explain(app: &AppHandle, id: u64) {
+    let state = app.state::<AppState>();
+    let Some(last) = state.last.lock().expect("last lock").clone() else {
+        return;
+    };
+    let settings = state.settings();
+    let backend = state.backend(&settings);
+    if let Some(previous) = state.task.lock().expect("task lock").take() {
+        previous.abort();
+    }
+    let cleaned = text::clean(&last.text);
     // Capitalised ordinary words ("Lessee", "Agreement") aren't names for the meaning check.
     let common_words: Vec<String> = state
         .dictionary

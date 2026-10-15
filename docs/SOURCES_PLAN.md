@@ -47,7 +47,7 @@ double Ctrl+C cover it.
 └──────────────────────────────────────────────────────────┘
 ```
 
-- Same Atlas design, same rules: never takes focus from the app the person is reading in,
+- Same design as the rest of the app, same rules: never takes focus from the app the person is reading in,
   Esc or a click outside closes it, pin keeps it open.
 - A single word opens on Dictionary; a sentence or more on Explain. Both are settings.
 - Web source tabs carry a small globe so local and online are always told apart.
@@ -60,7 +60,7 @@ double Ctrl+C cover it.
   built-in web sources, and custom sources. Each can be shown or hidden and reordered.
 - **Web sources, data kind** (Wikipedia summary, Wiktionary definitions, Free Dictionary
   API; all free, no key): fetched by `te-core` over HTTPS with a short timeout and drawn
-  in the card in Atlas style, like the local dictionary. No page scripts run.
+  in the card in the app's own style, like the local dictionary. No page scripts run.
 - **Web sources, page kind** (custom sources, Google Translate, a web search): the site is
   loaded in a child webview inside the card, in its own profile with no access to the
   app's IPC, cookies cleared when the app quits. Reading it doesn't take focus; clicking

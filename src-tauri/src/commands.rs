@@ -302,6 +302,12 @@ pub async fn set_level(app: AppHandle, level: Level) -> CmdResult<()> {
     Ok(())
 }
 
+/// The card's Explain tab was opened on a word: start the model for request `id`.
+#[tauri::command]
+pub fn explain_now(app: AppHandle, id: u64) {
+    trigger::explain_now(&app, id);
+}
+
 #[tauri::command]
 pub fn copy_text(text: String) -> CmdResult<()> {
     te_win::set_clipboard_text(&text).map_err(|e| e.to_string())

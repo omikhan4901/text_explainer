@@ -1,6 +1,5 @@
-import "@fontsource/ibm-plex-sans/400.css";
-import "@fontsource/ibm-plex-sans/500.css";
-import "@fontsource/ibm-plex-sans/600.css";
+import "@fontsource-variable/geist";
+import "@fontsource-variable/geist-mono";
 import "@fontsource/atkinson-hyperlegible/400.css";
 import "@fontsource/atkinson-hyperlegible/700.css";
 import "@fontsource/source-serif-4/400.css";

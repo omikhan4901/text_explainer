@@ -13,9 +13,8 @@ export function IconButton({
       type="button"
       aria-label={label}
       title={label}
-      aria-pressed={rest["aria-pressed"]}
-      className={`grid size-7 place-items-center rounded-md transition-colors ${
-        active ? "bg-accent-soft text-accent-soft-text" : "text-muted hover:bg-surface-2 hover:text-text"
+      className={`grid size-7 place-items-center rounded-md transition-colors disabled:opacity-40 ${
+        active ? "bg-surface-2 text-text" : "text-muted hover:bg-surface-2 hover:text-text"
       } ${className}`}
       {...rest}
     >

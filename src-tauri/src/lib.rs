@@ -173,6 +173,7 @@ pub fn run() {
             commands::popup_close,
             commands::popup_pin,
             commands::set_level,
+            commands::explain_now,
             commands::copy_text,
             commands::explain_text,
             commands::open_main,

@@ -1,7 +1,8 @@
-import { Card } from "../../components/ui/Card";
 import { Field, inputClass } from "../../components/ui/Field";
+import { Group, Section } from "../../components/ui/Section";
 import { Segmented } from "../../components/ui/Segmented";
 import { strings } from "../../i18n";
+import { ACCENTS } from "../../lib/theme";
 import type { AccentName, Appearance, Level, ReadingFont, Theme } from "../../lib/types";
 import { Reading } from "../../popup/Popup";
 import { PageTitle } from "../App";
@@ -10,10 +11,10 @@ import { useData } from "../data";
 const t = strings.reading;
 /** Each accent's light and dark value (tokens.css), so every swatch shows on both themes. */
 const SWATCH: Record<AccentName, [string, string]> = {
-  plum: ["#6d28d9", "#a78bfa"],
-  saffron: ["#b45309", "#f59e0b"],
-  garnet: ["#9f1239", "#fb7185"],
-  ink: ["#18181b", "#e4e4e7"],
+  ink: ["#1b1b1a", "#ececea"],
+  plum: ["#6c3d78", "#d3aedc"],
+  saffron: ["#8f5208", "#e7b46a"],
+  garnet: ["#9b2c3c", "#f0a0ab"],
 };
 
 export function ReadingPage() {
@@ -24,9 +25,16 @@ export function ReadingPage() {
   const output = settings.output.mode === "fixed" ? settings.output.code : "";
   return (
     <>
-      <PageTitle>{t.title}</PageTitle>
-      <Card>
-        <div className="divide-y divide-border">
+      <PageTitle lead={t.lead}>{t.title}</PageTitle>
+
+      <Section title={t.preview}>
+        <div className="rounded-xl bg-surface px-5 py-4 shadow-[var(--shadow-card)]">
+          <Reading text={t.sample} streaming={false} />
+        </div>
+      </Section>
+
+      <Section title={t.explaining}>
+        <Group>
           <Field label={t.level} hint={t.levelHint}>
             <Segmented<Level>
               label={t.level}
@@ -54,6 +62,11 @@ export function ReadingPage() {
               ))}
             </select>
           </Field>
+        </Group>
+      </Section>
+
+      <Section title={t.text}>
+        <Group>
           <Field label={t.font} hint={t.fontHint}>
             <Segmented<ReadingFont>
               label={t.font}
@@ -66,8 +79,21 @@ export function ReadingPage() {
             <Range label={t.size} value={a.font_size} min={12} max={24} step={1} format={(v) => `${v}px`} onChange={(font_size) => setA({ font_size })} />
           </Field>
           <Field label={t.spacing}>
-            <Range label={t.spacing} value={a.line_height} min={1.2} max={2.2} step={0.1} format={(v) => v.toFixed(1)} onChange={(line_height) => setA({ line_height })} />
+            <Range
+              label={t.spacing}
+              value={a.line_height}
+              min={1.2}
+              max={2.2}
+              step={0.1}
+              format={(v) => v.toFixed(1)}
+              onChange={(line_height) => setA({ line_height })}
+            />
           </Field>
+        </Group>
+      </Section>
+
+      <Section title={t.look}>
+        <Group>
           <Field label={t.theme}>
             <Segmented<Theme>
               label={t.theme}
@@ -76,9 +102,9 @@ export function ReadingPage() {
               options={(["system", "light", "dark"] as const).map((v) => ({ value: v, label: t.themes[v] }))}
             />
           </Field>
-          <Field label={t.accent}>
-            <div role="radiogroup" aria-label={t.accent} className="flex gap-2">
-              {(Object.keys(SWATCH) as AccentName[]).map((name) => (
+          <Field label={t.accent} hint={t.accentHint}>
+            <div role="radiogroup" aria-label={t.accent} className="flex gap-1.5">
+              {ACCENTS.map((name) => (
                 <button
                   key={name}
                   type="button"
@@ -87,26 +113,36 @@ export function ReadingPage() {
                   aria-label={t.accents[name]}
                   title={t.accents[name]}
                   onClick={() => setA({ accent: name })}
-                  className={`size-8 rounded-full border-2 transition-transform ${a.accent === name ? "scale-110 border-text" : "border-border-strong"}`}
-                  style={{ background: SWATCH[name][dark ? 1 : 0] }}
-                />
+                  className={`grid size-7 place-items-center rounded-full transition-shadow ${a.accent === name ? "shadow-[0_0_0_1.5px_var(--text)]" : "hover:shadow-[0_0_0_1.5px_var(--border-strong)]"}`}
+                >
+                  <span className="size-5 rounded-full" style={{ background: SWATCH[name][dark ? 1 : 0] }} />
+                </button>
               ))}
             </div>
           </Field>
-        </div>
-      </Card>
-      <Card className="mt-4">
-        <p className="mb-3 text-sm font-medium text-muted">{t.preview}</p>
-        <Reading
-          text="Whatever else this agreement says, the tenant (the Lessee) must pay the monthly rent of $1,200 by the 5th day of each month. If they don't, a late fee of 5% of the unpaid amount is added."
-          streaming={false}
-        />
-      </Card>
+        </Group>
+      </Section>
     </>
   );
 }
 
-function Range({ label, value, min, max, step, format, onChange }: { label: string; value: number; min: number; max: number; step: number; format: (v: number) => string; onChange: (v: number) => void }) {
+function Range({
+  label,
+  value,
+  min,
+  max,
+  step,
+  format,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  format: (v: number) => string;
+  onChange: (v: number) => void;
+}) {
   return (
     <span className="flex items-center gap-3">
       <input
@@ -117,9 +153,9 @@ function Range({ label, value, min, max, step, format, onChange }: { label: stri
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-40 accent-[var(--accent)]"
+        className="w-36 accent-[var(--accent)]"
       />
-      <span className="w-12 text-right text-sm tabular-nums text-muted">{format(value)}</span>
+      <span className="w-10 text-right font-mono text-[12px] text-muted tabular-nums">{format(value)}</span>
     </span>
   );
 }

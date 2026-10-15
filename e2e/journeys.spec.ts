@@ -40,7 +40,9 @@ test("settings: a new shortcut is recorded from the keyboard", async ({ page }) 
   await page.getByRole("button", { name: "Change" }).click();
   await expect(page.getByText("Press the new shortcut…")).toBeVisible();
   await page.keyboard.press("Control+Alt+KeyR");
-  await expect(page.getByText("R", { exact: true })).toBeVisible();
+  await expect(page.getByRole("main").getByText("R", { exact: true })).toBeVisible();
+  // The sidebar shows the new shortcut too.
+  await expect(page.getByRole("complementary").getByText("R", { exact: true })).toBeVisible();
 });
 
 test("home warns when another app owns the shortcut", async ({ page }) => {
@@ -48,4 +50,20 @@ test("home warns when another app owns the shortcut", async ({ page }) => {
   await expect(page.getByRole("alert")).toContainText("Another app is already using Ctrl+Shift+Space.");
   await page.getByRole("button", { name: "Choose another shortcut" }).click();
   await expect(page.getByRole("heading", { name: "Shortcuts" })).toBeVisible();
+});
+
+test("a word opens on its dictionary entry; the Explain tab starts the model", async ({ page }) => {
+  await page.goto("/popup.html?demo=word");
+  await expect(page.getByRole("tab", { name: "Dictionary", selected: true })).toBeVisible();
+  await expect(page.getByText("being present everywhere at once")).toBeVisible();
+  await page.getByRole("tab", { name: "Explain" }).click();
+  await expect(page.getByText(/smartphones are part of nearly every moment/)).toBeVisible({ timeout: 5000 });
+  await page.getByRole("tab", { name: "Dictionary" }).click();
+  await expect(page.getByText("being present everywhere at once")).toBeVisible();
+});
+
+test("without a model a word shows only its dictionary entry", async ({ page }) => {
+  await page.goto("/popup.html?demo=word_offline");
+  await expect(page.getByText("being present everywhere at once")).toBeVisible();
+  await expect(page.getByRole("tab")).toHaveCount(1);
 });

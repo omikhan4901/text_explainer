@@ -1,9 +1,15 @@
 // What the reading card shows, driven by events from the app. Pure so it's easy to test.
-import type { DictionaryEntry, PopupEvent, Report, SelectionKind } from "../lib/types";
+import type { AiMode, DictionaryEntry, PopupEvent, Report, SelectionKind } from "../lib/types";
+
+/** The card's tabs: the model's explanation and the bundled dictionary. */
+export type TabId = "explain" | "dictionary";
 
 export interface Explaining {
   view: "explain";
   id: number;
+  /** "requested": the person opened Explain on a word and the card has asked the app. */
+  ai: AiMode | "requested";
+  tab: TabId;
   started: boolean;
   kind: SelectionKind;
   source: string;
@@ -30,12 +36,17 @@ export type CardState =
   | { view: "capture_failed"; message: string }
   | Explaining;
 
+/** What the card itself does (the person picks a tab). */
+export type CardAction = { type: "select_tab"; tab: TabId };
+
 export const initialState: CardState = { view: "empty" };
 
-function fresh(id: number): Explaining {
+function fresh(id: number, ai: AiMode): Explaining {
   return {
     view: "explain",
     id,
+    ai,
+    tab: "explain",
     started: false,
     kind: "passage",
     source: "",
@@ -54,10 +65,14 @@ function fresh(id: number): Explaining {
   };
 }
 
-export function reduce(state: CardState, event: PopupEvent): CardState {
+export function reduce(state: CardState, event: PopupEvent | CardAction): CardState {
   switch (event.type) {
     case "open":
-      return fresh(event.id);
+      return fresh(event.id, event.ai);
+    case "select_tab":
+      if (state.view !== "explain" || !tabs(state).includes(event.tab)) return state;
+      // Opening Explain on a word starts the model (the card then asks the app for it).
+      return { ...state, tab: event.tab, ai: event.tab === "explain" && state.ai === "deferred" ? "requested" : state.ai };
     case "no_selection":
       return { view: "no_selection", hotkey: event.hotkey };
     case "no_model":
@@ -68,8 +83,14 @@ export function reduce(state: CardState, event: PopupEvent): CardState {
       return state;
     case "dictionary":
       if (state.view !== "explain" || state.id !== event.id) return state;
-      // Without a model the entry is the whole answer, so the card isn't waiting.
-      return { ...state, dictionary: event.entry, kind: state.started ? state.kind : "word", source: state.source || event.entry.lemma };
+      return {
+        ...state,
+        dictionary: event.entry,
+        // A word opens on its dictionary entry unless the model is already answering.
+        tab: state.ai === "running" && state.started ? state.tab : "dictionary",
+        kind: state.started ? state.kind : "word",
+        source: state.source || event.entry.lemma,
+      };
     case "explain": {
       // Events from an earlier request (still finishing) are ignored.
       if (state.view !== "explain" || state.id !== event.id) return state;
@@ -78,6 +99,7 @@ export function reduce(state: CardState, event: PopupEvent): CardState {
         case "started":
           return {
             ...state,
+            ai: "running",
             started: true,
             kind: e.kind,
             source: e.source,
@@ -119,9 +141,29 @@ function setPart(parts: string[], index: number, text: string): string[] {
   return next;
 }
 
+/** The tabs this request has, in order: a word's dictionary entry comes first. */
+export function tabs(state: Explaining): TabId[] {
+  const list: TabId[] = [];
+  if (state.dictionary) list.push("dictionary");
+  if (state.ai !== "off") list.push("explain");
+  return list;
+}
+
 /** The full answer so far. */
 export function answerText(state: Explaining): string {
   return state.parts.filter((p) => p.trim()).join("\n\n");
+}
+
+/** A dictionary entry as plain text, for copying. */
+export function entryText(entry: DictionaryEntry): string {
+  const senses = entry.senses.map((s, i) => `${i + 1}. (${s.pos}) ${s.definition}${s.example ? ` "${s.example}"` : ""}`);
+  return [entry.lemma, ...senses].join("\n");
+}
+
+/** What the copy button copies on the open tab ("" while there's nothing finished). */
+export function copyable(state: Explaining): string {
+  if (state.tab === "dictionary") return state.dictionary ? entryText(state.dictionary) : "";
+  return state.done && !state.error ? answerText(state) : "";
 }
 
 /** True while the answer is still arriving (show the caret). */
@@ -129,7 +171,7 @@ export function isStreaming(state: Explaining): boolean {
   return !state.done && state.parts.some((p) => p.length > 0);
 }
 
-/** Only show the grade badge when it means something (passages, both grades known). */
+/** Only show the grade when it means something (passages, both grades known). */
 export function gradeBadge(state: Explaining): { before: number; after: number } | null {
   if (state.kind !== "passage" || state.gradeBefore == null || state.gradeAfter == null) return null;
   return { before: state.gradeBefore, after: state.gradeAfter };

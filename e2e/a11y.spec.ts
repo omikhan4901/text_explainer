@@ -6,7 +6,7 @@ async function expectAccessible(page: Page) {
   expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
 }
 
-for (const demo of ["passage", "check", "word", "word_offline", "no_model", "no_selection", "loading", "error"]) {
+for (const demo of ["passage", "check", "word", "word&tab=explain", "word_offline", "no_model", "no_selection", "loading", "error"]) {
   test(`reading card (${demo}) is accessible`, async ({ page }) => {
     await page.goto(`/popup.html?demo=${demo}`);
     await expect(page.getByRole("dialog")).toBeVisible();

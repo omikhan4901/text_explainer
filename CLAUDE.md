@@ -35,8 +35,8 @@ The plan is `docs/IMPLEMENTATION_PLAN.md` (sources, translation and Definer pari
 - `src-tauri`: the Tauri 2 app. Tray, global hotkey, selection capture (UI Automation, then
   a clipboard-safe Ctrl+C fallback), the popup window that never takes focus, IPC commands.
 - `src/`: React + TypeScript + Tailwind v4 + Radix front end. `popup.html` is the reading
-  card, `index.html` the main window (settings, models, first run). Atlas design tokens in
-  `src/styles/tokens.css`.
+  card, `index.html` the main window (settings, models, first run). Design tokens in
+  `src/styles/tokens.css` (`docs/GUIDE.md`, "The interface").
 
 ## Rules that are easy to break
 
@@ -52,10 +52,12 @@ The plan is `docs/IMPLEMENTATION_PLAN.md` (sources, translation and Definer pari
 
 ## Working with the owner
 
-- Look and feel: Atlas design (see `companymgmt/docs/design/atlas`). White by default,
-  dark mode follows the system, accents Plum (default) / Saffron / Garnet / Ink; never blue
-  or neon. Radix + Tailwind. No gradient washes, glows or illustrated mock-ups (the owner
-  reads them as "AI-looking"). Calm, minimal, little text; one clear action at a time.
+- Look and feel: its own quiet design, not the HR app's (the owner rejected the Atlas
+  look on 15 October 2026). Neutral surfaces, near-black controls, one accent that only
+  marks where you are (Ink default; Plum / Saffron / Garnet); never blue or neon. Geist,
+  Phosphor icons, Radix + Tailwind. No hero banners, pill clutter, gradient washes, glows,
+  em dashes or illustrated mock-ups (the owner reads them as "AI-looking"). Calm, minimal,
+  little text; one clear action at a time. The text being read is the loudest thing.
 - Windows first: build the MVP for Windows only. macOS and Linux come after the MVP.
 - This is a portfolio project: keep `docs/marketing/` current, and only claim what is built
   and measured.

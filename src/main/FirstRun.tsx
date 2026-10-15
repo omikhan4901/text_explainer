@@ -1,15 +1,18 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
-import { Button } from "../components/ui/Button";
-import { Card } from "../components/ui/Card";
+import { Button, LinkButton } from "../components/ui/Button";
 import { Kbd } from "../components/ui/Kbd";
 import { Progress } from "../components/ui/Progress";
+import { Group } from "../components/ui/Section";
 import { strings } from "../i18n";
 import { api, inApp } from "../lib/ipc";
+import { Reading } from "../popup/Popup";
+import { Mark } from "./App";
 import { useData, useDownloadOf } from "./data";
 import { ModelRow } from "./ModelRow";
 
 const t = strings.firstRun;
+const STEPS = 3;
 
 /** Three calm steps: what it does, get a model, try it. */
 export function FirstRun({ onSeeModels }: { onSeeModels: () => void }) {
@@ -30,18 +33,36 @@ export function FirstRun({ onSeeModels }: { onSeeModels: () => void }) {
   };
 
   return (
-    <div className="grid min-h-dvh place-items-center bg-bg px-6 py-10">
-      <div className="w-full max-w-xl">
-        <ol className="mb-8 flex justify-center gap-2" aria-label="Steps">
-          {[0, 1, 2].map((i) => (
-            <li key={i} aria-current={i === step ? "step" : undefined} className={`h-1.5 w-10 rounded-full ${i <= step ? "bg-accent" : "bg-border"}`} />
+    <div className="flex min-h-dvh flex-col bg-bg px-10 py-8">
+      <div className="flex items-center justify-between">
+        <span className="flex items-center gap-2.5">
+          <Mark />
+          <span className="text-[13px] font-semibold">{strings.app.name}</span>
+        </span>
+        <ol className="flex items-center gap-1.5" aria-label={t.steps}>
+          {Array.from({ length: STEPS }, (_, i) => (
+            <li
+              key={i}
+              aria-current={i === step ? "step" : undefined}
+              aria-label={t.stepOf(i + 1, STEPS)}
+              className={`h-1 w-6 rounded-full transition-colors ${i <= step ? "bg-control" : "bg-border-strong"}`}
+            />
           ))}
         </ol>
+      </div>
 
+      <div key={step} className="card-in mx-auto my-auto w-full max-w-[560px] py-10">
         {step === 0 && (
-          <div className="text-center">
-            <h1 className="text-4xl font-semibold">{t.welcome}</h1>
-            <p className="mx-auto mt-4 max-w-md text-lg text-muted">{t.welcomeBody}</p>
+          <div>
+            <h1 className="text-[30px] leading-[1.15] font-semibold tracking-[-0.03em]">{t.welcome}</h1>
+            <p className="mt-3 max-w-[46ch] text-[15px] text-muted">{t.welcomeBody}</p>
+            <figure className="mt-8 space-y-3">
+              <blockquote className="border-l-2 border-border-strong pl-4 text-[13px] leading-relaxed text-muted">{strings.home.sample}</blockquote>
+              <div className="ml-4 rounded-xl bg-surface px-4 py-3.5 shadow-[var(--shadow-card)]">
+                <Reading text={strings.reading.sample} streaming={false} />
+              </div>
+              <figcaption className="ml-4 text-[12px] text-muted">{t.example}</figcaption>
+            </figure>
             <Button variant="primary" className="mt-8" onClick={() => setStep(1)}>
               {t.start}
             </Button>
@@ -50,28 +71,24 @@ export function FirstRun({ onSeeModels }: { onSeeModels: () => void }) {
 
         {step === 1 && recommended && (
           <div>
-            <h1 className="text-3xl font-semibold">{t.modelTitle}</h1>
+            <h1 className="text-[24px] font-semibold tracking-[-0.025em]">{t.modelTitle}</h1>
             <p className="mt-2 text-muted">{t.modelBody}</p>
-            {info.total_ram_bytes && <p className="mt-1 text-sm text-muted">{strings.model.ram(info.total_ram_bytes)}</p>}
-            <Card className="mt-6">
+            {info.total_ram_bytes && <p className="mt-1 text-[13px] text-muted">{strings.model.ram(info.total_ram_bytes)}</p>}
+            <Group className="mt-6">
               <ModelRow model={recommended} recommended compact />
-            </Card>
-            <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
-              <button
-                type="button"
-                className="font-medium text-accent underline-offset-2 hover:underline"
+            </Group>
+            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-[13px]">
+              <LinkButton
                 onClick={() => {
                   finish();
                   onSeeModels();
                 }}
               >
                 {t.otherModels}
-              </button>
-              <button type="button" className="font-medium text-accent underline-offset-2 hover:underline" onClick={() => void chooseFile()}>
-                {t.haveModel}
-              </button>
+              </LinkButton>
+              <LinkButton onClick={() => void chooseFile()}>{t.haveModel}</LinkButton>
             </div>
-            <div className="mt-8 flex justify-between">
+            <div className="mt-10 flex justify-between">
               <Button variant="ghost" onClick={() => setStep(0)}>
                 {t.back}
               </Button>
@@ -84,18 +101,22 @@ export function FirstRun({ onSeeModels }: { onSeeModels: () => void }) {
 
         {step === 2 && (
           <div>
-            <h1 className="text-3xl font-semibold">{t.tryTitle}</h1>
+            <h1 className="text-[24px] font-semibold tracking-[-0.025em]">{t.tryTitle}</h1>
             <p className="mt-2 flex flex-wrap items-center gap-2 text-muted">
               {t.tryBody(settings.hotkey)} <Kbd keys={settings.hotkey} />
             </p>
-            <blockquote className="mt-6 rounded-xl border border-border bg-surface p-5 leading-relaxed select-text">{strings.home.sample}</blockquote>
+            <Group className="mt-6 px-5 py-4">
+              <p className="leading-relaxed select-text" style={{ fontFamily: "var(--reading-font)" }}>
+                {strings.home.sample}
+              </p>
+            </Group>
             {progress && !hasModel && (
               <div className="mt-4 space-y-1.5">
                 <Progress value={progress.downloaded / progress.total} label={strings.model.downloading} />
-                <p className="text-sm text-muted">{t.downloadingNote}</p>
+                <p className="text-[13px] text-muted">{t.downloadingNote}</p>
               </div>
             )}
-            <div className="mt-8 flex justify-between">
+            <div className="mt-10 flex justify-between">
               <Button variant="ghost" onClick={() => setStep(1)}>
                 {t.back}
               </Button>

@@ -26,6 +26,7 @@ pub enum PopupEvent {
     /// A new request starts (the page clears and shows the source).
     Open {
         id: u64,
+        ai: AiMode,
     },
     Explain {
         id: u64,
@@ -45,6 +46,16 @@ pub enum PopupEvent {
     },
     /// Settings changed (appearance, level); the page reloads them.
     Settings,
+}
+
+/// Whether the model works on a request: now, once the card's Explain tab is opened, or
+/// not at all (no model set up; the dictionary entry is the whole answer).
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AiMode {
+    Running,
+    Deferred,
+    Off,
 }
 
 pub fn emit(app: &AppHandle, event: PopupEvent) {

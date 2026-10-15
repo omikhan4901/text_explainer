@@ -26,15 +26,32 @@ A guide to the code for anyone changing it. Keep it true when you change how thi
    global shortcut only while it's open; a low-level mouse hook closes it on clicks
    elsewhere.
 3. **Dictionary** (`crates/core/src/dictionary.rs`). For one word or a short term, the
-   WordNet entry is sent to the card at once.
+   WordNet entry is sent to the card at once and the card opens on its Dictionary tab.
+   The model doesn't start: the card's `open` event says `ai: "deferred"`, and only if
+   the person opens the Explain tab does the card call `explain_now`, which runs step 4
+   for that request (if it's still the current one). Passages and words the dictionary
+   doesn't know go straight to step 4 (`ai: "running"`); with no model it's `"off"`.
 4. **Pipeline** (`crates/core/src/explain.rs`): repair the text (`text.rs`), classify it,
    detect its language (`language.rs`), decide the allowed scripts and build the GBNF
    grammar, split long text into parts, then for each part: build the prompt
    (`prompt.rs`), stream from llama-server (`engine/`), clean the stream (`output.rs`),
    check the script; on drift, retry once with a stricter instruction. Finally the
    meaning check (`meaning.rs`) and reading grade (`readability.rs`, English only).
-5. **Card updates** (`src/popup/state.ts` reduces the events; `Popup.tsx` renders them).
-   The window is resized to the card as text streams in.
+5. **Card updates** (`src/popup/state.ts` reduces the events and the tab choice;
+   `Popup.tsx` renders them). The card is a set of tabs (`tabs()` in `state.ts`): the
+   dictionary entry first for words, then Explain. The level switch and grade sit in a
+   footer on passages. The window is resized to the card as text streams in.
+
+## The interface
+
+Design tokens are in `src/styles/tokens.css`: neutral surfaces, near-black controls
+(`--control`) and one accent (`--accent`, from Settings: Ink by default, or Plum, Saffron,
+Garnet) that marks only where you are (open tab, links, switches, focus). Type is Geist
+(UI and the default reading font) with Geist Mono for small figures; the reading font can
+be Atkinson Hyperlegible or Source Serif. Icons are Phosphor. Shared pieces are in
+`src/components/ui/` (`Section` and `Group` for settings pages, `Field` and `Switch` rows,
+`Segmented`, `Kbd`, `Button`). Every pair of colours meets WCAG 2.2 AA in light and dark,
+checked by `e2e/a11y.spec.ts`.
 
 ## The model engine
 
@@ -63,6 +80,7 @@ request, restarted if it crashes, and stopped after the idle time in Settings.
 ## Developing without Windows
 
 `npx vite` serves the interface in a browser against a mock (`src/lib/mock.ts`):
-`popup.html?demo=passage|word|word_offline|check|no_model|loading|error`, and
+`popup.html?demo=passage|word|word_offline|check|no_model|loading|error` (add `&tab=explain`
+to open a word's Explain tab), and
 `index.html?state=ready&page=model`. `scripts/wincheck.sh clippy -p text-explainer`
 type-checks the Windows app from Linux.

@@ -1,9 +1,9 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { FileUp, Server } from "lucide-react";
+import { FileArrowUp } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Button } from "../../components/ui/Button";
-import { Card, CardTitle } from "../../components/ui/Card";
 import { Field, inputClass } from "../../components/ui/Field";
+import { Group, Section } from "../../components/ui/Section";
 import { Segmented } from "../../components/ui/Segmented";
 import { Tag } from "../../components/ui/Tag";
 import { strings } from "../../i18n";
@@ -23,20 +23,17 @@ export function ModelPage() {
     <>
       <PageTitle lead={t.lead}>{t.title}</PageTitle>
       {!info.engine_found && (
-        <p role="alert" className="mb-4 rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger-text">
+        <p role="alert" className="mb-6 rounded-lg bg-danger-soft px-3.5 py-2.5 text-[13px] text-danger">
           {t.engineMissing}
         </p>
       )}
-      <Card>
-        <CardTitle aside={info.total_ram_bytes ? <span className="text-sm text-muted">{t.ram(info.total_ram_bytes)}</span> : undefined}>
-          {t.catalog}
-        </CardTitle>
-        <div className="divide-y divide-border">
+      <Section title={t.catalog} description={info.total_ram_bytes ? t.ram(info.total_ram_bytes) : undefined}>
+        <Group>
           {models.map((m) => (
             <ModelRow key={m.id} model={m} recommended={m.id === info.recommended} />
           ))}
-        </div>
-      </Card>
+        </Group>
+      </Section>
       <OwnModel />
       <Tuning />
       <Prompts />
@@ -58,50 +55,53 @@ function OwnModel() {
   };
 
   return (
-    <Card className="mt-4">
-      <CardTitle>{t.own}</CardTitle>
-      <p className="-mt-2 mb-4 text-sm text-muted">{t.ownBody}</p>
-      <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={() => void chooseFile()}>
-          <FileUp size={16} /> {t.chooseFile}
-        </Button>
-        {current.kind === "file" && (
-          <span className="flex min-w-0 items-center gap-2 text-sm">
-            <Tag tone="accent">{t.usingFile}</Tag>
-            <span className="truncate text-muted" title={current.path}>
-              {current.path}
-            </span>
-          </span>
-        )}
-      </div>
-      <form
-        className="mt-6 grid gap-3 sm:grid-cols-[1fr_1fr]"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void update({ model: { kind: "endpoint", base_url: url.trim(), model: name.trim(), api_key: key.trim() || null } });
-        }}
-      >
-        <p className="flex items-center gap-2 font-medium sm:col-span-2">
-          <Server size={16} aria-hidden /> {t.endpoint}
-          {current.kind === "endpoint" && <Tag tone="accent">{t.usingEndpoint}</Tag>}
-        </p>
-        <label className="grid gap-1 text-sm">
-          {t.endpointUrl}
-          <input className={inputClass} value={url} onChange={(e) => setUrl(e.target.value)} required pattern="https?://.+" />
-        </label>
-        <label className="grid gap-1 text-sm">
-          {t.endpointModel}
-          <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} required placeholder="qwen3.5:4b" />
-        </label>
-        <label className="grid gap-1 text-sm">
-          {t.endpointKey}
-          <input className={inputClass} value={key} onChange={(e) => setKey(e.target.value)} type="password" autoComplete="off" />
-        </label>
-        <div className="flex items-end">
-          <Button type="submit">{t.useEndpoint}</Button>
+    <Section title={t.own} description={t.ownBody}>
+      <Group>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 font-medium">
+              {t.file}
+              {current.kind === "file" && <Tag tone="accent">{t.usingFile}</Tag>}
+            </p>
+            {current.kind === "file" && (
+              <p className="mt-0.5 truncate font-mono text-[11px] text-muted" title={current.path}>
+                {current.path}
+              </p>
+            )}
+          </div>
+          <Button size="sm" onClick={() => void chooseFile()}>
+            <FileArrowUp size={14} /> {t.chooseFile}
+          </Button>
         </div>
-      </form>
-    </Card>
+        <form
+          className="grid gap-3 px-4 py-3.5 sm:grid-cols-[1fr_1fr]"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void update({ model: { kind: "endpoint", base_url: url.trim(), model: name.trim(), api_key: key.trim() || null } });
+          }}
+        >
+          <p className="flex items-center gap-2 font-medium sm:col-span-2">
+            {t.endpoint}
+            {current.kind === "endpoint" && <Tag tone="accent">{t.usingEndpoint}</Tag>}
+          </p>
+          <label className="grid gap-1 text-[13px] text-muted">
+            {t.endpointUrl}
+            <input className={inputClass} value={url} onChange={(e) => setUrl(e.target.value)} required pattern="https?://.+" />
+          </label>
+          <label className="grid gap-1 text-[13px] text-muted">
+            {t.endpointModel}
+            <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} required placeholder="qwen3.5:4b" />
+          </label>
+          <label className="grid gap-1 text-[13px] text-muted">
+            {t.endpointKey}
+            <input className={inputClass} value={key} onChange={(e) => setKey(e.target.value)} type="password" autoComplete="off" />
+          </label>
+          <div className="flex items-end">
+            <Button type="submit">{t.useEndpoint}</Button>
+          </div>
+        </form>
+      </Group>
+    </Section>
   );
 }
 
@@ -123,10 +123,16 @@ function Tuning() {
     </select>
   );
   return (
-    <Card className="mt-4">
-      <CardTitle aside={<Button size="sm" variant="ghost" onClick={() => void api.unloadModel()}>{t.unload}</Button>}>{t.advanced}</CardTitle>
-      <p className="-mt-2 mb-2 text-sm text-muted">{t.advancedLead}</p>
-      <div className="divide-y divide-border">
+    <Section
+      title={t.advanced}
+      description={t.advancedLead}
+      aside={
+        <Button size="sm" variant="ghost" onClick={() => void api.unloadModel()}>
+          {t.unload}
+        </Button>
+      }
+    >
+      <Group>
         <Field label={t.temperature} hint={t.temperatureHint}>
           <Slider label={t.temperature} value={settings.temperature} min={0} max={1.5} step={0.05} onChange={(v) => void update({ temperature: v })} />
         </Field>
@@ -134,7 +140,17 @@ function Tuning() {
           <Slider label={t.topP} value={settings.top_p} min={0.1} max={1} step={0.05} onChange={(v) => void update({ top_p: v })} />
         </Field>
         <Field label={t.context} hint={t.contextHint}>
-          {numberSelect("context_size", t.context, [[2048, "2,048"], [4096, "4,096"], [8192, "8,192"], [16384, "16,384"]], settings.context_size)}
+          {numberSelect(
+            "context_size",
+            t.context,
+            [
+              [2048, "2,048"],
+              [4096, "4,096"],
+              [8192, "8,192"],
+              [16384, "16,384"],
+            ],
+            settings.context_size,
+          )}
         </Field>
         <Field label={t.threads}>
           {numberSelect(
@@ -162,12 +178,26 @@ function Tuning() {
             placeholder="--mlock"
           />
         </Field>
-      </div>
-    </Card>
+      </Group>
+    </Section>
   );
 }
 
-function Slider({ label, value, min, max, step, onChange }: { label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void }) {
+function Slider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (v: number) => void;
+}) {
   const [local, setLocal] = useState(value);
   return (
     <span className="flex items-center gap-3">
@@ -181,9 +211,9 @@ function Slider({ label, value, min, max, step, onChange }: { label: string; val
         onChange={(e) => setLocal(Number(e.target.value))}
         onPointerUp={() => onChange(local)}
         onKeyUp={() => onChange(local)}
-        className="w-40 accent-[var(--accent)]"
+        className="w-36 accent-[var(--accent)]"
       />
-      <span className="w-10 text-right text-sm tabular-nums text-muted">{local.toFixed(2)}</span>
+      <span className="w-10 text-right font-mono text-[12px] text-muted tabular-nums">{local.toFixed(2)}</span>
     </span>
   );
 }
@@ -201,41 +231,45 @@ function Prompts() {
   const isCustom = custom !== null && custom.trim() !== "";
   const save = (value: string | null) => void update({ prompts: { ...settings.prompts, [level]: value } });
   return (
-    <Card className="mt-4">
-      <CardTitle aside={<Tag tone={isCustom ? "warn" : "neutral"}>{isCustom ? t.promptCustom : t.promptDefault}</Tag>}>{t.prompts}</CardTitle>
-      <p className="-mt-2 mb-4 text-sm text-muted">{t.promptsLead}</p>
-      <Segmented<Level>
-        label={strings.level.label}
-        value={level}
-        onChange={setLevel}
-        options={[
-          { value: "simpler", label: strings.level.simpler },
-          { value: "plain", label: strings.level.plain },
-          { value: "clearer", label: strings.level.clearer },
-        ]}
-      />
-      <textarea
-        aria-label={t.prompts}
-        className={`${inputClass} mt-3 h-64 w-full py-2 font-mono text-xs leading-relaxed`}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-      />
-      <div className="mt-3 flex gap-2">
-        <Button variant="primary" size="sm" onClick={() => save(draft === info.default_prompts[level] ? null : draft)}>
-          {strings.common.save}
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={!isCustom}
-          onClick={() => {
-            setDraft(info.default_prompts[level]);
-            save(null);
-          }}
-        >
-          {strings.common.reset}
-        </Button>
-      </div>
-    </Card>
+    <Section
+      title={t.prompts}
+      description={t.promptsLead}
+      aside={<Tag tone={isCustom ? "warn" : "neutral"}>{isCustom ? t.promptCustom : t.promptDefault}</Tag>}
+    >
+      <Group className="p-3">
+        <Segmented<Level>
+          label={strings.level.label}
+          value={level}
+          onChange={setLevel}
+          options={[
+            { value: "simpler", label: strings.level.simpler },
+            { value: "plain", label: strings.level.plain },
+            { value: "clearer", label: strings.level.clearer },
+          ]}
+        />
+        <textarea
+          aria-label={t.prompts}
+          className={`${inputClass} mt-3 h-64 w-full py-2 font-mono text-[12px] leading-relaxed`}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+        />
+        <div className="mt-3 flex gap-2">
+          <Button variant="primary" size="sm" onClick={() => save(draft === info.default_prompts[level] ? null : draft)}>
+            {strings.common.save}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={!isCustom}
+            onClick={() => {
+              setDraft(info.default_prompts[level]);
+              save(null);
+            }}
+          >
+            {strings.common.reset}
+          </Button>
+        </div>
+      </Group>
+    </Section>
   );
 }

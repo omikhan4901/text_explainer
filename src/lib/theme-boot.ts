@@ -4,10 +4,10 @@
 import { applyTheme, type Accent, type ThemeChoice } from "./theme";
 
 let theme: ThemeChoice = "system";
-let accent: Accent = "plum";
+let accent: Accent = "ink";
 try {
   theme = (localStorage.getItem("te.theme") as ThemeChoice | null) ?? "system";
-  accent = (localStorage.getItem("te.accent") as Accent | null) ?? "plum";
+  accent = (localStorage.getItem("te.accent") as Accent | null) ?? "ink";
 } catch {
   // Storage can be unavailable; the defaults are fine.
 }

@@ -113,11 +113,12 @@ pub enum Theme {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Accent {
+    /// Near-black: the calm default.
     #[default]
+    Ink,
     Plum,
     Saffron,
     Garnet,
-    Ink,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -145,7 +146,7 @@ impl Default for Appearance {
     fn default() -> Self {
         Appearance {
             theme: Theme::System,
-            accent: Accent::Plum,
+            accent: Accent::Ink,
             reading_font: ReadingFont::Plex,
             font_size: 15,
             line_height: 1.6,

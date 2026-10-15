@@ -29,6 +29,7 @@ export const api = {
   popupClose: () => call<void>("popup_close"),
   popupPin: (pinned: boolean) => call<void>("popup_pin", { pinned }),
   setLevel: (level: Level) => call<void>("set_level", { level }),
+  explainNow: (id: number) => call<void>("explain_now", { id }),
   copyText: (text: string) => call<void>("copy_text", { text }),
   explainText: (text: string) => call<void>("explain_text", { text }),
   openMain: () => call<void>("open_main"),

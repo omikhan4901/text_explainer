@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Button } from "../../components/ui/Button";
-import { Card } from "../../components/ui/Card";
 import { Field } from "../../components/ui/Field";
 import { Kbd } from "../../components/ui/Kbd";
+import { Group, Section } from "../../components/ui/Section";
 import { Switch } from "../../components/ui/Switch";
 import { strings } from "../../i18n";
 import { api } from "../../lib/ipc";
@@ -21,7 +21,8 @@ export function shortcutFromEvent(e: Pick<KeyboardEvent, "ctrlKey" | "altKey" | 
   else if (code.startsWith("Digit")) key = code.slice(5);
   else if (/^F\d{1,2}$/.test(code)) key = code;
   else if (code === "Space") key = "Space";
-  else if (["Period", "Comma", "Slash", "Semicolon", "Quote", "BracketLeft", "BracketRight", "Backslash", "Minus", "Equal", "Backquote"].includes(code)) key = code;
+  else if (["Period", "Comma", "Slash", "Semicolon", "Quote", "BracketLeft", "BracketRight", "Backslash", "Minus", "Equal", "Backquote"].includes(code))
+    key = code;
   if (!key) return null;
   const mods = [e.ctrlKey && "Ctrl", e.altKey && "Alt", e.shiftKey && "Shift", e.metaKey && "Super"].filter(Boolean);
   return [...mods, key].join("+");
@@ -55,27 +56,32 @@ export function ShortcutsPage() {
 
   return (
     <>
-      <PageTitle>{t.title}</PageTitle>
-      <Card>
-        <div className="divide-y divide-border">
+      <PageTitle lead={t.lead}>{t.title}</PageTitle>
+      <Section title={t.open}>
+        <Group>
           <Field label={t.hotkey} hint={problem ?? t.hotkeyHint}>
             <div className="flex items-center gap-3">
-              {recording ? <span className="text-sm text-accent">{t.press}</span> : <Kbd keys={settings.hotkey} />}
+              {recording ? (
+                <span className="text-[13px] font-medium text-accent" role="status">
+                  {t.press}
+                </span>
+              ) : (
+                <Kbd keys={settings.hotkey} />
+              )}
               <Button size="sm" onClick={() => setRecording((r) => !r)}>
                 {recording ? strings.common.cancel : t.change}
               </Button>
             </div>
           </Field>
           <Switch label={t.doubleCopy} hint={t.doubleCopyHint} checked={settings.double_copy} onChange={(v) => void update({ double_copy: v })} />
-          <Switch
-            label={t.clipboard}
-            hint={t.clipboardHint}
-            checked={settings.clipboard_fallback}
-            onChange={(v) => void update({ clipboard_fallback: v })}
-          />
+        </Group>
+      </Section>
+      <Section title={t.behaviour}>
+        <Group>
+          <Switch label={t.clipboard} hint={t.clipboardHint} checked={settings.clipboard_fallback} onChange={(v) => void update({ clipboard_fallback: v })} />
           <Switch label={t.startup} hint={t.startupHint} checked={settings.start_with_windows} onChange={(v) => void update({ start_with_windows: v })} />
-        </div>
-      </Card>
+        </Group>
+      </Section>
     </>
   );
 }

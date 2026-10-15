@@ -10,7 +10,7 @@ Tauri 2 app (tray only)
 │   UI Automation capture · clipboard fallback · double Ctrl+C listener
 │   non-activating popup · click-outside hook · job object · memory size
 ├─ src-tauri: hotkey, popup placement, commands, tray
-├─ React + TypeScript (Atlas design): reading card, settings, first run
+├─ React + TypeScript (own design system): reading card, settings, first run
 └─ llama.cpp llama-server (pinned Windows CPU build, SHA-256 checked)
     on 127.0.0.1 with a random port and per-launch API key
 ```

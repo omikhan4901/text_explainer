@@ -1,10 +1,10 @@
-// Theme and accent on <html>: `.dark` and `data-accent`, as in the Atlas design.
+// Theme and accent on <html>: `.dark` and `data-accent` (tokens.css).
 import type { AccentName, Appearance, Theme } from "./types";
 
 export type ThemeChoice = Theme;
 export type Accent = AccentName;
 
-export const ACCENTS: Accent[] = ["plum", "saffron", "garnet", "ink"];
+export const ACCENTS: Accent[] = ["ink", "plum", "saffron", "garnet"];
 
 export function prefersDark(): boolean {
   return typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -13,7 +13,7 @@ export function prefersDark(): boolean {
 export function applyTheme(theme: ThemeChoice, accent: Accent, root: HTMLElement = document.documentElement): void {
   const dark = theme === "dark" || (theme === "system" && prefersDark());
   root.classList.toggle("dark", dark);
-  if (accent === "plum") root.removeAttribute("data-accent");
+  if (accent === "ink") root.removeAttribute("data-accent");
   else root.setAttribute("data-accent", accent);
 }
 

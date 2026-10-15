@@ -5,9 +5,10 @@
   html {
     background: var(--bg);
     color: var(--text);
+    font-feature-settings: "ss01", "cv11";
   }
   body {
-    @apply bg-bg font-sans text-text antialiased;
+    @apply bg-bg font-sans text-[14px] leading-normal text-text antialiased;
     min-height: 100dvh;
   }
   /* The popup page is a transparent window: only the card is painted. */
@@ -20,15 +21,22 @@
   :focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
+    border-radius: 4px;
   }
   ::selection {
     background: var(--accent-soft);
-    color: var(--accent-soft-text);
+    color: var(--text);
   }
   h1,
   h2,
   h3 {
-    @apply font-display tracking-tight;
+    @apply tracking-[-0.01em] text-balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  button:not(:disabled) {
+    cursor: default;
   }
 }
 
@@ -45,16 +53,41 @@
 .stream-caret::after {
   content: "";
   display: inline-block;
-  width: 0.45em;
-  height: 1em;
+  width: 2px;
+  height: 1.05em;
   margin-left: 2px;
-  vertical-align: -0.12em;
-  border-radius: 2px;
-  background: var(--accent);
+  vertical-align: -0.15em;
+  background: var(--text);
   animation: caret 1s steps(2, start) infinite;
 }
 @keyframes caret {
   to {
     visibility: hidden;
   }
+}
+
+/* The card settles in from just below where it ends up. */
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.99);
+  }
+}
+.card-in {
+  animation: card-in 160ms var(--ease-out);
+}
+
+/* Placeholder lines while the model starts writing. */
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+.skeleton-line {
+  background: linear-gradient(90deg, var(--surface-2) 30%, var(--surface-3) 50%, var(--surface-2) 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
 }

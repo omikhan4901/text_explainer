@@ -148,8 +148,12 @@ export interface DictionaryEntry {
   senses: Sense[];
 }
 
+/** Whether the model works on this request: now, once its tab is opened, or not at all
+ * (no model set up; the dictionary is the whole answer). */
+export type AiMode = "running" | "deferred" | "off";
+
 export type PopupEvent =
-  | { type: "open"; id: number }
+  | { type: "open"; id: number; ai: AiMode }
   | { type: "dictionary"; id: number; entry: DictionaryEntry }
   | { type: "explain"; id: number; event: ExplainEvent }
   | { type: "no_selection"; hotkey: string }
