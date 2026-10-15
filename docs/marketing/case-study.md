@@ -2,8 +2,8 @@
 
 **Mehboob Ehsan Khan** · 2026 · [github.com/omikhan4901/text_explainer](https://github.com/omikhan4901/text_explainer)
 
-> Status: in development. The Windows MVP is being built in the open; this page is
-> updated at each milestone and only describes what exists.
+> Status: free preview for Windows (rebuilt on every change). This page is updated at
+> each milestone and only describes what exists.
 
 ## The problem
 
@@ -47,6 +47,13 @@ anything leaving the computer. It must not get in the way of the work you are do
 - **Gave people full control.** A model catalog with "fits your memory" hints, resumable
   downloads, any GGUF file, a local Ollama or LM Studio server, sampling settings, and
   editable instructions per reading level.
+- **Grew it into a product people can use daily.** A tabbed card (web searches first, the
+  offline dictionary, then the AI only when asked, which saves compute), a Look up box for
+  words that aren't on screen, private translation by the same local model (with the
+  language and number checks extended to translations), a Word book that exports to Excel
+  and Anki, and a list of apps the card never reads from (password managers by default).
+  Each feature was reviewed for security, data handling and AI quality; the review's nine
+  findings were fixed before release.
 
 ## Results so far
 
@@ -60,9 +67,10 @@ anything leaving the computer. It must not get in the way of the work you are do
   (fewer false alarms on contract terms and shortened names), and the engine's prompt
   cache, sized by measurement after a memory-saving idea made answers 4 to 7 seconds
   slower.
-- 111 Rust tests, 10 front-end unit tests and 38 Playwright checks (journeys plus WCAG
-  2.2 AA scans in light and dark), run on every push on Linux and on a real Windows
-  runner that also builds the installer.
+- 192 Rust tests, 30 front-end unit tests and 92 Playwright checks (journeys plus WCAG
+  2.2 AA scans in light and dark), run before every push; every push also builds the
+  Windows installer, smoke-tests it on a Windows runner and publishes it as the preview
+  download.
 - The Windows app is type-checked and linted from Linux with a small cross-check script,
   so most mistakes are caught before the Windows build runs.
 
