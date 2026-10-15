@@ -1,145 +1,118 @@
-# Text Explainer in the browser: plan
+# Sources, translation and Definer parity: plan
 
-Decided by the owner on 15 October 2026: Text Explainer gets a browser extension that does
-everything [Definer](https://chromewebstore.google.com/detail/mkhlnnpfjieohiohgbphcnfdkmniofac)
-does, plus the local AI that Definer can't do. It stays local software: the AI and the
-dictionary run on the person's computer, and the desktop app itself still never goes online.
+Decided by the owner on 15 October 2026: Text Explainer does everything
+[Definer](https://chromewebstore.google.com/detail/mkhlnnpfjieohiohgbphcnfdkmniofac) does,
+plus the local AI that Definer can't do. **It stays desktop software, never a browser
+extension.** Everything here is built into the app and works in browsers the same way it
+works in any other app.
 
-## 1. What the extension does
+## 1. What it does
 
 ### What Definer does (parity)
 
-| Feature | What it means here |
+| Definer | In Text Explainer |
 |---|---|
-| Bubble next to the selection | Select text on any page and a bubble opens beside it, without a new tab and without leaving the page |
-| Several sources, one bubble | Each source is a tab in the bubble: dictionary, translation, Wikipedia, web search |
-| Custom sources | Add any site as a source from a URL template such as `https://example.com/search?q={query}` |
-| Toolbar search | Click the toolbar icon, type a word or phrase, get the same tabs |
-| Trigger settings | Choose what opens the bubble: selecting text, double-clicking a word, selecting while holding a key, the shortcut, or the right-click menu |
-| Site rules | Turn the bubble off on chosen sites, or only turn it on for chosen sites |
-| Translation | Pick the target language once; the translation tab uses it |
-| Chrome and Firefox | One code base, built for both (and Edge, which takes Chrome's build) |
+| Bubble next to the selection | The reading card, already placed by the selection's rectangle in any app, browsers included |
+| Several sources in one bubble | The card gets tabs: Explain, Translate, Dictionary, then web sources |
+| Custom sources | Add any site from a URL template such as `https://example.com/search?q={query}` |
+| Toolbar search | A **Look up** box: from the tray menu or its own shortcut, type a word or phrase, get the same tabs |
+| Trigger settings | The shortcut and double Ctrl+C (built), plus select-to-show, double-click a word, and select while holding a key, each a setting |
+| Site rules | **App and site rules**: turn the card off for chosen apps, and in Chrome, Edge and Firefox for chosen sites (the site is read from the browser's address bar through UI Automation) |
+| Translation | Pick the target language once; the Translate tab uses it |
+
+Definer's right-click menu entry has no system-wide equivalent on Windows; the shortcut and
+double Ctrl+C cover it.
 
 ### More than Definer
 
-| Feature | What it means here |
+| Feature | What it means |
 |---|---|
-| **Explain** (first tab) | The plain-language rewrite at Simpler / Plain / Clearer, with the reading grade before and after, streamed from the local model |
+| **Explain** (first tab) | The plain-language rewrite at Simpler / Plain / Clearer with the reading grade before and after, from the local model |
 | **AI Translate** | Translation by the local model, so the text never goes to a translation service |
-| **Meaning guard** | If a rewrite or translation drops or invents a number, date or name, the bubble says so |
+| **Meaning guard** | If a rewrite or translation drops or invents a number, date or name, the card says so |
 | **Language guard** | The model can't drift into a third language (the GBNF grammar the app already uses) |
-| **Offline dictionary** | The bundled WordNet dictionary answers in about 60 microseconds with no internet |
-| **Meaning in context** | For a single word, the extension sends the sentence around it, so "here it means…" fits the page |
-| **Outside the browser too** | The desktop shortcut and double Ctrl+C keep working in PDFs, Word and chat apps, with the same card |
-| **Offline only switch** | One switch hides every web source; then nothing leaves the computer at all |
+| **Offline dictionary** | WordNet, bundled, about 60 microseconds a lookup, no internet |
+| **Every app, not only the browser** | PDFs, Word, chat apps, terminals: anywhere text can be selected |
+| **Offline only** | One switch hides every web source; then nothing leaves the computer at all |
 
-### The bubble
+### The card
 
 ```
-┌─────────────────────────────────────────────────────┐
-│ Explain · Translate · Dictionary · Wikipedia · +    │  tabs; the order is a setting
-├─────────────────────────────────────────────────────┤
-│ (content of the open tab)                           │
-├─────────────────────────────────────────────────────┤
-│ Simpler | Plain | Clearer        Grade 17 → 9   ⧉ 📌 │  only on AI tabs
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│ Explain · Translate · Dictionary · Wikipedia · +         │  tabs; order and which show are settings
+├──────────────────────────────────────────────────────────┤
+│ (content of the open tab)                                │
+├──────────────────────────────────────────────────────────┤
+│ Simpler | Plain | Clearer      Grade 17 → 9    copy  pin │  only on the AI tabs
+└──────────────────────────────────────────────────────────┘
 ```
 
-- Same Atlas design as the desktop card (tokens shared from `src/styles/tokens.css`),
-  white by default, dark when the system is, Plum / Saffron / Garnet / Ink accents.
-- Lives in a closed Shadow DOM so pages can't restyle it and it can't break pages.
-- Esc or a click outside closes it; pin keeps it open; it never steals focus from a text
-  field the person is typing in.
-- Placed by the selection's rectangle, flipped above when there's no room below, kept on
-  screen.
-- A single word opens on Dictionary; a sentence or more opens on Explain. Both are settings.
+- Same Atlas design, same rules: never takes focus from the app the person is reading in,
+  Esc or a click outside closes it, pin keeps it open.
+- A single word opens on Dictionary; a sentence or more on Explain. Both are settings.
+- Web source tabs carry a small globe so local and online are always told apart.
+- Only the open tab does any work: a web source is fetched when its tab is opened, not
+  before.
 
 ## 2. How it works
 
-```
-Browser                                    Desktop
-┌────────────────────────────┐             ┌────────────────────────────────┐
-│ content script: bubble     │             │ Text Explainer (Tauri app)     │
-│   (Shadow DOM, Atlas)      │             │  te-core: explain, translate,  │
-│ service worker:            │  native     │  dictionary, guards            │
-│   web sources (fetch)      │  messaging  │  llama-server (127.0.0.1)      │
-│   bridge to the app ───────┼──► te-host ─┼──► named pipe, this user only  │
-│ toolbar popup, options     │   (stdio)   │                                │
-└────────────────────────────┘             └────────────────────────────────┘
-```
-
-- **`extension/`**: Manifest V3 extension in TypeScript and React, built with Vite into
-  `dist-extension/chrome` and `dist-extension/firefox` (the manifests differ only in the
-  background key and Firefox's `browser_specific_settings`).
-- **Bridge, native messaging:** the browser starts `te-host.exe` (a small new crate,
-  `crates/host`) and talks to it over stdin/stdout. The host forwards each request to the
-  running app over a Windows named pipe that only the same user can open, and streams the
-  answer back. The model stays loaded once, shared by the desktop card and the browser.
-  Native messaging was chosen over a local web server because no website can reach it:
-  the browser only lets the extension IDs listed in the host's manifest start it.
-- **Messages:** `status`, `explain {text, level, context}`, `translate {text, to, context}`,
-  `define {word, context}`, `cancel {id}`. Answers stream as `chunk`, then `done` with the
-  guard results, or `error` with a reason the bubble can show.
-- **App not running:** the host starts it in the tray and waits up to 10 seconds. Not
-  installed: the AI and Dictionary tabs say "Install Text Explainer to use the local AI"
-  with a link; web sources still work.
-- **Web sources:** fetched by the extension's service worker, from the person's browser,
-  only for sources they turned on. Built in, all free with no key:
-  Wiktionary and Wikipedia (REST APIs), Free Dictionary API, a web search tab, and Google
-  Translate as a page. Host permissions for a source are requested when it is turned on,
-  not at install.
-- **Page sources** (custom sources and Google Translate): the site is shown in a frame
-  inside the bubble. Many sites refuse to be framed; for those requests only, a
-  `declarativeNetRequest` rule removes `X-Frame-Options` and `frame-ancestors`, which is
-  what Definer does. If a site still won't show, the tab offers "Open in a new tab".
-- **Installer:** the NSIS installer adds `te-host.exe` and registers it for Chrome, Edge
-  and Firefox under `HKCU` (no admin rights), and removes it on uninstall.
+- **Tabs** are a list in settings: built-in local tabs (Explain, Translate, Dictionary),
+  built-in web sources, and custom sources. Each can be shown or hidden and reordered.
+- **Web sources, data kind** (Wikipedia summary, Wiktionary definitions, Free Dictionary
+  API; all free, no key): fetched by `te-core` over HTTPS with a short timeout and drawn
+  in the card in Atlas style, like the local dictionary. No page scripts run.
+- **Web sources, page kind** (custom sources, Google Translate, a web search): the site is
+  loaded in a child webview inside the card, in its own profile with no access to the
+  app's IPC, cookies cleared when the app quits. Reading it doesn't take focus; clicking
+  into it does, because then the person chose to use it. "Open in browser" on every page
+  tab.
+- **Translate** reuses the engine: a translation prompt, the language guard built for the
+  target language's script, and the meaning guard on the result.
+- **Look up box**: a small window that does take focus (it has a text field), with the
+  same tabs underneath.
+- **Triggers**: select-to-show and double-click use the low-level mouse hook the card
+  already installs for "click outside", plus UI Automation to read the selection. Off by
+  default, as decided for the MVP.
+- **App and site rules**: the foreground process name, and for supported browsers the
+  address bar's host, checked before the card opens.
 
 ## 3. Privacy, said plainly
 
-- The desktop app still makes no network requests except downloads the person starts.
-- The AI tabs and the dictionary run on the computer. The selected text goes from the
-  browser to the app on the same machine and nowhere else.
-- Web sources are like visiting those sites: the browser sends the selected text to the
-  sites the person turned on, and only when they open that tab. The bubble marks them with
-  a small globe so the difference is visible.
-- The "Offline only" switch hides every web source.
-- The bubble needs to run on every site to appear there, which browsers show as "read and
-  change all your data on all websites". The store listing and the first-run page explain
-  why, and site rules can narrow it.
-- No analytics, no account, no server of ours.
+- The AI tabs and the dictionary run on the computer. Selected text sent to them never
+  leaves it.
+- Web sources are like visiting those sites: when the person opens that tab, the app sends
+  the selected text to that site. Nothing is sent for tabs that aren't opened.
+- First run asks whether to use web sources; **Offline only** is the preselected answer.
+  The switch stays in settings.
+- No analytics, no account, no server of ours. Page sources get a separate webview profile.
 
 ## 4. Milestones
 
-Each milestone ships on its own, passes `scripts/check.sh` and CI, and is pushed to `main`.
-Windows MVP release (M6 in `IMPLEMENTATION_PLAN.md`) comes first; this work starts after it
-or alongside it where it doesn't touch the release.
+Each milestone ships on its own, passes `scripts/check.sh` and the Windows CI job, and is
+pushed to `main`. The Windows MVP release (M6 in `IMPLEMENTATION_PLAN.md`) comes first.
 
 | # | Milestone | Done when |
 |---|---|---|
-| B1 | Extension shell | `extension/` builds for Chrome and Firefox; bubble on selection with Atlas design, placement, Esc / click outside / pin; toolbar popup with a search box; options page; Playwright tests that load the unpacked extension in Chromium |
-| B2 | Web sources | Built-in sources, custom sources from URL templates, page sources in a frame with the header rule, tab order and on/off per source, "Offline only" switch, globe marks |
-| B3 | Bridge | `crates/host`, the named pipe in the app, streaming Explain and Dictionary in the bubble, "app not running" and "not installed" states, installer registration, tests against a fake app |
-| B4 | AI Translate | Translation prompts, the language guard for the target language, meaning guard on translations, a translation corpus in `eval/` (English ↔ Bangla, Spanish, Hindi, Arabic, Chinese) measured per model in `docs/models.md` |
-| B5 | Triggers and rules | Double-click, modifier key, shortcut (`commands`), right-click menu, site allow / block lists, which tab opens first |
-| B6 | Release | WCAG 2.2 AA checks on the bubble, popup and options in light and dark; store listings and screenshots; README, `GUIDE.md` and the marketing kit updated |
+| S1 | Tabs and Look up | The card has tabs (Explain, Dictionary, then the rest as they land); the Look up box from the tray and a shortcut; tab settings |
+| S2 | Web sources | Wikipedia, Wiktionary and Free Dictionary drawn in the card; Offline only switch and the first-run question; tests against saved responses |
+| S3 | Page sources | Child webview with its own profile, custom sources from URL templates, Google Translate and web search, "Open in browser" |
+| S4 | AI Translate | Translation prompts, language and meaning guards on translations, a translation corpus in `eval/` (English ↔ Bangla, Spanish, Hindi, Arabic, Chinese) measured per model in `docs/models.md` |
+| S5 | Triggers and rules | Select-to-show, double-click a word, select while holding a key; app rules, and site rules for Chrome, Edge and Firefox |
+| S6 | Polish | WCAG 2.2 AA checks on the new screens in light and dark, screenshots, README, `GUIDE.md` and the marketing kit updated |
 
 ## 5. Testing
 
-- Vitest for the bubble's placement, source URL templates, site rules and message parsing.
-- Playwright loads the unpacked Chrome build into Chromium and checks the journeys on local
-  test pages: select → bubble → switch tabs → Esc; toolbar search; options; a page that
-  tries to restyle the bubble; a page with a strict CSP.
-- Web sources are tested against local fixtures, never the real sites, so CI stays offline
-  and stable.
-- `crates/host` is tested on Linux with a fake pipe, and on the Windows runner for real.
-- Translation quality is measured by the eval workflow, on demand, like rewrites.
+- Rust tests for source URL templates, the data-source parsers (against saved responses),
+  translation prompts and guards, and app / site rule matching.
+- Vitest and Playwright for the tabs, Look up box and settings, with IPC mocked.
+- CI never calls the real sites; the eval workflow measures translation on demand.
 
-## 6. Costs and decisions for the owner
+## 6. Risks
 
-- **Chrome Web Store:** a one-time **$5** developer registration. Needs the owner's yes
-  before B6. Until then the extension installs unpacked (developer mode).
-- **Firefox Add-ons and Edge Add-ons:** free.
 - **Small models and translation:** 2B models on a CPU may translate poorly into some
-  languages, especially Bangla. B4 measures this before the UI promises it; languages that
+  languages, especially Bangla. S4 measures this before the UI promises it; languages that
   score badly get a "may be rough" label or a bigger-model hint.
+- **Memory:** a child webview is another WebView2 renderer (about 30 MB). It is created
+  only when a page tab is opened and closed with the card.
+- **Sites that refuse to be framed** aren't a problem: the child webview loads the page as
+  a top-level page, not in a frame.
