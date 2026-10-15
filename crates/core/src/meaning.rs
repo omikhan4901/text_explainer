@@ -9,6 +9,8 @@
 use serde::Serialize;
 use std::collections::BTreeSet;
 
+use crate::language::Language;
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(tag = "kind", content = "text", rename_all = "snake_case")]
 pub enum Fact {
@@ -43,6 +45,53 @@ pub fn check(source: &str, rewrite: &str) -> Report {
     check_with(source, rewrite, &|_| false)
 }
 
+/// The meaning guard for a translation into `target`. Numbers and dates must survive,
+/// whatever digits and separators the target uses: Bangla, Devanagari, Arabic-Indic and
+/// full-width digits count as the same digits, "1.200,50" (Spanish) and "1,20,000"
+/// (Indian grouping) are read too, and "12 লাখ" or "120万" match "1.2 million". Names and
+/// acronyms are checked only when both texts are written in the same script: across
+/// scripts they are transliterated, and checking them would only raise false alarms.
+/// Spelled-out number words in the source are required only in an English translation
+/// (the guard reads number words in English only).
+pub fn check_translation(
+    source: &str,
+    translation: &str,
+    target: &Language,
+    is_common_word: &dyn Fn(&str) -> bool,
+) -> Report {
+    let same_script =
+        crate::language::dominant_script(source).is_none_or(|s| target.scripts.contains(&s));
+    let rules = Rules {
+        translation: true,
+        word_numbers_required: target.code == "en",
+        terms: same_script,
+    };
+    compare(
+        &normalize_numerals(source),
+        &normalize_numerals(translation),
+        rules,
+        is_common_word,
+    )
+}
+
+/// What a comparison checks and how it reads numbers.
+#[derive(Debug, Clone, Copy)]
+struct Rules {
+    /// The two texts are in different languages: read numbers in any locale's notation and
+    /// multiplier words in several languages.
+    translation: bool,
+    /// Small numbers written as words ("thirty days") must survive.
+    word_numbers_required: bool,
+    /// Names and acronyms must survive.
+    terms: bool,
+}
+
+const REWRITE: Rules = Rules {
+    translation: false,
+    word_numbers_required: true,
+    terms: true,
+};
+
 /// Single capitalised words in `source` that the check would treat as names. The app
 /// looks them up in the dictionary and passes the common ones (contract terms like
 /// "Lessee" or "Agreement") back through `check_with` so they aren't flagged.
@@ -56,24 +105,42 @@ pub fn single_word_names(source: &str) -> Vec<String> {
 /// Like `check`, skipping single-word "names" for which `is_common_word` (given the
 /// lowercase word) is true.
 pub fn check_with(source: &str, rewrite: &str, is_common_word: &dyn Fn(&str) -> bool) -> Report {
-    let src_numbers = numbers(source);
-    let out_numbers = numbers(rewrite);
+    compare(source, rewrite, REWRITE, is_common_word)
+}
+
+fn compare(
+    source: &str,
+    rewrite: &str,
+    rules: Rules,
+    is_common_word: &dyn Fn(&str) -> bool,
+) -> Report {
+    let src_numbers = numbers(source, rules);
+    let out_numbers = numbers(rewrite, rules);
     let out_values: Vec<f64> = out_numbers.iter().flat_map(|n| n.values.clone()).collect();
     let src_values: Vec<f64> = src_numbers.iter().flat_map(|n| n.values.clone()).collect();
     let out_lower = rewrite.to_lowercase();
 
     let mut missing = BTreeSet::new();
     for n in &src_numbers {
-        if !n.required.iter().all(|v| contains_value(&out_values, *v)) {
+        let kept = n
+            .required
+            .iter()
+            .all(|any| any.iter().any(|v| contains_value(&out_values, *v)));
+        if !kept {
             missing.insert(Fact::Number(n.text.clone()));
         }
     }
-    for a in acronyms(source) {
+    let terms = if rules.terms {
+        (acronyms(source), names(source))
+    } else {
+        Default::default()
+    };
+    for a in terms.0 {
         if !contains_word(rewrite, &a) {
             missing.insert(Fact::Acronym(a));
         }
     }
-    for name in names(source) {
+    for name in terms.1 {
         let words: Vec<&str> = name
             .split_whitespace()
             .filter(|w| !CONNECTORS.contains(&w.to_lowercase().as_str()))
@@ -129,9 +196,135 @@ struct Number {
     text: String,
     /// Values this mention can match (a number with a multiplier word has both forms).
     values: Vec<f64>,
-    /// Values the rewrite must contain for this mention to count as kept.
-    required: Vec<f64>,
+    /// What the rewrite must contain for this mention to count as kept: one value from
+    /// each group (a time needs its hour and its minutes; an ambiguous "1.200" in a
+    /// translation needs either reading).
+    required: Vec<Vec<f64>>,
     is_word: bool,
+}
+
+/// Multiplier words in the languages AI Translate writes, as the next word ("1,2
+/// millones", "12 লাখ", "5 मिलियन"). English ones are in `MULTIPLIERS`. Spanish
+/// "billón" (a million million) is left out: it is a false friend of "billion".
+const TRANSLATED_MULTIPLIERS: &[(&str, f64)] = &[
+    ("mil", 1e3),
+    ("millón", 1e6),
+    ("millones", 1e6),
+    ("milliers", 1e3),
+    ("milliards", 1e9),
+    ("milliard", 1e9),
+    ("milhão", 1e6),
+    ("milhões", 1e6),
+    ("tausend", 1e3),
+    ("million", 1e6),
+    ("millionen", 1e6),
+    ("milliarde", 1e9),
+    ("milliarden", 1e9),
+    ("тысяч", 1e3),
+    ("тысячи", 1e3),
+    ("млн", 1e6),
+    ("миллиона", 1e6),
+    ("миллионов", 1e6),
+    ("млрд", 1e9),
+    ("হাজার", 1e3),
+    ("লাখ", 1e5),
+    ("লক্ষ", 1e5),
+    ("কোটি", 1e7),
+    // য় and ड़ come both precomposed and as letter plus nukta.
+    ("মিলি\u{09DF}ন", 1e6),
+    ("মিলি\u{09AF}\u{09BC}ন", 1e6),
+    ("বিলি\u{09DF}ন", 1e9),
+    ("বিলি\u{09AF}\u{09BC}ন", 1e9),
+    ("ह\u{095B}ार", 1e3),
+    ("हज\u{093C}ार", 1e3),
+    ("हजार", 1e3),
+    ("लाख", 1e5),
+    ("करो\u{095C}", 1e7),
+    ("करो\u{0921}\u{093C}", 1e7),
+    ("मिलियन", 1e6),
+    ("बिलियन", 1e9),
+    ("अरब", 1e9),
+    ("ألف", 1e3),
+    ("آلاف", 1e3),
+    ("مليون", 1e6),
+    ("ملايين", 1e6),
+    ("مليار", 1e9),
+];
+
+/// Multipliers written straight after the digits ("120万", "1.2亿"), longest first.
+const ATTACHED_MULTIPLIERS: &[(&str, f64)] = &[
+    ("千万", 1e7),
+    ("百万", 1e6),
+    ("万", 1e4),
+    ("萬", 1e4),
+    ("亿", 1e8),
+    ("億", 1e8),
+    ("千", 1e3),
+    ("만", 1e4),
+    ("억", 1e8),
+];
+
+/// The zero of every decimal digit set the guard reads (Arabic-Indic, Eastern
+/// Arabic-Indic, NKo, Devanagari, Bengali, Gurmukhi, Gujarati, Oriya, Tamil, Telugu,
+/// Kannada, Malayalam, Sinhala, Thai, Lao, Tibetan, Myanmar, Khmer, Mongolian, full-width).
+const DIGIT_ZEROS: &[u32] = &[
+    0x0660, 0x06F0, 0x07C0, 0x0966, 0x09E6, 0x0A66, 0x0AE6, 0x0B66, 0x0BE6, 0x0C66, 0x0CE6, 0x0D66,
+    0x0DE6, 0x0E50, 0x0ED0, 0x0F20, 0x1040, 0x17E0, 0x1810, 0xFF10,
+];
+
+fn ascii_digit(c: char) -> Option<char> {
+    let cp = c as u32;
+    DIGIT_ZEROS
+        .iter()
+        .find(|&&zero| (zero..zero + 10).contains(&cp))
+        .and_then(|&zero| char::from_digit(cp - zero, 10))
+}
+
+/// Writes every number with ASCII digits and separators, so numbers in any script compare:
+/// native digits become 0-9; the Arabic decimal and thousands separators and percent sign,
+/// and full-width ones, become `.` `,` `%`; and digit groups separated by a space, a
+/// no-break or thin space or an apostrophe ("1 200", "1'200") are joined with a comma.
+pub fn normalize_numerals(text: &str) -> String {
+    let chars: Vec<char> = text
+        .chars()
+        .map(|c| {
+            ascii_digit(c).unwrap_or(match c {
+                '\u{066B}' | '．' => '.',
+                '\u{066C}' => ',',
+                '\u{066A}' | '％' => '%',
+                '：' => ':',
+                '／' => '/',
+                other => other,
+            })
+        })
+        .collect();
+    let mut out = String::with_capacity(text.len());
+    // Digits since the last separator, or None when not inside a number.
+    let mut group: Option<usize> = None;
+    for (i, &c) in chars.iter().enumerate() {
+        let joins = matches!(
+            c,
+            ' ' | '\u{00A0}' | '\u{202F}' | '\u{2009}' | '\'' | '’' | '，'
+        );
+        let three_after = chars
+            .get(i + 1..i + 4)
+            .is_some_and(|d| d.iter().all(char::is_ascii_digit))
+            && !chars.get(i + 4).is_some_and(char::is_ascii_digit);
+        if joins && group.is_some_and(|n| (1..=3).contains(&n)) && three_after {
+            out.push(',');
+            group = Some(0);
+            continue;
+        }
+        if c.is_ascii_digit() {
+            group = Some(group.map_or(1, |n| n + 1));
+        } else if c == ',' && group.is_some() {
+            group = Some(0);
+        } else {
+            group = None;
+        }
+        out.push(c);
+    }
+    out
 }
 
 const MULTIPLIERS: &[(&str, f64)] = &[
@@ -216,7 +409,7 @@ fn small_word(w: &str) -> Option<f64> {
 }
 
 /// Every number mentioned in `text`, in digits or (for small ones) words.
-fn numbers(text: &str) -> Vec<Number> {
+fn numbers(text: &str, rules: Rules) -> Vec<Number> {
     let tokens: Vec<&str> = text.split_whitespace().collect();
     let mut out = Vec::new();
     let mut i = 0;
@@ -240,10 +433,11 @@ fn numbers(text: &str) -> Vec<Number> {
             // "first request", "one of", "scales to zero", "half the time": words like
             // these are usually idiom, not a quantity the reader needs.
             let idiom = !text.contains(' ') && IDIOMATIC.contains(&text.to_lowercase().as_str());
+            let required = !idiom && rules.word_numbers_required;
             out.push(Number {
                 text,
                 values: vec![v],
-                required: if idiom { vec![] } else { vec![v] },
+                required: if required { vec![vec![v]] } else { vec![] },
                 is_word: true,
             });
             i += 1;
@@ -254,12 +448,13 @@ fn numbers(text: &str) -> Vec<Number> {
             let run = &raw[start..end];
             let suffix = &raw[end..];
             let prefix = &raw[..start];
-            // Dates: only the year has to survive ("12/03/2024" → "12 March 2024").
-            if let Some(year) = date_year(run) {
+            // Dates: only the year has to survive ("12/03/2024" → "12 March 2024"), but
+            // the day and month may appear on their own.
+            if let Some((year, parts)) = date_parts(run) {
                 out.push(Number {
                     text: run.to_string(),
-                    values: vec![year],
-                    required: vec![year],
+                    values: parts,
+                    required: vec![vec![year]],
                     is_word: false,
                 });
                 continue;
@@ -269,57 +464,99 @@ fn numbers(text: &str) -> Vec<Number> {
                 let parts: Vec<f64> = run.split(':').filter_map(|p| p.parse().ok()).collect();
                 out.push(Number {
                     text: run.to_string(),
-                    values: parts.clone(),
-                    required: parts,
+                    required: parts.iter().map(|&p| vec![p]).collect(),
+                    values: parts,
                     is_word: false,
                 });
                 continue;
             }
-            let Some(v) = parse_number(run) else { continue };
-            let mut values = vec![v];
-            let mut text = format!(
-                "{}{run}",
-                prefix.trim_start_matches(|c: char| c.is_alphabetic())
-            );
-            // Multiplier attached ("5m", "2bn") or as the next word ("1.2 million").
+            // A translation may write "1.200" for 1,200: every reading counts.
+            let readings = if rules.translation {
+                parse_any(run)
+            } else {
+                parse_number(run).into_iter().collect()
+            };
+            let Some(&v) = readings.first() else { continue };
+            // Currency signs and the like just before the digits ("US$5" → "$5").
+            let lead = &prefix[prefix
+                .trim_end_matches(|c: char| !c.is_alphanumeric())
+                .len()..];
+            let mut text = format!("{lead}{run}");
+            // Multiplier attached ("5m", "2bn", "120万") or as the next word ("1.2 million").
             let attached = suffix
                 .trim_end_matches(|c: char| !c.is_alphanumeric())
                 .to_lowercase();
-            let next = tokens.get(i + 1).map(|t| {
-                t.trim_matches(|c: char| !c.is_alphanumeric())
-                    .to_lowercase()
-            });
-            if let Some(&(name, m)) = MULTIPLIERS.iter().find(|(s, _)| *s == attached) {
-                values.push(v * m);
-                text.push_str(name);
-            } else if let Some(next) = next
-                && let Some(&(name, m)) =
-                    MULTIPLIERS.iter().find(|(s, _)| *s == next && s.len() > 2)
-            {
-                values.push(v * m);
-                text = format!("{text} {name}");
-                consumed_next = true;
-            }
+            let next = tokens.get(i + 1).map(|t| word_of(t).to_lowercase());
+            let next_word = |list: &[(&'static str, f64)]| {
+                let next = next.as_deref()?;
+                list.iter()
+                    .find(|(s, _)| *s == next && s.len() > 2)
+                    .copied()
+            };
+            let multiplier =
+                if let Some(&(name, m)) = MULTIPLIERS.iter().find(|(s, _)| *s == attached) {
+                    text.push_str(name);
+                    Some(m)
+                } else if let Some((name, m)) = rules
+                    .translation
+                    .then(|| {
+                        ATTACHED_MULTIPLIERS
+                            .iter()
+                            .find(|(s, _)| suffix.starts_with(s))
+                    })
+                    .flatten()
+                {
+                    text.push_str(name);
+                    Some(*m)
+                } else if let Some((name, m)) = next_word(MULTIPLIERS).or_else(|| {
+                    rules
+                        .translation
+                        .then(|| next_word(TRANSLATED_MULTIPLIERS))
+                        .flatten()
+                }) {
+                    text = format!("{text} {name}");
+                    consumed_next = true;
+                    Some(m)
+                } else {
+                    None
+                };
             if suffix.starts_with('%') {
                 text.push('%');
             }
-            // The mention is kept if any form of it appears.
-            let required = vec![*values.last().unwrap_or(&v)];
+            let mut values = readings.clone();
+            let required = match multiplier {
+                Some(m) => {
+                    values.extend(readings.iter().map(|r| r * m));
+                    if rules.translation {
+                        // Multiplier words differ between languages ("1.2 million" is
+                        // "12 লাখ"): any reading or its multiple counts.
+                        vec![values.clone()]
+                    } else {
+                        // Kept as "1.2 million" or "1,200,000", not as a bare 1.2.
+                        vec![vec![v * m]]
+                    }
+                }
+                None => vec![readings],
+            };
             out.push(Number {
                 text,
-                values: values.clone(),
+                values,
                 required,
                 is_word: false,
             });
-            // Keep "1.2 million" findable as 1.2 as well as 1,200,000.
-            if values.len() > 1 {
-                let last = out.last_mut().expect("just pushed");
-                last.required = vec![values[1]];
-            }
         }
         i += if consumed_next { 2 } else { 1 };
     }
     out
+}
+
+/// A token without the punctuation around it. Indic vowel signs and nukta are part of the
+/// word (some aren't "alphabetic" to Rust); the danda is punctuation.
+fn word_of(token: &str) -> &str {
+    token.trim_matches(|c: char| {
+        let indic = (0x0900..=0x0DFF).contains(&(c as u32)) && !matches!(c, '।' | '॥');
+        !(c.is_alphanumeric() || indic)
+    })
 }
 
 /// Runs like "1,200.50", "12/03/2024", "5:30", "3.5" inside a token.
@@ -350,7 +587,8 @@ fn digit_runs(token: &str) -> Vec<(usize, usize)> {
     runs
 }
 
-fn date_year(run: &str) -> Option<f64> {
+/// A date's year, and all of its parts.
+fn date_parts(run: &str) -> Option<(f64, Vec<f64>)> {
     let sep = ['/', '-', '.']
         .into_iter()
         .find(|&s| run.matches(s).count() == 2)?;
@@ -369,7 +607,10 @@ fn date_year(run: &str) -> Option<f64> {
         parts[2]
     };
     let y: f64 = year.parse().ok()?;
-    Some(if year.len() == 2 { 2000.0 + y } else { y })
+    let y = if year.len() == 2 { 2000.0 + y } else { y };
+    let mut values: Vec<f64> = parts.iter().filter_map(|p| p.parse().ok()).collect();
+    values.push(y);
+    Some((y, values))
 }
 
 fn parse_number(run: &str) -> Option<f64> {
@@ -377,10 +618,17 @@ fn parse_number(run: &str) -> Option<f64> {
     // treat a single dash run as two numbers' first value.
     let run = run.split('-').next()?;
     let grouped = {
-        // 1,200 or 1,200,000.5 → remove thousands separators.
+        // 1,200 or 1,200,000.5 → remove thousands separators. Indian grouping too:
+        // 1,20,000 (a lakh and twenty thousand).
         let int_part = run.split('.').next().unwrap_or(run);
         let groups: Vec<&str> = int_part.split(',').collect();
-        groups.len() > 1 && groups[0].len() <= 3 && groups[1..].iter().all(|g| g.len() == 3)
+        let western =
+            groups.len() > 1 && groups[0].len() <= 3 && groups[1..].iter().all(|g| g.len() == 3);
+        let indian = groups.len() > 2
+            && groups[0].len() <= 2
+            && groups[1..groups.len() - 1].iter().all(|g| g.len() == 2)
+            && groups.last().is_some_and(|g| g.len() == 3);
+        western || indian
     };
     let cleaned: String = if grouped {
         run.replace(',', "")
@@ -391,6 +639,41 @@ fn parse_number(run: &str) -> Option<f64> {
         run.to_string()
     };
     cleaned.parse().ok()
+}
+
+/// Every plausible reading of a number written in some language's notation: English
+/// "1,200.5", continental "1.200,5", and a lone comma as either ("3,500" is 3500 in
+/// English, 3.5 in Spanish). The usual English reading comes first.
+fn parse_any(run: &str) -> Vec<f64> {
+    let Some(run) = run.split('-').next() else {
+        return vec![];
+    };
+    let mut readings: Vec<f64> = parse_number(run).into_iter().collect();
+    // Continental: dots group thousands, a comma marks decimals.
+    let (int_part, decimals) = match run.split_once(',') {
+        Some((i, d)) if !d.contains([',', '.']) => (i, Some(d)),
+        Some(_) => ("", None),
+        None => (run, None),
+    };
+    let groups: Vec<&str> = int_part.split('.').collect();
+    if groups.len() > 1 && groups[0].len() <= 3 && groups[1..].iter().all(|g| g.len() == 3) {
+        let whole = groups.concat();
+        let text = match decimals {
+            Some(d) => format!("{whole}.{d}"),
+            None => whole,
+        };
+        readings.extend(text.parse::<f64>().ok());
+    }
+    if run.matches(',').count() == 1 && !run.contains('.') {
+        readings.extend(run.replace(',', ".").parse::<f64>().ok());
+    }
+    let mut unique: Vec<f64> = Vec::with_capacity(readings.len());
+    for r in readings {
+        if !contains_value(&unique, r) {
+            unique.push(r);
+        }
+    }
+    unique
 }
 
 /// Words that are all capitals (2+ letters), like GDPR, NASA, COVID-19.
@@ -699,5 +982,205 @@ mod tests {
     #[test]
     fn decimal_comma() {
         assert!(missing("Inflation was 3,5 percent.", "Prices rose 3.5%.").is_empty());
+    }
+
+    #[test]
+    fn a_dates_day_and_month_are_not_invented() {
+        assert!(added("Filed 2024-03-12.", "Filed on 12 March 2024.").is_empty());
+        assert!(added("Due 31/12/2026.", "Due on the 31st of December, 2026.").is_empty());
+    }
+
+    #[test]
+    fn indian_grouping_is_read() {
+        assert!(missing("It costs 120,000 taka.", "It costs 1,20,000 taka.").is_empty());
+        assert!(missing("The fund is 12,34,56,789.", "The fund is 123456789.").is_empty());
+    }
+
+    // Translations.
+
+    fn lang(code: &str) -> &'static Language {
+        crate::language::language(code).unwrap()
+    }
+    fn translated(src: &str, out: &str, to: &str) -> Report {
+        check_translation(src, out, lang(to), &|_| false)
+    }
+    fn texts(facts: &[Fact]) -> Vec<&str> {
+        facts.iter().map(Fact::text).collect()
+    }
+
+    #[test]
+    fn numerals_in_every_script_become_ascii() {
+        assert_eq!(normalize_numerals("৳১,২০০ ও ৫%"), "৳1,200 ও 5%");
+        assert_eq!(
+            normalize_numerals("१२ लाख, ०५/०३/२०२६"),
+            "12 लाख, 05/03/2026"
+        );
+        assert_eq!(normalize_numerals("١٬٢٠٠٫٥ و ٪٥"), "1,200.5 و %5");
+        assert_eq!(normalize_numerals("۱۲۰۰"), "1200");
+        assert_eq!(normalize_numerals("１２００％、３：３０"), "1200%、3:30");
+        // Digit groups split by spaces, no-break spaces and apostrophes are joined.
+        assert_eq!(normalize_numerals("1 200 €"), "1,200 €");
+        assert_eq!(
+            normalize_numerals("1\u{202F}200\u{00A0}000 €"),
+            "1,200,000 €"
+        );
+        assert_eq!(normalize_numerals("CHF 1'200.50"), "CHF 1,200.50");
+        // ...but not when they can't be one number.
+        assert_eq!(
+            normalize_numerals("in 2024 100 people"),
+            "in 2024 100 people"
+        );
+        assert_eq!(
+            normalize_numerals("pages 3, 100 and 7"),
+            "pages 3, 100 and 7"
+        );
+        assert_eq!(normalize_numerals("1 2000"), "1 2000");
+        assert_eq!(normalize_numerals("plain text"), "plain text");
+    }
+
+    #[test]
+    fn numbers_survive_into_bangla_digits() {
+        let src = "The rent of $1,200 is due on 05/03/2026, and the late fee is 5%.";
+        let ok = translated(
+            src,
+            "$১,২০০ ভাড়া ০৫/০৩/২০২৬ তারিখের মধ্যে দিতে হবে, এবং দেরির ফি ৫%।",
+            "bn",
+        );
+        assert!(ok.is_clean(), "{ok:?}");
+        // ASCII digits in a Bangla translation are fine too.
+        assert!(translated(src, "$1,200 ভাড়া 05/03/2026 তারিখে, দেরির ফি 5%।", "bn").is_clean());
+        let bad = translated(src, "$১,৩০০ ভাড়া ২০২৬ সালে দিতে হবে।", "bn");
+        assert_eq!(texts(&bad.missing), vec!["$1,200", "5%"]);
+        assert_eq!(texts(&bad.added), vec!["$1,300"]);
+    }
+
+    #[test]
+    fn numbers_survive_into_devanagari_and_arabic_digits() {
+        let src = "About 1.2 million people paid 120,000 rupees by 31/12/2025.";
+        assert!(
+            translated(
+                src,
+                "लगभग 12 लाख लोगों ने 31/12/2025 तक 1,20,000 रुपये दिए।",
+                "hi"
+            )
+            .is_clean()
+        );
+        assert!(
+            translated(
+                src,
+                "लगभग १२ लाख लोगों ने ३१/१२/२०२५ तक १,२०,००० रुपये दिए।",
+                "hi"
+            )
+            .is_clean()
+        );
+        let bad = translated(src, "लगभग १२ लाख लोगों ने २०२५ तक रुपये दिए।", "hi");
+        assert_eq!(texts(&bad.missing), vec!["120,000"]);
+        let src = "The fee is 1,200.5 dollars, or 3.5% a year.";
+        assert!(translated(src, "الرسوم ١٬٢٠٠٫٥ دولار، أو ٣٫٥٪ سنويا.", "ar").is_clean());
+        assert!(translated(src, "الرسوم ۱۲۰۰.۵ دولار، أو ۳.۵٪ سنويا.", "ar").is_clean());
+        let bad = translated(src, "الرسوم ١٬٢٠٠ دولار.", "ar");
+        assert_eq!(texts(&bad.missing), vec!["1,200.5", "3.5%"]);
+        assert_eq!(texts(&bad.added), vec!["1,200"]);
+    }
+
+    #[test]
+    fn continental_notation_in_spanish() {
+        let src = "The deposit is $1,200,000.50, about 1.2 million, plus 3.5% interest.";
+        let ok = translated(
+            src,
+            "El depósito es de 1.200.000,50 $, unos 1,2 millones, más un 3,5 % de interés.",
+            "es",
+        );
+        assert!(ok.is_clean(), "{ok:?}");
+        // A translation that keeps the English notation is fine too.
+        assert!(
+            translated(
+                src,
+                "El depósito es de $1,200,000.50, unos 1.2 millones, más un 3.5% de interés.",
+                "es"
+            )
+            .is_clean()
+        );
+        assert!(translated("It costs $1,200.", "Cuesta 1.200 $.", "es").is_clean());
+        assert!(translated("It costs $1,200.", "Cuesta 1 200 $.", "es").is_clean());
+        let bad = translated("It costs $1,200.", "Cuesta 1.300 $.", "es");
+        assert_eq!(texts(&bad.missing), vec!["$1,200"]);
+        assert_eq!(texts(&bad.added), vec!["1.300"]);
+    }
+
+    #[test]
+    fn chinese_numbers_dates_and_full_width_digits() {
+        let src = "About 1.2 million people paid $1,200 on 12/03/2024.";
+        let ok = translated(src, "约120万人在2024年3月12日支付了1,200美元。", "zh");
+        assert!(ok.is_clean(), "{ok:?}");
+        assert!(
+            translated(
+                src,
+                "约１２０万人在２０２４年３月１２日支付了１２００美元。",
+                "zh"
+            )
+            .is_clean()
+        );
+        let bad = translated(src, "约120万人支付了美元。", "zh");
+        assert_eq!(texts(&bad.missing), vec!["$1,200", "12/03/2024"]);
+    }
+
+    #[test]
+    fn names_are_checked_only_within_one_script() {
+        let src = "Analysts at Goldman Sachs met the WHO in Geneva in 2025.";
+        // Across scripts, names and acronyms are transliterated: no false alarm.
+        let bn = translated(
+            src,
+            "২০২৫ সালে গোল্ডম্যান স্যাকসের বিশ্লেষকরা জেনেভায় বিশ্ব স্বাস্থ্য সংস্থার সঙ্গে দেখা করেন।",
+            "bn",
+        );
+        assert!(bn.is_clean(), "{bn:?}");
+        assert!(translated(src, "2025年，高盛的分析师在日内瓦会见了世卫组织。", "zh").is_clean());
+        // In the same script they must survive.
+        let es_ok = translated(
+            src,
+            "Analistas de Goldman Sachs se reunieron con la WHO en Geneva en 2025.",
+            "es",
+        );
+        assert!(es_ok.is_clean(), "{es_ok:?}");
+        let es_bad = translated(src, "Unos analistas se reunieron en 2025.", "es");
+        assert_eq!(
+            texts(&es_bad.missing),
+            vec!["WHO", "Geneva", "Goldman Sachs"]
+        );
+        // A Bangla source translated into English: different scripts, names not checked.
+        assert!(translated("ঢাকায় ৫ জন এসেছিলেন।", "Five people came to Dhaka.", "en").is_clean());
+    }
+
+    #[test]
+    fn number_words_are_required_only_in_english() {
+        let src = "Pay within thirty days.";
+        assert!(translated(src, "Paga en treinta días.", "es").is_clean());
+        assert!(translated(src, "৩০ দিনের মধ্যে পরিশোধ করুন।", "bn").is_clean());
+        // Into English, a number from the source may come back as a word.
+        assert!(
+            translated("৩০ দিনের মধ্যে পরিশোধ করুন।", "Pay within thirty days.", "en").is_clean()
+        );
+        assert!(translated("Paga en 30 días.", "Pay within 30 days.", "en").is_clean());
+        let bad = translated("Paga en 30 días.", "Pay soon.", "en");
+        assert_eq!(texts(&bad.missing), vec!["30"]);
+    }
+
+    #[test]
+    fn invented_numbers_in_a_translation_are_reported() {
+        let r = translated(
+            "Pay the rent on time.",
+            "ভাড়া ৫ তারিখের মধ্যে ৫০০ টাকা দিন।",
+            "bn",
+        );
+        assert_eq!(texts(&r.added), vec!["5", "500"]);
+        assert!(r.missing.is_empty());
+    }
+
+    #[test]
+    fn times_survive_translation() {
+        assert!(translated("Open 9:30 to 17:00.", "খোলা ৯:৩০ থেকে ১৭:০০।", "bn").is_clean());
+        let r = translated("Open 9:30 to 17:00.", "খোলা ৯:৩০ থেকে।", "bn");
+        assert_eq!(texts(&r.missing), vec!["17:00"]);
     }
 }
