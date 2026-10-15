@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use serde::Serialize;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tauri_plugin_updater::UpdaterExt;
 
@@ -31,6 +31,30 @@ pub enum Status {
     Declined {
         version: String,
     },
+}
+
+/// How an update the person accepted is going, shown in the main window.
+#[derive(Clone, Serialize, Debug)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum Progress {
+    Downloading {
+        version: String,
+        downloaded: u64,
+        /// The file's size, when the server says.
+        total: Option<u64>,
+    },
+    /// Checked and handed to the installer: the app closes and opens again.
+    Installing {
+        version: String,
+    },
+    Failed {
+        version: String,
+        message: String,
+    },
+}
+
+fn report(app: &AppHandle, progress: Progress) {
+    let _ = app.emit_to("main", "te://update", progress);
 }
 
 /// Whether this build carries the public key that update signatures are checked against.
@@ -112,11 +136,58 @@ async fn check_once(app: &AppHandle) -> Result<Status, String> {
         return Ok(Status::Declined { version });
     }
     tracing::info!("installing version {version}");
+    // The main window shows the download, so the wait before the installer isn't silent.
+    crate::show_main(app);
+    report(
+        app,
+        Progress::Downloading {
+            version: version.clone(),
+            downloaded: 0,
+            total: None,
+        },
+    );
+    let mut downloaded = 0u64;
+    let mut shown = 0u64;
     // Verifies the signature before running anything; on Windows the installer takes
     // over and the app exits.
-    update
-        .download_and_install(|_, _| {}, || {})
-        .await
-        .map_err(|e| e.to_string())?;
+    let result = update
+        .download_and_install(
+            |chunk, total| {
+                downloaded += chunk as u64;
+                // About every 1% (or 256 KB when the size is unknown).
+                let step = total.map_or(256 * 1024, |t| (t / 100).max(1));
+                if downloaded - shown >= step || Some(downloaded) == total {
+                    shown = downloaded;
+                    report(
+                        app,
+                        Progress::Downloading {
+                            version: version.clone(),
+                            downloaded,
+                            total,
+                        },
+                    );
+                }
+            },
+            || {
+                report(
+                    app,
+                    Progress::Installing {
+                        version: version.clone(),
+                    },
+                )
+            },
+        )
+        .await;
+    if let Err(e) = result {
+        let message = e.to_string();
+        report(
+            app,
+            Progress::Failed {
+                version: version.clone(),
+                message: message.clone(),
+            },
+        );
+        return Err(message);
+    }
     app.restart();
 }

@@ -286,3 +286,9 @@ export interface TranslateLanguage {
 
 /** What a manual update check found (when there is a new version, the app asks itself). */
 export type UpdateStatus = { state: "unavailable" } | { state: "up_to_date" } | { state: "busy" } | { state: "declined"; version: string };
+
+/** How an update the person accepted is going (`te://update`). */
+export type UpdateProgress =
+  | { state: "downloading"; version: string; downloaded: number; total: number | null }
+  | { state: "installing"; version: string }
+  | { state: "failed"; version: string; message: string };

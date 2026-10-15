@@ -296,50 +296,45 @@ test("about: check for updates now", async ({ page }) => {
   await expect(page.getByRole("status").filter({ hasText: "You have the newest version." })).toBeVisible();
 });
 
-test("the card moves by its header and resizes from its corner; the size is kept until a double-click", async ({ page }) => {
+test("the card moves by its header and resizes from its corner; a double-click fits it again", async ({ page }) => {
+  await page.setViewportSize({ width: 700, height: 640 });
   await page.goto("/popup.html?demo=passage");
   await expect(page.getByText("google.com")).toBeVisible();
   const card = page.getByRole("dialog");
+  const drags = async () => (await mockCalls(page)).filter((c) => c.command === "popup_drag").map((c) => c.args.kind);
   expect((await card.boundingBox())?.width).toBe(480);
 
-  // Drag by the header: the window follows, measured from where the drag started.
-  const header = page.getByText(/Notwithstanding/).first();
-  const h = (await header.boundingBox())!;
-  await page.mouse.move(h.x + 20, h.y + 8);
-  await page.mouse.down();
-  await page.mouse.move(h.x + 40, h.y + 18, { steps: 4 });
-  await page.mouse.move(h.x + 60, h.y + 38, { steps: 4 });
-  await page.mouse.up();
-  await expect.poll(async () => (await mockCalls(page)).filter((c) => c.command === "popup_move").at(-1)?.args).toEqual({ dx: 40, dy: 30, first: false });
-  const moves = (await mockCalls(page)).filter((c) => c.command === "popup_move");
-  expect(moves[0]?.args.first).toBe(true);
-  expect(moves.filter((m) => m.args.first)).toHaveLength(1);
+  // Pressing the header hands the drag to the app; its tabs and buttons still just work.
+  await page.getByText(/Notwithstanding/).first().click();
+  await page.getByRole("tab", { name: "Bing" }).click();
+  await expect(page.getByText("bing.com")).toBeVisible();
+  expect(await drags()).toEqual(["move"]);
 
-  // Drag the corner: the card, its web page and the window grow, and the size is saved.
-  const grip = (await page.getByTestId("resize-grip").boundingBox())!;
-  await page.mouse.move(grip.x + 8, grip.y + 8);
-  await page.mouse.down();
-  await page.mouse.move(grip.x + 108, grip.y + 88, { steps: 5 });
-  await page.mouse.up();
-  await expect.poll(async () => (await card.boundingBox())?.width).toBe(580);
-  const saved = (await mockCalls(page)).filter((c) => c.command === "set_card_size");
-  expect(saved.at(-1)?.args.size).toEqual({ width: 580, height: expect.any(Number) });
-  await expect
-    .poll(async () => (await mockCalls(page)).filter((c) => c.command === "popup_resize").at(-1)?.args)
-    .toMatchObject({ width: 604, byPerson: true });
+  // Pressing the corner starts a resize (the stand-in app saves the window's size): the card
+  // fills its window from then on.
+  await page.getByTestId("resize-grip").click();
+  expect(await drags()).toEqual(["move", "resize"]);
+  await expect.poll(async () => (await card.boundingBox())?.width).toBe(700 - 24);
   await expect
     .poll(async () => ((await mockCalls(page)).filter((c) => c.command === "web_show").at(-1)?.args.bounds as { width: number }).width)
-    .toBe(580);
+    .toBe(700 - 24);
 
-  // Every tab fills the card the person sized.
-  await page.getByRole("tab", { name: "Explain with AI" }).click();
-  await expect(page.getByText(/Whatever else this agreement says/)).toBeVisible({ timeout: 5000 });
-  expect((await card.boundingBox())?.width).toBe(580);
-
-  // Double-click fits it to its content again.
+  // Double-click fits it to its content again, and forgets the size.
   await page.getByTestId("resize-grip").dblclick();
   await expect.poll(async () => (await card.boundingBox())?.width).toBe(480);
   expect((await mockCalls(page)).filter((c) => c.command === "set_card_size").at(-1)?.args).toEqual({ size: null });
+});
+
+test("a card the person sized fills its window on every tab", async ({ page }) => {
+  await page.setViewportSize({ width: 640, height: 600 });
+  await page.goto("/popup.html?demo=passage");
+  await page.getByTestId("resize-grip").click();
+  const card = page.getByRole("dialog");
+  await expect.poll(async () => (await card.boundingBox())?.height).toBe(600 - 24);
+  await page.getByRole("tab", { name: "Explain with AI" }).click();
+  await expect(page.getByText(/Whatever else this agreement says/)).toBeVisible({ timeout: 5000 });
+  expect((await card.boundingBox())?.height).toBe(600 - 24);
+  expect((await card.boundingBox())?.width).toBe(640 - 24);
 });
 
 test("model: the model's memory is freed when the card closes, unless chosen otherwise", async ({ page }) => {
@@ -353,4 +348,16 @@ test("model: the model's memory is freed when the card closes, unless chosen oth
   });
   await free.selectOption({ label: "The card closes" });
   await expect(free).toHaveValue("close");
+});
+
+test("an accepted update shows its download, and a failed one can be dismissed", async ({ page }) => {
+  await page.goto("/index.html?state=ready&update=downloading");
+  const dialog = page.getByRole("dialog", { name: "Updating to Plainly 0.1.22" });
+  await expect(dialog.getByRole("progressbar", { name: "Downloading" })).toHaveAttribute("aria-valuenow", "40");
+  await expect(dialog.getByRole("status")).toHaveText("Downloading · 4.0 MB of 10.0 MB");
+
+  await page.goto("/index.html?state=ready&update=failed");
+  await expect(page.getByText("The download was interrupted.")).toBeVisible();
+  await page.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });

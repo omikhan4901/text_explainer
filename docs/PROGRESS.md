@@ -100,6 +100,13 @@ by security, database and AI engineers before it reaches `main`:
       model's memory is freed when the card closes ("Free memory after: The card closes",
       the new default). Needs the owner's check on Windows: dragging and resizing a
       non-activating window, typing in the web page, the memory going back.
+- [x] Second real-PC test (15 October 2026): updates now show their download in the main
+      window; dragging and resizing follow the real cursor from Rust (the page's mouse
+      coordinates went stale while the window moved, so dragging did nothing and resizing
+      lost track); a resized card fills its window; the card stays open until its X (no
+      more closing on a click elsewhere, so the pin is gone). Bing still serves its desktop
+      page (it reads the browser's hidden "Windows" hint, not the phone identity); the
+      owner is fine with that.
 - [ ] Not verified on Windows yet: the Look up box's focus and placement, app rules on
       real apps, the Windows voice, export through the save dialog
 
@@ -115,7 +122,7 @@ Decisions that belong to the owner (not built until decided):
 
 - Tests (15 October 2026): 198 Rust (core and Windows crate, including end-to-end engine
   tests against a stand-in llama-server, download tests against a flaky local server, and
-  the word book's SQLite tests), 37 front-end unit tests, 100 Playwright checks (journeys
+  the word book's SQLite tests), 37 front-end unit tests, 108 Playwright checks (journeys
   and WCAG 2.2 AA scans, each in light and dark).
 - Model evaluation (4-vCPU GitHub runner, no GPU, 56 rewrites per model; `docs/models.md`):
   Gemma 4 E2B 17.3 tok/s, 5.8 s median per answer (first words after 2.2 s), 3.9 GB

@@ -14,11 +14,9 @@ export const en = {
     clearerHint: "Same level and terms, untangled.",
   },
   card: {
-    close: "Close (Esc)",
+    close: "Close",
     copy: "Copy",
     copied: "Copied",
-    pin: "Keep open",
-    unpin: "Close when I click elsewhere",
     resize: "Drag to resize. Double-click to fit the card to its content.",
     grade: (before: number, after: number) => `Grade ${Math.round(before)} → ${Math.round(after)}`,
     gradeTitle: "Reading grade before and after (Flesch–Kincaid).",
@@ -262,6 +260,15 @@ export const en = {
     busy: "Already checking.",
     unavailable: "This build can't update itself. Download the newest one from GitHub.",
     failed: "Couldn't check for updates. Check your internet connection.",
+  },
+  update: {
+    title: (v: string) => `Updating to Plainly ${v}`,
+    downloading: "Downloading",
+    mb: (bytes: number) => `${(bytes / 1024 ** 2).toFixed(1)} MB`,
+    of: (done: string, total: string) => `${done} of ${total}`,
+    installing: "Installing. Plainly closes and opens again by itself in a moment.",
+    failed: "The update didn't install. Your version still works; it will be offered again later.",
+    close: "Close",
   },
   firstRun: {
     welcome: "Make anything readable",

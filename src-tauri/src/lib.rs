@@ -60,7 +60,7 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let click_watcher = ClickOutsideWatcher::start(
         move || {
             let app = click_app.clone();
-            let _ = click_app.run_on_main_thread(move || popup::close(&app));
+            let _ = click_app.run_on_main_thread(move || popup::clicked_elsewhere(&app));
         },
         move || popup::focus_web(&focus_app),
     );
@@ -80,7 +80,6 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         popup: Mutex::new(None),
         card_size: Mutex::new(popup::INITIAL_SIZE),
         web_focused: AtomicBool::new(false),
-        pinned: AtomicBool::new(false),
         paused: AtomicBool::new(false),
         hotkey: Mutex::new(None),
         click_watcher,
@@ -215,10 +214,9 @@ pub fn run() {
             commands::delete_model,
             commands::unload_model,
             commands::popup_resize,
-            commands::popup_move,
+            commands::popup_drag,
             commands::set_card_size,
             commands::popup_close,
-            commands::popup_pin,
             commands::set_level,
             commands::explain_now,
             commands::set_ai_task,

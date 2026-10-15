@@ -33,13 +33,15 @@ Try each in **Notepad**, **Edge or Chrome**, **Microsoft Word** (if you have it)
       selection within a moment and the rewrite streams in.
 - [ ] While the card is open, the app you were in **keeps focus**: you can keep typing
       in Notepad and the text goes into Notepad, not the card.
-- [ ] **Esc** closes the card. Clicking anywhere else closes it. The X closes it.
-- [ ] The **pin** keeps it open when you click elsewhere.
+- [ ] The **X** closes the card. **Esc** closes it too, until you click in another app;
+      clicking elsewhere never closes it.
 - [ ] The card comes up whole (header, tabs, page and footer), never cut off, also the
       second and third time.
 - [ ] Drag the card by its header: it follows the mouse smoothly. Drag its bottom right
-      corner: it resizes, and the next card opens at that size. Double-click the corner:
-      it fits its content again.
+      corner: the card and its web page resize together, and the next card opens at that
+      size. Double-click the corner: it fits its content again.
+- [ ] Accept an update: the main window shows the download with its size, then
+      "Installing", then the new version opens.
 - [ ] Google and Bing pages fit the card (no sideways scrolling). Click into Google's
       search box and type: the text goes into the box. Close the card: you are back in
       the app you were reading in.

@@ -52,8 +52,9 @@ pub struct Memory {
 #[cfg(windows)]
 pub use imp::{
     ClickOutsideWatcher, DoubleCopyWatcher, capture_selection, cursor_position,
-    foreground_process_name, hide_window, kill_with_app, memory, prepare_popup_window,
-    process_memory, set_clipboard_text, set_popup_focus, show_window_at, speak, work_area_at,
+    foreground_process_name, hide_window, kill_with_app, memory, place_window_async,
+    prepare_popup_window, primary_button_down, process_memory, set_clipboard_text, set_popup_focus,
+    show_window_at, speak, work_area_at,
 };
 
 #[cfg(not(windows))]
@@ -79,6 +80,18 @@ mod stub {
         Err(Error::Unsupported)
     }
     pub fn hide_window(_hwnd: isize) {}
+    pub fn place_window_async(
+        _hwnd: isize,
+        _x: i32,
+        _y: i32,
+        _w: i32,
+        _h: i32,
+    ) -> Result<(), Error> {
+        Err(Error::Unsupported)
+    }
+    pub fn primary_button_down() -> bool {
+        false
+    }
     pub fn kill_with_app(_pid: u32) -> Result<(), Error> {
         Err(Error::Unsupported)
     }
@@ -119,7 +132,8 @@ mod stub {
         }
     }
 
-    /// Calls back when the mouse is pressed outside a rectangle (Windows only).
+    /// Calls back when the mouse is pressed outside a rectangle, or inside a focus area
+    /// (Windows only).
     pub struct ClickOutsideWatcher;
     impl ClickOutsideWatcher {
         pub fn start(

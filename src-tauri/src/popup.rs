@@ -1,11 +1,13 @@
 //! The reading card's window: opened next to the selection without taking focus, resized
-//! to its content as text streams in, and closed by Esc, a click elsewhere, or its X.
+//! to its content as text streams in, and closed by its X (or Esc, until the person clicks
+//! in another app).
 //! Web source tabs show their page in a child web view placed over the card's content
 //! area (private, no access to the app, never focused on its own). The person can drag
 //! the card by its header and resize it from its corner; the size is remembered.
 
 use std::sync::OnceLock;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tauri::webview::{Color, NewWindowResponse, WebviewBuilder};
@@ -13,6 +15,7 @@ use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewUr
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 use tauri_plugin_opener::OpenerExt;
 use te_core::explain::Event;
+use te_core::settings::CardSize;
 use te_core::sources::{self, WebTab};
 use te_core::text::{self, SelectionKind};
 use te_core::translate::Offer;
@@ -36,6 +39,8 @@ const WEB_USER_AGENT: &str = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebK
 /// The popup's window handle, for the mouse hook's thread (asking Tauri for it there
 /// would wait on the main thread).
 static POPUP_HWND: OnceLock<isize> = OnceLock::new();
+/// A drag (move or resize) is running: the page's size reports wait until it ends.
+static DRAGGING: AtomicBool = AtomicBool::new(false);
 
 /// Everything the popup page is told.
 #[derive(Clone, Serialize)]
@@ -135,9 +140,12 @@ pub fn open(app: &AppHandle, selection: Option<Rect>) {
         .flatten()
         .map_or(1.0, |m| m.scale_factor());
     let px = |css: f64| (css * scale).round() as i32;
-    // The card as the page last measured it: the page reports only when that changes, and
-    // the next card is often the same size (a web tab's height, or the size set by hand).
-    let (width, height) = *state.card_size.lock().expect("card size lock");
+    // The size the person gave the card, or the card as the page last measured it: the
+    // page reports only when that changes, and the next card is often the same size.
+    let (width, height) = state.settings().card_size.map_or_else(
+        || *state.card_size.lock().expect("card size lock"),
+        |c| (c.width + 2.0 * MARGIN, c.height + 2.0 * MARGIN),
+    );
     let size = (px(width), px(height));
     let tallest = px(MAX_CARD_HEIGHT + 2.0 * MARGIN).max(size.1);
     let side = choose_side(anchor, tallest, work, px(GAP));
@@ -154,7 +162,6 @@ pub fn open(app: &AppHandle, selection: Option<Rect>) {
         scale,
         rect,
         placed: false,
-        moved_from: rect,
         web: None,
     };
     *state.popup.lock().expect("popup lock") = Some(placement);
@@ -162,15 +169,17 @@ pub fn open(app: &AppHandle, selection: Option<Rect>) {
     let _ = app.global_shortcut().register(ESCAPE);
 }
 
-/// Fits the window to the card (CSS pixels, including the margin). `by_person` is true
-/// while the person drags the card's corner: from then on it keeps its top left corner.
-pub fn resize(app: &AppHandle, width: f64, height: f64, by_person: bool) {
+/// Fits the window to the card (CSS pixels, including the margin). A card the person
+/// sized fills its window instead, so this only applies to cards sized by their content.
+pub fn resize(app: &AppHandle, width: f64, height: f64) {
     let state = app.state::<AppState>();
+    if DRAGGING.load(Ordering::SeqCst) || state.settings().card_size.is_some() {
+        return;
+    }
     *state.card_size.lock().expect("card size lock") = (width, height);
     let Some(h) = hwnd(app) else { return };
     let mut popup = state.popup.lock().expect("popup lock");
     let Some(p) = popup.as_mut() else { return };
-    p.placed |= by_person;
     let px = |css: f64| (css * p.scale).round() as i32;
     let size = (
         px(width).clamp(px(100.0), p.work.width()),
@@ -186,34 +195,125 @@ pub fn resize(app: &AppHandle, width: f64, height: f64, by_person: bool) {
     watch(&state, p);
 }
 
-/// Moves the card by (`dx`, `dy`) CSS pixels from where it was when the drag started
-/// (`first` starts a drag). Measuring from the start keeps rounding from adding up.
-pub fn move_by(app: &AppHandle, dx: f64, dy: f64, first: bool) {
-    let Some(h) = hwnd(app) else { return };
-    let state = app.state::<AppState>();
-    let mut popup = state.popup.lock().expect("popup lock");
-    let Some(p) = popup.as_mut() else { return };
-    if first {
-        p.moved_from = p.rect;
-    }
-    p.placed = true;
-    let (dx, dy) = ((dx * p.scale).round() as i32, (dy * p.scale).round() as i32);
-    let from = p.moved_from;
-    p.rect = Rect::new(
-        from.left + dx,
-        from.top + dy,
-        from.right + dx,
-        from.bottom + dy,
-    );
-    let _ = te_win::show_window_at(h, p.rect.left, p.rect.top, from.width(), from.height());
-    watch(&state, p);
+/// What the person drags: the card's header moves it, its corner resizes it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Drag {
+    Move,
+    Resize,
 }
 
-/// Tells the mouse hook where the card is (clicks outside close it, unless pinned) and
-/// where its web page is (a click there lets the card take focus).
+/// Follows the mouse until its button is released: the card moves (or its corner
+/// resizes) by as much as the pointer has moved since the press. Reads the real cursor
+/// position; the page's own mouse coordinates go stale while its window moves. A resize is
+/// saved as the card's size, and a card the person moved stays where they put it.
+pub fn drag(app: &AppHandle, kind: Drag) {
+    let Some(h) = hwnd(app) else { return };
+    let Some(press) = te_win::cursor_position() else {
+        return;
+    };
+    let state = app.state::<AppState>();
+    let Some(start) = *state.popup.lock().expect("popup lock") else {
+        return;
+    };
+    if DRAGGING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let app = app.clone();
+    let spawned = std::thread::Builder::new()
+        .name("card-drag".into())
+        .spawn(move || {
+            let state = app.state::<AppState>();
+            let px = |css: f64| (css * start.scale).round() as i32;
+            let (min_w, min_h) = (
+                px(CardSize::MIN.width + 2.0 * MARGIN),
+                px(CardSize::MIN.height + 2.0 * MARGIN),
+            );
+            let from = start.rect;
+            let mut rect = from;
+            while te_win::primary_button_down() {
+                let Some((cx, cy)) = te_win::cursor_position() else {
+                    break;
+                };
+                let (dx, dy) = (cx - press.0, cy - press.1);
+                let next = match kind {
+                    Drag::Move => Rect::new(
+                        from.left + dx,
+                        from.top + dy,
+                        from.right + dx,
+                        from.bottom + dy,
+                    ),
+                    // Grows to the right and down, within the screen it started on.
+                    Drag::Resize => Rect::new(
+                        from.left,
+                        from.top,
+                        from.left
+                            + (from.width() + dx)
+                                .clamp(min_w, (start.work.right - from.left).max(min_w)),
+                        from.top
+                            + (from.height() + dy)
+                                .clamp(min_h, (start.work.bottom - from.top).max(min_h)),
+                    ),
+                };
+                if next != rect {
+                    rect = next;
+                    {
+                        let mut popup = state.popup.lock().expect("popup lock");
+                        let Some(p) = popup.as_mut() else { break };
+                        p.placed = true;
+                        p.rect = rect;
+                        watch(&state, p);
+                    }
+                    let _ = te_win::place_window_async(
+                        h,
+                        rect.left,
+                        rect.top,
+                        rect.width(),
+                        rect.height(),
+                    );
+                }
+                std::thread::sleep(Duration::from_millis(8));
+            }
+            DRAGGING.store(false, Ordering::SeqCst);
+            if kind == Drag::Resize && rect != from {
+                let size = CardSize {
+                    width: f64::from(rect.width()) / start.scale - 2.0 * MARGIN,
+                    height: f64::from(rect.height()) / start.scale - 2.0 * MARGIN,
+                };
+                if let Err(e) = save_card_size(&app, Some(size)) {
+                    tracing::warn!("{e}");
+                }
+            }
+        });
+    if spawned.is_err() {
+        DRAGGING.store(false, Ordering::SeqCst);
+    }
+}
+
+/// Remembers the size the person gave the card (`None` fits it to what it shows again)
+/// and tells the card.
+pub fn save_card_size(app: &AppHandle, size: Option<CardSize>) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let mut settings = state.settings();
+    settings.card_size = size;
+    let settings = settings.sanitized();
+    settings
+        .save(&state.paths.settings)
+        .map_err(|e| format!("Couldn't save settings: {e}"))?;
+    *state.settings.lock().expect("settings lock") = settings;
+    emit(app, PopupEvent::Settings);
+    Ok(())
+}
+
+/// The person clicked in another app: the card stays open, and Esc goes back to that app.
+pub fn clicked_elsewhere(app: &AppHandle) {
+    let _ = app.global_shortcut().unregister(ESCAPE);
+}
+
+/// Tells the mouse hook where the card is (a click outside gives Esc back) and where its
+/// web page is (a click there lets the card take focus).
 fn watch(state: &AppState, p: &PopupPlacement) {
-    let pinned = state.pinned.load(Ordering::SeqCst);
-    state.click_watcher.set_rect((!pinned).then_some(p.rect));
+    state.click_watcher.set_rect(Some(p.rect));
     let px = |css: f64| (css * p.scale).round() as i32;
     state.click_watcher.set_focus_rect(p.web.map(|b| {
         Rect::new(
@@ -291,7 +391,6 @@ pub fn close(app: &AppHandle) {
     *state.web_url.lock().expect("web lock") = None;
     state.click_watcher.set_rect(None);
     state.click_watcher.set_focus_rect(None);
-    state.pinned.store(false, Ordering::SeqCst);
     let was_open = state.popup.lock().expect("popup lock").take().is_some();
     if let Some(h) = hwnd(app) {
         te_win::hide_window(h);
@@ -309,14 +408,6 @@ pub fn close(app: &AppHandle) {
                 engine.unload().await;
             }
         });
-    }
-}
-
-pub fn set_pinned(app: &AppHandle, pinned: bool) {
-    let state = app.state::<AppState>();
-    state.pinned.store(pinned, Ordering::SeqCst);
-    if let Some(p) = *state.popup.lock().expect("popup lock") {
-        watch(&state, &p);
     }
 }
 

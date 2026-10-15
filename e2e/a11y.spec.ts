@@ -65,3 +65,11 @@ test("reading card translating, with the language search open, is accessible", a
   await page.getByRole("combobox", { name: "Search languages" }).waitFor();
   await expectAccessible(page);
 });
+
+for (const update of ["downloading", "failed"]) {
+  test(`update progress (${update}) is accessible`, async ({ page }) => {
+    await page.goto(`/index.html?state=ready&update=${update}`);
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expectAccessible(page);
+  });
+}

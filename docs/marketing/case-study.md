@@ -38,7 +38,7 @@ anything leaving the computer. It must not get in the way of the work you are do
   content, and flags anything missing or invented right on the card.
 - **Made it invisible until needed.** The card opens beside the selection without taking
   keyboard focus from the app you're in, grows away from your text as the answer streams
-  in, and closes with Esc or a click elsewhere. Two triggers: a shortcut that reads the
+  in, and stays until you close it (drag it anywhere, resize it). Two triggers: a shortcut that reads the
   selection through Windows UI Automation (no clipboard), or pressing Ctrl+C twice. When
   an app hides its selection, a fallback copies it and restores the clipboard exactly,
   every format, kept out of clipboard history.
@@ -68,7 +68,7 @@ anything leaving the computer. It must not get in the way of the work you are do
   (fewer false alarms on contract terms and shortened names), and the engine's prompt
   cache, sized by measurement after a memory-saving idea made answers 4 to 7 seconds
   slower.
-- 198 Rust tests, 37 front-end unit tests and 100 Playwright checks (journeys plus WCAG
+- 198 Rust tests, 37 front-end unit tests and 108 Playwright checks (journeys plus WCAG
   2.2 AA scans in light and dark), run before every push; every push also builds the
   Windows installer, smoke-tests it on a Windows runner and publishes it as the preview
   download.

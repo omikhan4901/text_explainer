@@ -22,14 +22,18 @@ A guide to the code for anyone changing it. Keep it true when you change how thi
    same file and hands over the copied text directly.
 2. **Card opens** (`src-tauri/src/popup.rs`). Placed by the selection's screen rectangle
    (or the mouse), on the right monitor, on the side with room (`crates/win/src/placement.rs`),
-   shown with `SWP_NOACTIVATE` so the reading app keeps focus. Esc is registered as a
-   global shortcut only while it's open; a low-level mouse hook closes it on clicks
-   elsewhere. It opens at the size the page last reported (`AppState::card_size`): the
+   shown with `SWP_NOACTIVATE` so the reading app keeps focus. It stays open until its X
+   is pressed (the owner's call, 15 October 2026: it closed too easily). Esc closes it
+   too, as a global shortcut registered while it's open, until the person clicks in
+   another app (a low-level mouse hook sees that click): from then on Esc belongs to that
+   app again. It opens at the size the page last reported (`AppState::card_size`): the
    page reports only changes, so starting from a fixed height left a card that kept its
-   size cut off. The person can drag it by its header (`popup_move`, measured from where
-   the drag started) and resize it from its bottom right corner; after either it stays
-   where they put it, and the size is saved (`settings.card_size`; double-click the
-   corner to fit the card to its content again).
+   size cut off. Pressing its header (move) or its bottom right corner (resize) calls
+   `popup_drag`: a thread follows the real cursor until the button is released
+   (`popup::drag`), since the page's own mouse coordinates go stale while its window
+   moves. A moved card stays where it was put; a resized card's size is saved
+   (`settings.card_size`), and from then on the card fills its window instead of the
+   window following the card. Double-click the corner to fit it to its content again.
 3. **Tabs** (`trigger.rs`, `crates/core/src/sources.rs`). The `open` event lists the
    card's web tabs (`sources::tabs_for`: enabled sources for words or for passages, none
    while Offline only is on) and the selection's kind. For one word or a short term the
@@ -257,8 +261,9 @@ repository holds the update key, the installer is signed (minisign, Tauri's upda
 `latest.json` is published beside it on the `latest-build` release. Installed apps read it
 90 seconds after starting and then every 6 hours (`src-tauri/src/updater.rs`, when "Check
 for updates" is on), and on "Check now" (About). A newer version brings up a native dialog:
-"Install and restart" downloads it, **checks the signature against the public key built
-into the app**, runs the installer (passive: progress only, no questions) and opens the new
+"Install and restart" opens the main window over a progress screen (`te://update`:
+downloading with the size, then installing), downloads it, **checks the signature against
+the public key built into the app**, runs the installer (passive: progress only, no questions) and opens the new
 version; "Later" asks again next time. A build without the key (local builds, or before
 the key is set) never checks.
 

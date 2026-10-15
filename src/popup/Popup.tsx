@@ -6,8 +6,6 @@ import {
   Copy,
   Globe,
   MagnifyingGlass,
-  PushPin,
-  PushPinSlash,
   SpeakerHigh,
   Sparkle,
   Warning,
@@ -24,7 +22,7 @@ import { mock } from "../lib/mock";
 import { applyAppearance, followSystemTheme } from "../lib/theme";
 import { bareTerm, savableTerm } from "../lib/words";
 import { pairUp, type Pair } from "./pairs";
-import type { AiTask, CardSize, DictionaryEntry, LanguageName, Level, PopupEvent, Sense, Settings, TranslateLanguage } from "../lib/types";
+import type { AiTask, DictionaryEntry, LanguageName, Level, PopupEvent, Sense, Settings, TranslateLanguage } from "../lib/types";
 import {
   answerText,
   copyable,
@@ -49,8 +47,6 @@ const MARGIN = 12;
 /** Height of the area a web page fills, and of the footer under every tab. */
 const PAGE_HEIGHT = 400;
 const FOOTER_HEIGHT = 40;
-/** The smallest card the person can resize to (match `CardSize::MIN` in settings.rs). */
-const MIN_SIZE: CardSize = { width: 320, height: 200 };
 const ICON = 15;
 
 export function Popup() {
@@ -69,30 +65,29 @@ export function Popup() {
       .catch(() => undefined);
   }, []);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [pinned, setPinned] = useState(false);
-  // The size the person gave the card; null fits the card to what it shows.
-  const [size, setSize] = useState<CardSize | null>(null);
+  // The person is resizing the card (the app saves the size when they let go).
+  const [resizing, setResizing] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const settingsRef = useRef<Settings | null>(null);
-  // True once the person resizes this card: it then keeps its top left corner in place.
-  const resizedByPerson = useRef(false);
 
   const applySettings = useCallback((s: Settings) => {
     settingsRef.current = s;
     setSettings(s);
-    setSize(s.card_size);
+    setResizing(false);
     applyAppearance(s.appearance);
   }, []);
+  // A card the person sized fills its window; otherwise the window follows the card.
+  const sized = resizing || Boolean(settings?.card_size);
+  const sizedRef = useRef(sized);
+  useLayoutEffect(() => {
+    sizedRef.current = sized;
+  }, [sized]);
 
   useEffect(() => {
     const loadSettings = () => void api.getSettings().then(applySettings);
     loadSettings();
     const stopTheme = followSystemTheme(() => settingsRef.current?.appearance);
     const unlisten = on<PopupEvent>("te://popup", (event) => {
-      if (event.type === "open") {
-        setPinned(false);
-        resizedByPerson.current = false;
-      }
       if (event.type === "settings") loadSettings();
       dispatch(event);
     });
@@ -116,9 +111,9 @@ export function Popup() {
     let frame = 0;
     const report = () => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(
-        () => void api.popupResize(card.offsetWidth + 2 * MARGIN, card.offsetHeight + 2 * MARGIN, resizedByPerson.current),
-      );
+      frame = requestAnimationFrame(() => {
+        if (!sizedRef.current) void api.popupResize(card.offsetWidth + 2 * MARGIN, card.offsetHeight + 2 * MARGIN);
+      });
     };
     const observer = new ResizeObserver(report);
     observer.observe(card);
@@ -145,100 +140,53 @@ export function Popup() {
     if (!onWebTab) void api.webHide();
   }, [onWebTab]);
 
-  const togglePin = () => {
-    setPinned((p) => {
-      void api.popupPin(!p);
-      return !p;
-    });
-  };
-
-  const resizeTo = (next: CardSize | null) => {
-    resizedByPerson.current = true;
-    setSize(next);
-  };
-  const keepSize = (next: CardSize | null) => {
-    if (settingsRef.current) settingsRef.current = { ...settingsRef.current, card_size: next };
-    void api.setCardSize(next);
-  };
-
   return (
-    <div className="p-3" style={{ width: (size?.width ?? WIDTH) + 2 * MARGIN }}>
+    <div className={sized ? "h-screen w-screen p-3" : "p-3"} style={sized ? undefined : { width: WIDTH + 2 * MARGIN }}>
       <div
         ref={cardRef}
         role="dialog"
         aria-label={strings.app.name}
-        className={`relative flex flex-col overflow-hidden rounded-xl bg-surface text-text shadow-[var(--shadow-card)] ${size ? "" : "max-h-[560px]"}`}
-        style={size ? { height: size.height } : undefined}
+        className={`relative flex flex-col overflow-hidden rounded-xl bg-surface text-text shadow-[var(--shadow-card)] ${sized ? "h-full" : "max-h-[560px]"}`}
       >
         {state.view === "explain" ? (
           <ExplainCard
             state={state}
             level={settings?.level ?? "plain"}
-            pinned={pinned}
-            onPin={togglePin}
             onTab={(tab) => dispatch({ type: "select_tab", tab })}
             languages={languages}
             onTask={(task, target) => setTask(state.id, task, target)}
-            fill={size !== null}
+            fill={sized}
           />
         ) : (
-          <MessageCard state={state} pinned={pinned} onPin={togglePin} />
+          <MessageCard state={state} />
         )}
-        <ResizeGrip card={cardRef} onResize={resizeTo} onDone={keepSize} />
+        <ResizeGrip
+          onStart={() => setResizing(true)}
+          onReset={() => {
+            setResizing(false);
+            void api.setCardSize(null);
+          }}
+        />
       </div>
     </div>
   );
 }
 
-/** Lets the person move the card by dragging `onPointerDown`'s element (its header).
- * Buttons, links and tabs inside it still work as usual. */
+/** Handlers for the card's header: pressing it lets the person drag the card (the app
+ * follows the mouse until the button is released). Buttons and tabs in it work as usual. */
 function useCardDrag() {
-  const drag = useRef<{ x: number; y: number; dx: number; dy: number; first: boolean; frame: number } | null>(null);
-  const end = () => {
-    if (drag.current) cancelAnimationFrame(drag.current.frame);
-    drag.current = null;
-  };
   return {
     onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
       if (e.button !== 0 || (e.target as Element).closest("button, a, input, select, [role=tab]")) return;
       e.preventDefault();
-      e.currentTarget.setPointerCapture(e.pointerId);
-      drag.current = { x: e.screenX, y: e.screenY, dx: 0, dy: 0, first: true, frame: 0 };
+      void api.popupDrag("move");
     },
-    onPointerMove: (e: React.PointerEvent<HTMLElement>) => {
-      const d = drag.current;
-      if (!d) return;
-      // Measured from where the drag started, so the card follows the pointer exactly.
-      d.dx = e.screenX - d.x;
-      d.dy = e.screenY - d.y;
-      if (d.frame) return;
-      d.frame = requestAnimationFrame(() => {
-        d.frame = 0;
-        void api.popupMove(d.dx, d.dy, d.first);
-        d.first = false;
-      });
-    },
-    onPointerUp: end,
-    onPointerCancel: end,
   };
 }
 
 /** The card's bottom right corner: drag to resize (the size is remembered), double-click
  * to fit the card to what it shows again. */
-function ResizeGrip({
-  card,
-  onResize,
-  onDone,
-}: {
-  card: React.RefObject<HTMLDivElement | null>;
-  onResize: (size: CardSize | null) => void;
-  onDone: (size: CardSize | null) => void;
-}) {
-  const drag = useRef<{ x: number; y: number; width: number; height: number; size: CardSize | null } | null>(null);
-  const end = () => {
-    if (drag.current?.size) onDone(drag.current.size);
-    drag.current = null;
-  };
+function ResizeGrip({ onStart, onReset }: { onStart: () => void; onReset: () => void }) {
   return (
     <div
       aria-hidden
@@ -246,28 +194,12 @@ function ResizeGrip({
       data-testid="resize-grip"
       className="absolute right-0 bottom-0 z-10 flex size-4 cursor-nwse-resize items-end justify-end p-[3px] text-border-strong hover:text-muted"
       onPointerDown={(e) => {
-        const el = card.current;
-        if (e.button !== 0 || !el) return;
+        if (e.button !== 0) return;
         e.preventDefault();
-        e.currentTarget.setPointerCapture(e.pointerId);
-        drag.current = { x: e.screenX, y: e.screenY, width: el.offsetWidth, height: el.offsetHeight, size: null };
+        onStart();
+        void api.popupDrag("resize");
       }}
-      onPointerMove={(e) => {
-        const d = drag.current;
-        if (!d) return;
-        const most = { width: screen.availWidth - 2 * MARGIN, height: screen.availHeight - 2 * MARGIN };
-        d.size = {
-          width: Math.round(Math.min(Math.max(d.width + e.screenX - d.x, MIN_SIZE.width), Math.max(most.width, MIN_SIZE.width))),
-          height: Math.round(Math.min(Math.max(d.height + e.screenY - d.y, MIN_SIZE.height), Math.max(most.height, MIN_SIZE.height))),
-        };
-        onResize(d.size);
-      }}
-      onPointerUp={end}
-      onPointerCancel={end}
-      onDoubleClick={() => {
-        onResize(null);
-        onDone(null);
-      }}
+      onDoubleClick={onReset}
     >
       <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round">
         <path d="M7 1 1 7M7 4.5 4.5 7" />
@@ -276,24 +208,17 @@ function ResizeGrip({
   );
 }
 
-function PinClose({ pinned, onPin }: { pinned: boolean; onPin: () => void }) {
+function CloseButton() {
   return (
-    <div className="flex shrink-0 items-center gap-0.5">
-      <IconButton label={pinned ? t.unpin : t.pin} active={pinned} aria-pressed={pinned} onClick={onPin}>
-        {pinned ? <PushPinSlash size={ICON} /> : <PushPin size={ICON} />}
-      </IconButton>
-      <IconButton label={t.close} onClick={() => void api.popupClose()}>
-        <X size={ICON} />
-      </IconButton>
-    </div>
+    <IconButton label={t.close} onClick={() => void api.popupClose()}>
+      <X size={ICON} />
+    </IconButton>
   );
 }
 
 function ExplainCard({
   state,
   level,
-  pinned,
-  onPin,
   onTab,
   onTask,
   languages,
@@ -301,8 +226,6 @@ function ExplainCard({
 }: {
   state: Explaining;
   level: Level;
-  pinned: boolean;
-  onPin: () => void;
   onTab: (tab: TabId) => void;
   onTask: (task: AiTask, target?: LanguageName) => void;
   languages: TranslateLanguage[];
@@ -326,7 +249,7 @@ function ExplainCard({
         </p>
         <div className="flex shrink-0 items-center gap-0.5">
           <WordActions state={state} />
-          <PinClose pinned={pinned} onPin={onPin} />
+          <CloseButton />
         </div>
       </div>
       {/* Only the AI tab (offline, no dictionary entry): no row of tabs to choose from. */}
@@ -1063,12 +986,12 @@ function ErrorBlock({ message, detail }: { message: string; detail: string | nul
   );
 }
 
-function MessageCard({ state, pinned, onPin }: { state: Exclude<ReturnType<typeof reduce>, Explaining>; pinned: boolean; onPin: () => void }) {
+function MessageCard({ state }: { state: Exclude<ReturnType<typeof reduce>, Explaining> }) {
   const drag = useCardDrag();
   if (state.view === "empty") {
     return (
       <div className="flex h-11 items-center justify-end pr-1.5" {...drag}>
-        <PinClose pinned={pinned} onPin={onPin} />
+        <CloseButton />
       </div>
     );
   }
@@ -1082,7 +1005,7 @@ function MessageCard({ state, pinned, onPin }: { state: Exclude<ReturnType<typeo
     <>
       <div className="flex h-11 shrink-0 items-center gap-3 pr-1.5 pl-4" {...drag}>
         <p className="min-w-0 flex-1 truncate text-[14px] font-semibold">{title}</p>
-        <PinClose pinned={pinned} onPin={onPin} />
+        <CloseButton />
       </div>
       <div className="card-in space-y-3 px-4 pb-4 text-[13px] text-muted">
         <p>{body}</p>

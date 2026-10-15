@@ -149,6 +149,8 @@ if (typeof location !== "undefined" && new URLSearchParams(location.search).get(
   settings = { ...settings, first_run_done: true, model: { kind: "catalog", id: "gemma-4-e2b" } };
 }
 const handlers = new Map<string, Set<Handler>>();
+// `?update=downloading` (or `failed`) shows an update in progress in the main window.
+const updateParam = typeof location !== "undefined" ? new URLSearchParams(location.search).get("update") : null;
 
 // The Word book, with a few saved words and lookups so the Words page has something to show.
 let ago = 0;
@@ -298,8 +300,16 @@ async function call<T>(command: string, args: Record<string, unknown> = {}): Pro
       return undefined as T;
     case "popup_focus":
       return undefined as T;
+    case "popup_drag":
+      // The app follows the mouse, then saves a resized card's size.
+      if (args.kind === "resize") {
+        settings = { ...settings, card_size: { width: innerWidth - 24, height: innerHeight - 24 } };
+        emit("te://popup", { type: "settings" });
+      }
+      return undefined as T;
     case "set_card_size":
       settings = { ...settings, card_size: args.size as Settings["card_size"] };
+      emit("te://popup", { type: "settings" });
       return undefined as T;
     case "explain_now":
       if (args.id === demoId && pendingAi) void pendingAi(demoId);
@@ -375,6 +385,17 @@ async function call<T>(command: string, args: Record<string, unknown> = {}): Pro
 function on(event: string, handler: Handler): () => void {
   if (!handlers.has(event)) handlers.set(event, new Set());
   handlers.get(event)!.add(handler);
+  if (event === "te://update" && updateParam) {
+    setTimeout(
+      () =>
+        handler(
+          updateParam === "failed"
+            ? { state: "failed", version: "0.1.22", message: "The download was interrupted." }
+            : { state: "downloading", version: "0.1.22", downloaded: 4 * 1024 ** 2, total: 10 * 1024 ** 2 },
+        ),
+      50,
+    );
+  }
   return () => handlers.get(event)?.delete(handler);
 }
 

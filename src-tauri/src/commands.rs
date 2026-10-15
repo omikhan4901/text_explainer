@@ -302,38 +302,25 @@ pub async fn unload_model(state: State<'_, AppState>) -> CmdResult<()> {
 }
 
 #[tauri::command]
-pub fn popup_resize(app: AppHandle, width: f64, height: f64, by_person: bool) {
-    popup::resize(&app, width, height, by_person);
+pub fn popup_resize(app: AppHandle, width: f64, height: f64) {
+    popup::resize(&app, width, height);
 }
 
-/// The person drags the card by its header.
+/// The person pressed the card's header (move) or its corner (resize).
 #[tauri::command]
-pub fn popup_move(app: AppHandle, dx: f64, dy: f64, first: bool) {
-    popup::move_by(&app, dx, dy, first);
+pub fn popup_drag(app: AppHandle, kind: popup::Drag) {
+    popup::drag(&app, kind);
 }
 
 /// Remembers the size the person gave the card (`None`: fit it to what it shows again).
 #[tauri::command]
 pub fn set_card_size(app: AppHandle, size: Option<CardSize>) -> CmdResult<()> {
-    let state = app.state::<AppState>();
-    let mut settings = state.settings();
-    settings.card_size = size;
-    let settings = settings.sanitized();
-    settings
-        .save(&state.paths.settings)
-        .map_err(|e| format!("Couldn't save settings: {e}"))?;
-    *state.settings.lock().expect("settings lock") = settings;
-    Ok(())
+    popup::save_card_size(&app, size)
 }
 
 #[tauri::command]
 pub fn popup_close(app: AppHandle) {
     popup::close(&app);
-}
-
-#[tauri::command]
-pub fn popup_pin(app: AppHandle, pinned: bool) {
-    popup::set_pinned(&app, pinned);
 }
 
 /// Changes the reading level from the card and explains the same text again (the card

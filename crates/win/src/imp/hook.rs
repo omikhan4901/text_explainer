@@ -1,5 +1,6 @@
-//! Closing the card when the person clicks anywhere else. The card never has focus, so
-//! it can't rely on losing it; a low-level mouse hook sees clicks in every app. The same
+//! Noticing when the person clicks anywhere else while the card is open (it then gives
+//! Esc back to that app). The card never has focus, so it can't rely on losing it; a
+//! low-level mouse hook sees clicks in every app. The same
 //! hook sees a click into the card's web page before the page gets it, so the card can
 //! become focusable in time for that click to focus it (typing in a search box).
 
@@ -33,21 +34,32 @@ impl ClickOutsideWatcher {
     ) -> Self {
         let _ = ON_FOCUS_AREA.set(Box::new(on_focus_area));
         if ON_OUTSIDE.set(Box::new(on_click_outside)).is_ok() {
-            let _ = std::thread::Builder::new().name("click-outside".into()).spawn(|| {
-                // SAFETY: the hook lives as long as this thread's message loop.
-                unsafe {
-                    let module = GetModuleHandleW(None).ok();
-                    if SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_proc), module.map(Into::into), 0).is_err() {
-                        tracing::warn!("couldn't install the mouse hook; click outside won't close the card");
-                        return;
+            let _ = std::thread::Builder::new()
+                .name("click-outside".into())
+                .spawn(|| {
+                    // SAFETY: the hook lives as long as this thread's message loop.
+                    unsafe {
+                        let module = GetModuleHandleW(None).ok();
+                        if SetWindowsHookExW(
+                            WH_MOUSE_LL,
+                            Some(mouse_proc),
+                            module.map(Into::into),
+                            0,
+                        )
+                        .is_err()
+                        {
+                            tracing::warn!(
+                                "couldn't install the mouse hook; clicks elsewhere go unnoticed"
+                            );
+                            return;
+                        }
+                        let mut msg = MSG::default();
+                        while GetMessageW(&mut msg, None, 0, 0).as_bool() {
+                            let _ = TranslateMessage(&msg);
+                            DispatchMessageW(&msg);
+                        }
                     }
-                    let mut msg = MSG::default();
-                    while GetMessageW(&mut msg, None, 0, 0).as_bool() {
-                        let _ = TranslateMessage(&msg);
-                        DispatchMessageW(&msg);
-                    }
-                }
-            });
+                });
         }
         ClickOutsideWatcher
     }
@@ -100,7 +112,11 @@ unsafe extern "system" fn mouse_proc(code: i32, wparam: WPARAM, lparam: LPARAM) 
                     cb();
                 }
             } else if outside {
-                ACTIVE.store(false, Ordering::SeqCst);
+                // Once is enough, until the card is placed again.
+                if let Ok(mut r) = RECT.lock() {
+                    *r = None;
+                }
+                update_active();
                 if let Some(cb) = ON_OUTSIDE.get() {
                     cb();
                 }

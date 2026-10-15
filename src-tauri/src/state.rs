@@ -67,8 +67,6 @@ pub struct PopupPlacement {
     pub rect: Rect,
     /// The person moved or resized the card: it stays where they put it.
     pub placed: bool,
-    /// Where the card was when the person started dragging it.
-    pub moved_from: Rect,
     /// Where the web page shows inside the card, while it shows.
     pub web: Option<WebBounds>,
 }
@@ -89,7 +87,6 @@ pub struct AppState {
     pub card_size: Mutex<(f64, f64)>,
     /// The person clicked into the card's web page, so the card took focus to let them type.
     pub web_focused: AtomicBool,
-    pub pinned: AtomicBool,
     pub paused: AtomicBool,
     pub hotkey: Mutex<Option<Shortcut>>,
     pub click_watcher: ClickOutsideWatcher,

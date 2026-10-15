@@ -6,6 +6,7 @@ import { strings } from "../i18n";
 import { api } from "../lib/ipc";
 import { DataProvider, useData } from "./data";
 import { FirstRun } from "./FirstRun";
+import { UpdateProgress } from "./UpdateProgress";
 import { AboutPage } from "./pages/About";
 import { HomePage } from "./pages/Home";
 import { ModelPage } from "./pages/Model";
@@ -28,9 +29,13 @@ const PAGES: { id: PageId; icon: Icon; label: string }[] = [
 
 export function App() {
   return (
-    <DataProvider fallback={<div className="min-h-dvh bg-bg" />}>
-      <Shell />
-    </DataProvider>
+    <>
+      <DataProvider fallback={<div className="min-h-dvh bg-bg" />}>
+        <Shell />
+      </DataProvider>
+      {/* Outside the data provider: it listens from the first moment. */}
+      <UpdateProgress />
+    </>
   );
 }
 
