@@ -26,6 +26,8 @@ export interface Explaining {
   gradeAfter: number | null;
   /** Text per part (long selections are rewritten in parts). */
   parts: string[];
+  /** The source text of each part, for showing a translation next to its original. */
+  sourceParts: string[];
   loadingModel: boolean;
   done: boolean;
   report: Report | null;
@@ -71,6 +73,7 @@ function fresh(event: Extract<PopupEvent, { type: "open" }>): Explaining {
     gradeBefore: null,
     gradeAfter: null,
     parts: [],
+    sourceParts: [],
     loadingModel: false,
     done: false,
     report: null,
@@ -97,6 +100,7 @@ export function reduce(state: CardState, event: PopupEvent | CardAction): CardSt
         task: event.task,
         started: false,
         parts: [],
+        sourceParts: [],
         loadingModel: false,
         done: false,
         gradeAfter: null,
@@ -143,6 +147,7 @@ export function reduce(state: CardState, event: PopupEvent | CardAction): CardSt
             gradeBefore: e.grade_before,
             gradeAfter: null,
             parts: Array.from({ length: e.parts }, () => ""),
+            sourceParts: e.source_parts,
             loadingModel: false,
             done: false,
             report: null,

@@ -340,6 +340,7 @@ export const en = {
     webOnly: (language: string) => `${language}: the web Translate tab only`,
     aiLanguages: "Explain with AI can translate into the languages without a mark; the others use the web Translate tab.",
     webOnlyMark: "web only",
+    pairs: "Each sentence and its translation",
     onTheWeb: (site: string) => `Use the ${site} tab`,
     compare: (site: string) => `Compare in the ${site} tab`,
   },

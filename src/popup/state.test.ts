@@ -20,6 +20,7 @@ const started: ExplainEvent = {
   truncated: false,
   grade_before: 16.2,
   parts: 2,
+  source_parts: ["Hard", "text."],
   language: "English",
 };
 

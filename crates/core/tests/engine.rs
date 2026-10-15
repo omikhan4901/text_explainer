@@ -61,11 +61,13 @@ async fn rewrites_a_passage_and_strips_the_preamble() {
         Event::Started {
             kind,
             parts,
+            source_parts,
             language,
             ..
         } => {
             assert_eq!(*kind, SelectionKind::Passage);
             assert_eq!(*parts, 1);
+            assert_eq!(source_parts.len(), 1);
             assert_eq!(language.as_deref(), Some("English"));
         }
         e => panic!("unexpected first event {e:?}"),

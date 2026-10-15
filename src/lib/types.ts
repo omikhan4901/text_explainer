@@ -156,6 +156,8 @@ export type ExplainEvent =
       truncated: boolean;
       grade_before: number | null;
       parts: number;
+      /** The source text of each part, in order (pairs the translation with it). */
+      source_parts: string[];
       language: string | null;
     }
   | { type: "loading" }

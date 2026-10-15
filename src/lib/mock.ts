@@ -438,7 +438,7 @@ async function playDemo(name: string) {
 async function explainPassage(id: number, name: string) {
   if (aiTask === "translate") return translateDemo(id, "passage");
   const send = (event: ExplainEvent) => emit("te://popup", { type: "explain", id, task: "explain", event } satisfies PopupEvent);
-  send({ type: "started", kind: "passage", source: SOURCE, truncated: false, grade_before: 17.4, parts: 1, language: "English" });
+  send({ type: "started", kind: "passage", source: SOURCE, truncated: false, grade_before: 17.4, parts: 1, source_parts: [SOURCE], language: "English" });
   if (name === "loading") {
     send({ type: "loading" });
     return;
@@ -472,7 +472,16 @@ async function explainPassage(id: number, name: string) {
 async function explainWord(id: number) {
   if (aiTask === "translate") return translateDemo(id, "word");
   const send = (event: ExplainEvent) => emit("te://popup", { type: "explain", id, task: "explain", event } satisfies PopupEvent);
-  send({ type: "started", kind: "word", source: "ubiquitous", truncated: false, grade_before: null, parts: 1, language: "English" });
+  send({
+    type: "started",
+    kind: "word",
+    source: "ubiquitous",
+    truncated: false,
+    grade_before: null,
+    parts: 1,
+    source_parts: ["ubiquitous"],
+    language: "English",
+  });
   await sleep(500);
   if (id !== demoId) return;
   const text = "Here it means found almost everywhere: smartphones are part of nearly every moment of daily life.";
@@ -514,7 +523,16 @@ function translateAvailability(): TranslateAvailability {
 async function translateDemo(id: number, kind: "word" | "passage") {
   const send = (event: ExplainEvent) => emit("te://popup", { type: "explain", id, task: "translate", event } satisfies PopupEvent);
   const lang = settings.translate_to;
-  send({ type: "started", kind, source: kind === "word" ? "ubiquitous" : SOURCE, truncated: false, grade_before: null, parts: 1, language: lang });
+  send({
+    type: "started",
+    kind,
+    source: kind === "word" ? "ubiquitous" : SOURCE,
+    truncated: false,
+    grade_before: null,
+    parts: 1,
+    source_parts: [kind === "word" ? "ubiquitous" : SOURCE],
+    language: lang,
+  });
   await sleep(400);
   if (id !== demoId || aiTask !== "translate") return;
   const text = (TRANSLATIONS[lang] ?? TRANSLATIONS.es!)[kind];

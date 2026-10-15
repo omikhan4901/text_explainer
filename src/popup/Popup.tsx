@@ -9,6 +9,7 @@ import { api, inApp, on } from "../lib/ipc";
 import { mock } from "../lib/mock";
 import { applyAppearance, followSystemTheme } from "../lib/theme";
 import { bareTerm, savableTerm } from "../lib/words";
+import { pairUp, type Pair } from "./pairs";
 import type { AiTask, DictionaryEntry, Level, PopupEvent, Sense, Settings } from "../lib/types";
 import {
   answerText,
@@ -439,6 +440,8 @@ function ExplainPane({ state, level, onTask, onTab }: { state: Explaining; level
       <div key={`${state.id}-${state.task}`} className="card-in min-h-0 overflow-y-auto px-4 pt-3 pb-4" aria-live="polite" aria-busy={!state.done}>
         {state.error ? (
           <ErrorBlock message={state.error.message} detail={state.error.detail} />
+        ) : text && state.task === "translate" && state.kind === "passage" && state.sourceParts.length > 0 ? (
+          <Pairs pairs={pairUp(state.sourceParts, state.parts, state.done)} streaming={streaming} />
         ) : text ? (
           <Reading text={text} streaming={streaming} />
         ) : (
@@ -623,6 +626,31 @@ export function Reading({ text, streaming }: { text: string; streaming: boolean 
         </p>
       ))}
     </div>
+  );
+}
+
+/** A translation sentence by sentence, each under its original (small and muted), so the
+ * reader can map one onto the other. Pointing at a pair highlights it. */
+function Pairs({ pairs, streaming }: { pairs: Pair[]; streaming: boolean }) {
+  const writing = pairs.findLastIndex((p) => p.result);
+  const next = pairs.findIndex((p) => !p.result);
+  return (
+    <ol
+      aria-label={strings.translate.pairs}
+      className="-mx-2 space-y-0.5 [overflow-wrap:anywhere]"
+      style={{ fontFamily: "var(--reading-font)", fontSize: "var(--reading-size, 15px)", lineHeight: "var(--reading-leading, 1.6)" }}
+    >
+      {pairs.map((p, i) => (
+        <li key={i} className="rounded-lg px-2 py-1.5 transition-colors duration-150 hover:bg-surface-2">
+          <p className="text-[0.82em] leading-snug text-muted">{p.source}</p>
+          {p.result ? (
+            <p className={`mt-0.5 ${streaming && i === writing ? "stream-caret" : ""}`}>{p.result}</p>
+          ) : (
+            i === next && <div className="skeleton-line mt-2 h-2.5 w-2/3 rounded-full" aria-hidden />
+          )}
+        </li>
+      ))}
+    </ol>
   );
 }
 

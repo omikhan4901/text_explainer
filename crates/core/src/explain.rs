@@ -94,6 +94,9 @@ pub enum Event {
         truncated: bool,
         grade_before: Option<f32>,
         parts: usize,
+        /// The source text of each part, in order: the card pairs each part's answer with
+        /// the text it came from ("Show original").
+        source_parts: Vec<String>,
         /// The language the answer is written in, when known (English name).
         language: Option<String>,
     },
@@ -215,6 +218,7 @@ async fn run_inner(
             .then(|| readability::grade(&source).map(|r| r.grade))
             .flatten(),
         parts: parts.len(),
+        source_parts: parts.clone(),
         language: out_lang.map(|l| l.name.to_string()),
     });
 

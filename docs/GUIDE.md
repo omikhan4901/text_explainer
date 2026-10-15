@@ -180,6 +180,12 @@ model like an explanation, so the text never leaves the computer.
   a translation rightly writes them the target's way ("Geneva" becomes "Ginebra").
 - Token budgets are per target script (`prompt::max_tokens_for_translation`): Bangla,
   Hindi, Arabic and CJK take many more tokens per word than English.
+- A translated passage is shown sentence by sentence, each under its original (small and
+  muted), so the reader can map one onto the other; pointing at a pair highlights it. The
+  core sends each part's source with the `started` event; `src/popup/pairs.ts` pairs the
+  sentences within each part when both sides have as many (Unicode sentence rules, so
+  "।" and "。" count) and otherwise keeps the whole part as one pair, so a sentence is
+  never shown next to the wrong translation. The model's prompt is unchanged.
 - The web translators work alongside it: the Translate tab (Google Translate) is on by
   default and Bing Translator can be turned on in Sources (it names Chinese "zh-Hans", so
   `sources::build_url` maps the setting's "zh-CN" for it). After an AI translation the

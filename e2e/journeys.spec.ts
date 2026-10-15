@@ -104,6 +104,10 @@ test("the AI tab translates on the computer, and says when it can't", async ({ p
   await expect(page.getByText(/Whatever else this agreement says/)).toBeVisible({ timeout: 5000 });
   await page.getByRole("radio", { name: "Translate to Bangla" }).click();
   await expect(page.getByText(/ভাড়াটিয়াকে/)).toBeVisible({ timeout: 5000 });
+  // Each sentence sits under its original.
+  const pairs = page.getByRole("list", { name: "Each sentence and its translation" });
+  await expect(pairs.getByRole("listitem").first()).toContainText("Notwithstanding any provision");
+  await expect(pairs.getByRole("listitem").first()).toContainText("ভাড়াটিয়াকে");
   await expect(page.getByRole("radio", { name: "Simpler" })).toHaveCount(0);
   // One click compares it with the web translator.
   await page.getByRole("button", { name: "Compare in the Translate tab" }).click();
