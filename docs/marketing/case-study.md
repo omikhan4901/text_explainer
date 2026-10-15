@@ -50,8 +50,8 @@ anything leaving the computer. It must not get in the way of the work you are do
 - **Grew it into a product people can use daily.** A tabbed card (web searches first, the
   offline dictionary, then the AI only when asked, which saves compute), a Look up box for
   words that aren't on screen, private translation by the same local model (with the
-  language and number checks extended to translations, and each sentence shown under its
-  original), a Word book that exports to Excel
+  language and number checks extended to translations, the text shown above its answer
+  with linked sentences, and a searchable language list), a Word book that exports to Excel
   and Anki, and a list of apps the card never reads from (password managers by default).
   Each feature was reviewed for security, data handling and AI quality; the review's nine
   findings were fixed before release.

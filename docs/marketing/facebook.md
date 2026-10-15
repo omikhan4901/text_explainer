@@ -41,15 +41,16 @@ Suggested order: post 1 (launch), then one feature post every two or three days.
 
 ## 2. Private translation
 
-**Image:** `feature-translate.png` (each sentence above its Bangla translation)
+**Image:** `feature-translate.png` (your text above its Bangla translation)
 
 > New in Text Explainer: translate without sending your text to anyone.
 >
 > The AI tab now has two buttons: Explain and Translate. Translation runs on your
 > computer, so contracts, medical letters and private messages stay private.
 >
-> Each sentence sits right under its original, so you can see which words became which.
-> Great if you're learning a language, or checking a letter before you sign it.
+> Your text stays on top and the translation sits right below it. Point at a sentence and
+> its partner lights up, so you can see which words became which. Click the language name
+> to search for any other. Text in another language goes into English on its own.
 >
 > It also checks itself: if a number or a date goes missing in the translation, the card
 > tells you, and the answer can't drift into the wrong language. You can translate into

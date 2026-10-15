@@ -41,14 +41,14 @@ For contracts, papers, letters and any word you don't know, in every app, not on
 <td width="50%" valign="top">
 <img src="docs/screenshots/feature-explain.png" alt="The card with the lease clause rewritten in plain language, the Simpler, Plain, Clearer switch and the grade going from 17 to 9">
 <h3>Explain in plain words</h3>
-A small AI on your own computer rewrites jargon at the level you pick, keeps every number,
-date and name, and shows the reading grade before and after.
+A small AI on your own computer rewrites jargon at the level you pick, right under what you
+selected, keeps every number, date and name, and shows the reading grade before and after.
 </td>
 <td width="50%" valign="top">
-<img src="docs/screenshots/feature-translate.png" alt="The AI tab set to Translate to Bangla: the original sentence, small and grey, above its Bangla translation">
+<img src="docs/screenshots/feature-translate.png" alt="The AI tab translating: what you selected, labelled English, above its Bangla translation, with the language as a dropdown">
 <h3>Translate privately</h3>
-The same AI translates, so private text never leaves your computer. Each sentence sits
-under its original, so you can map one onto the other. Google Translate is a tab away.
+The same AI translates, so private text never leaves your computer. Your text sits above
+the translation; point at a sentence to see its partner. Pick any language from a search.
 </td>
 </tr>
 <tr>
