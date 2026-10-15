@@ -10,7 +10,7 @@ use te_core::download::{self, Cancel, Download};
 use te_core::language::LANGUAGES;
 use te_core::models::{self, CATALOG, Fit, Tier};
 use te_core::prompt::{self, Level, OutputLanguage};
-use te_core::settings::{ModelChoice, Settings};
+use te_core::settings::{CardSize, ModelChoice, Settings};
 use te_core::translate;
 
 use crate::popup::{self, AiTask, PopupEvent};
@@ -302,8 +302,28 @@ pub async fn unload_model(state: State<'_, AppState>) -> CmdResult<()> {
 }
 
 #[tauri::command]
-pub fn popup_resize(app: AppHandle, height: f64) {
-    popup::resize(&app, height);
+pub fn popup_resize(app: AppHandle, width: f64, height: f64, by_person: bool) {
+    popup::resize(&app, width, height, by_person);
+}
+
+/// The person drags the card by its header.
+#[tauri::command]
+pub fn popup_move(app: AppHandle, dx: f64, dy: f64, first: bool) {
+    popup::move_by(&app, dx, dy, first);
+}
+
+/// Remembers the size the person gave the card (`None`: fit it to what it shows again).
+#[tauri::command]
+pub fn set_card_size(app: AppHandle, size: Option<CardSize>) -> CmdResult<()> {
+    let state = app.state::<AppState>();
+    let mut settings = state.settings();
+    settings.card_size = size;
+    let settings = settings.sanitized();
+    settings
+        .save(&state.paths.settings)
+        .map_err(|e| format!("Couldn't save settings: {e}"))?;
+    *state.settings.lock().expect("settings lock") = settings;
+    Ok(())
 }
 
 #[tauri::command]

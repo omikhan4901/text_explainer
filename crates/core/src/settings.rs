@@ -33,6 +33,11 @@ pub struct Settings {
     pub threads: Option<u32>,
     /// Unload the model after this many idle minutes (0 = keep it loaded).
     pub idle_unload_minutes: u32,
+    /// Free the model's memory as soon as the card closes (the AI tab loads it again).
+    pub unload_on_close: bool,
+    /// The card's size after the person resized it (CSS pixels); `None` fits it to what it
+    /// shows.
+    pub card_size: Option<CardSize>,
     pub prompts: CustomPrompts,
     /// Extra llama-server arguments (advanced).
     pub extra_server_args: Vec<String>,
@@ -73,6 +78,8 @@ impl Default for Settings {
             context_size: 4096,
             threads: None,
             idle_unload_minutes: 10,
+            unload_on_close: true,
+            card_size: None,
             prompts: CustomPrompts::default(),
             extra_server_args: Vec::new(),
             appearance: Appearance::default(),
@@ -87,6 +94,34 @@ impl Default for Settings {
             history_days: 30,
             check_updates: true,
         }
+    }
+}
+
+/// The card's width and height in CSS pixels.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct CardSize {
+    pub width: f64,
+    pub height: f64,
+}
+
+impl CardSize {
+    pub const MIN: CardSize = CardSize {
+        width: 320.0,
+        height: 200.0,
+    };
+    pub const MAX: CardSize = CardSize {
+        width: 2400.0,
+        height: 1600.0,
+    };
+
+    fn sanitized(self) -> Option<CardSize> {
+        (self.width.is_finite() && self.height.is_finite()).then(|| CardSize {
+            width: self.width.clamp(Self::MIN.width, Self::MAX.width).round(),
+            height: self
+                .height
+                .clamp(Self::MIN.height, Self::MAX.height)
+                .round(),
+        })
     }
 }
 
@@ -190,6 +225,7 @@ impl Settings {
         self.context_size = self.context_size.clamp(1024, 32_768);
         self.threads = self.threads.map(|t| t.clamp(1, 64));
         self.idle_unload_minutes = self.idle_unload_minutes.min(24 * 60);
+        self.card_size = self.card_size.and_then(CardSize::sanitized);
         self.appearance.font_size = self.appearance.font_size.clamp(12, 24);
         self.appearance.line_height = finite_or(self.appearance.line_height, 1.6).clamp(1.2, 2.2);
         if self.hotkey.trim().is_empty() {
@@ -297,6 +333,45 @@ mod tests {
         assert_eq!(s.appearance.font_size, 18);
         assert_eq!(s.appearance.line_height, 1.6);
         assert_eq!(s.hotkey, "Ctrl+Shift+Space");
+    }
+
+    #[test]
+    fn card_size_is_kept_in_range() {
+        let sized = |width, height| {
+            Settings {
+                card_size: Some(CardSize { width, height }),
+                ..Default::default()
+            }
+            .sanitized()
+            .card_size
+        };
+        assert_eq!(
+            sized(10.0, 99_999.0),
+            Some(CardSize {
+                width: 320.0,
+                height: 1600.0
+            })
+        );
+        assert_eq!(
+            sized(520.4, 610.6),
+            Some(CardSize {
+                width: 520.0,
+                height: 611.0
+            })
+        );
+        assert_eq!(sized(f64::NAN, 400.0), None);
+        assert_eq!(sized(500.0, f64::INFINITY), None);
+    }
+
+    #[test]
+    fn older_files_free_the_model_when_the_card_closes() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(&path, r#"{"idle_unload_minutes":30}"#).unwrap();
+        let s = Settings::load(&path);
+        assert!(s.unload_on_close);
+        assert_eq!(s.idle_unload_minutes, 30);
+        assert_eq!(s.card_size, None);
     }
 
     #[test]

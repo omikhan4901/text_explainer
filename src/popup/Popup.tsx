@@ -24,7 +24,7 @@ import { mock } from "../lib/mock";
 import { applyAppearance, followSystemTheme } from "../lib/theme";
 import { bareTerm, savableTerm } from "../lib/words";
 import { pairUp, type Pair } from "./pairs";
-import type { AiTask, DictionaryEntry, LanguageName, Level, PopupEvent, Sense, Settings, TranslateLanguage } from "../lib/types";
+import type { AiTask, CardSize, DictionaryEntry, LanguageName, Level, PopupEvent, Sense, Settings, TranslateLanguage } from "../lib/types";
 import {
   answerText,
   copyable,
@@ -49,6 +49,8 @@ const MARGIN = 12;
 /** Height of the area a web page fills, and of the footer under every tab. */
 const PAGE_HEIGHT = 400;
 const FOOTER_HEIGHT = 40;
+/** The smallest card the person can resize to (match `CardSize::MIN` in settings.rs). */
+const MIN_SIZE: CardSize = { width: 320, height: 200 };
 const ICON = 15;
 
 export function Popup() {
@@ -68,12 +70,17 @@ export function Popup() {
   }, []);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [pinned, setPinned] = useState(false);
+  // The size the person gave the card; null fits the card to what it shows.
+  const [size, setSize] = useState<CardSize | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const settingsRef = useRef<Settings | null>(null);
+  // True once the person resizes this card: it then keeps its top left corner in place.
+  const resizedByPerson = useRef(false);
 
   const applySettings = useCallback((s: Settings) => {
     settingsRef.current = s;
     setSettings(s);
+    setSize(s.card_size);
     applyAppearance(s.appearance);
   }, []);
 
@@ -82,7 +89,10 @@ export function Popup() {
     loadSettings();
     const stopTheme = followSystemTheme(() => settingsRef.current?.appearance);
     const unlisten = on<PopupEvent>("te://popup", (event) => {
-      if (event.type === "open") setPinned(false);
+      if (event.type === "open") {
+        setPinned(false);
+        resizedByPerson.current = false;
+      }
       if (event.type === "settings") loadSettings();
       dispatch(event);
     });
@@ -106,7 +116,9 @@ export function Popup() {
     let frame = 0;
     const report = () => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => void api.popupResize(card.offsetHeight + 2 * MARGIN));
+      frame = requestAnimationFrame(
+        () => void api.popupResize(card.offsetWidth + 2 * MARGIN, card.offsetHeight + 2 * MARGIN, resizedByPerson.current),
+      );
     };
     const observer = new ResizeObserver(report);
     observer.observe(card);
@@ -140,13 +152,23 @@ export function Popup() {
     });
   };
 
+  const resizeTo = (next: CardSize | null) => {
+    resizedByPerson.current = true;
+    setSize(next);
+  };
+  const keepSize = (next: CardSize | null) => {
+    if (settingsRef.current) settingsRef.current = { ...settingsRef.current, card_size: next };
+    void api.setCardSize(next);
+  };
+
   return (
-    <div className="p-3" style={{ width: WIDTH + 2 * MARGIN }}>
+    <div className="p-3" style={{ width: (size?.width ?? WIDTH) + 2 * MARGIN }}>
       <div
         ref={cardRef}
         role="dialog"
         aria-label={strings.app.name}
-        className="flex max-h-[560px] flex-col overflow-hidden rounded-xl bg-surface text-text shadow-[var(--shadow-card)]"
+        className={`relative flex flex-col overflow-hidden rounded-xl bg-surface text-text shadow-[var(--shadow-card)] ${size ? "" : "max-h-[560px]"}`}
+        style={size ? { height: size.height } : undefined}
       >
         {state.view === "explain" ? (
           <ExplainCard
@@ -157,11 +179,99 @@ export function Popup() {
             onTab={(tab) => dispatch({ type: "select_tab", tab })}
             languages={languages}
             onTask={(task, target) => setTask(state.id, task, target)}
+            fill={size !== null}
           />
         ) : (
           <MessageCard state={state} pinned={pinned} onPin={togglePin} />
         )}
+        <ResizeGrip card={cardRef} onResize={resizeTo} onDone={keepSize} />
       </div>
+    </div>
+  );
+}
+
+/** Lets the person move the card by dragging `onPointerDown`'s element (its header).
+ * Buttons, links and tabs inside it still work as usual. */
+function useCardDrag() {
+  const drag = useRef<{ x: number; y: number; dx: number; dy: number; first: boolean; frame: number } | null>(null);
+  const end = () => {
+    if (drag.current) cancelAnimationFrame(drag.current.frame);
+    drag.current = null;
+  };
+  return {
+    onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
+      if (e.button !== 0 || (e.target as Element).closest("button, a, input, select, [role=tab]")) return;
+      e.preventDefault();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      drag.current = { x: e.screenX, y: e.screenY, dx: 0, dy: 0, first: true, frame: 0 };
+    },
+    onPointerMove: (e: React.PointerEvent<HTMLElement>) => {
+      const d = drag.current;
+      if (!d) return;
+      // Measured from where the drag started, so the card follows the pointer exactly.
+      d.dx = e.screenX - d.x;
+      d.dy = e.screenY - d.y;
+      if (d.frame) return;
+      d.frame = requestAnimationFrame(() => {
+        d.frame = 0;
+        void api.popupMove(d.dx, d.dy, d.first);
+        d.first = false;
+      });
+    },
+    onPointerUp: end,
+    onPointerCancel: end,
+  };
+}
+
+/** The card's bottom right corner: drag to resize (the size is remembered), double-click
+ * to fit the card to what it shows again. */
+function ResizeGrip({
+  card,
+  onResize,
+  onDone,
+}: {
+  card: React.RefObject<HTMLDivElement | null>;
+  onResize: (size: CardSize | null) => void;
+  onDone: (size: CardSize | null) => void;
+}) {
+  const drag = useRef<{ x: number; y: number; width: number; height: number; size: CardSize | null } | null>(null);
+  const end = () => {
+    if (drag.current?.size) onDone(drag.current.size);
+    drag.current = null;
+  };
+  return (
+    <div
+      aria-hidden
+      title={t.resize}
+      data-testid="resize-grip"
+      className="absolute right-0 bottom-0 z-10 flex size-4 cursor-nwse-resize items-end justify-end p-[3px] text-border-strong hover:text-muted"
+      onPointerDown={(e) => {
+        const el = card.current;
+        if (e.button !== 0 || !el) return;
+        e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        drag.current = { x: e.screenX, y: e.screenY, width: el.offsetWidth, height: el.offsetHeight, size: null };
+      }}
+      onPointerMove={(e) => {
+        const d = drag.current;
+        if (!d) return;
+        const most = { width: screen.availWidth - 2 * MARGIN, height: screen.availHeight - 2 * MARGIN };
+        d.size = {
+          width: Math.round(Math.min(Math.max(d.width + e.screenX - d.x, MIN_SIZE.width), Math.max(most.width, MIN_SIZE.width))),
+          height: Math.round(Math.min(Math.max(d.height + e.screenY - d.y, MIN_SIZE.height), Math.max(most.height, MIN_SIZE.height))),
+        };
+        onResize(d.size);
+      }}
+      onPointerUp={end}
+      onPointerCancel={end}
+      onDoubleClick={() => {
+        onResize(null);
+        onDone(null);
+      }}
+    >
+      <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round">
+        <path d="M7 1 1 7M7 4.5 4.5 7" />
+      </svg>
     </div>
   );
 }
@@ -187,6 +297,7 @@ function ExplainCard({
   onTab,
   onTask,
   languages,
+  fill,
 }: {
   state: Explaining;
   level: Level;
@@ -195,13 +306,17 @@ function ExplainCard({
   onTab: (tab: TabId) => void;
   onTask: (task: AiTask, target?: LanguageName) => void;
   languages: TranslateLanguage[];
+  /** The person sized the card: every tab fills it. */
+  fill: boolean;
 }) {
   const word = isWord(state);
+  const drag = useCardDrag();
   // With web tabs every tab keeps the page's height, so switching never resizes the card.
-  const steady = state.web.length > 0 ? { height: PAGE_HEIGHT + FOOTER_HEIGHT } : undefined;
+  const steady = !fill && state.web.length > 0 ? { height: PAGE_HEIGHT + FOOTER_HEIGHT } : undefined;
+  const content = `flex min-h-0 flex-col focus-visible:outline-none ${fill ? "flex-1" : ""}`;
   return (
-    <Tabs.Root value={state.tab} onValueChange={(v) => onTab(v as TabId)} className="flex min-h-0 flex-col">
-      <div className="flex h-11 shrink-0 items-center gap-3 pr-1.5 pl-4">
+    <Tabs.Root value={state.tab} onValueChange={(v) => onTab(v as TabId)} className={`flex min-h-0 flex-col ${fill ? "flex-1" : ""}`}>
+      <div className="flex h-11 shrink-0 items-center gap-3 pr-1.5 pl-4" {...drag}>
         <p className="min-w-0 flex-1 truncate" title={state.query}>
           {word ? (
             <span className="text-[15px] font-semibold tracking-[-0.01em]">{bareTerm(state.query)}</span>
@@ -218,14 +333,14 @@ function ExplainCard({
       {tabs(state).length > 1 ? <TabRail state={state} /> : <div className="border-b border-border" />}
 
       {state.web.map((w) => (
-        <Tabs.Content key={w.id} value={`web:${w.id}`} className="focus-visible:outline-none">
-          <WebPane requestId={state.id} source={w.id} name={w.name} />
+        <Tabs.Content key={w.id} value={`web:${w.id}`} className={content}>
+          <WebPane requestId={state.id} source={w.id} name={w.name} fill={fill} />
         </Tabs.Content>
       ))}
-      <Tabs.Content value="dictionary" className="flex min-h-0 flex-col focus-visible:outline-none" style={steady}>
+      <Tabs.Content value="dictionary" className={content} style={steady}>
         {state.dictionary && <DictionaryPane entry={state.dictionary} copyText={copyable(state)} />}
       </Tabs.Content>
-      <Tabs.Content value="explain" className="flex min-h-0 flex-col focus-visible:outline-none" style={steady}>
+      <Tabs.Content value="explain" className={content} style={steady}>
         <ExplainPane state={state} level={level} languages={languages} onTask={onTask} onTab={onTab} />
       </Tabs.Content>
     </Tabs.Root>
@@ -293,23 +408,36 @@ function tabName(state: Explaining, id: TabId): string {
 
 /** A web source's page. The app lays its web view over this area; until the page paints,
  * a placeholder shaped like search results shows. */
-function WebPane({ requestId, source, name }: { requestId: number; source: string; name: string }) {
+function WebPane({ requestId, source, name, fill }: { requestId: number; source: string; name: string; fill: boolean }) {
   const area = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState<{ key: string; url: string | null; error: string | null }>({ key: "", url: null, error: null });
   const key = `${requestId}:${source}`;
 
+  // Shows the page over this area, and moves it along whenever the area changes size
+  // (the person resizing the card).
   useLayoutEffect(() => {
     const el = area.current;
     if (!el) return;
-    const r = el.getBoundingClientRect();
     const background = getComputedStyle(document.documentElement).getPropertyValue("--surface").trim() || null;
     let live = true;
-    api
-      .webShow(source, { x: r.left, y: r.top, width: r.width, height: r.height }, background)
-      .then((url) => live && setPage({ key, url, error: null }))
-      .catch((e: unknown) => live && setPage({ key, url: null, error: String(e) }));
+    let frame = 0;
+    const show = () => {
+      const r = el.getBoundingClientRect();
+      api
+        .webShow(source, { x: r.left, y: r.top, width: r.width, height: r.height }, background)
+        .then((url) => live && setPage({ key, url, error: null }))
+        .catch((e: unknown) => live && setPage({ key, url: null, error: String(e) }));
+    };
+    show();
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(show);
+    });
+    observer.observe(el);
     return () => {
       live = false;
+      observer.disconnect();
+      cancelAnimationFrame(frame);
     };
   }, [key, source]);
 
@@ -317,7 +445,12 @@ function WebPane({ requestId, source, name }: { requestId: number; source: strin
   const host = current.url ? hostOf(current.url) : name;
   return (
     <>
-      <div ref={area} className="relative overflow-hidden" style={{ height: PAGE_HEIGHT }} aria-busy={!current.url && !current.error}>
+      <div
+        ref={area}
+        className={`relative overflow-hidden ${fill ? "min-h-0 flex-1" : ""}`}
+        style={fill ? undefined : { height: PAGE_HEIGHT }}
+        aria-busy={!current.url && !current.error}
+      >
         {current.error ? (
           <div className="px-4 pt-4 text-[13px]">
             <p className="font-semibold text-danger">{t.webFailed(name)}</p>
@@ -931,9 +1064,10 @@ function ErrorBlock({ message, detail }: { message: string; detail: string | nul
 }
 
 function MessageCard({ state, pinned, onPin }: { state: Exclude<ReturnType<typeof reduce>, Explaining>; pinned: boolean; onPin: () => void }) {
+  const drag = useCardDrag();
   if (state.view === "empty") {
     return (
-      <div className="flex h-11 items-center justify-end pr-1.5">
+      <div className="flex h-11 items-center justify-end pr-1.5" {...drag}>
         <PinClose pinned={pinned} onPin={onPin} />
       </div>
     );
@@ -946,7 +1080,7 @@ function MessageCard({ state, pinned, onPin }: { state: Exclude<ReturnType<typeo
         : [t.captureFailed, state.message, null];
   return (
     <>
-      <div className="flex h-11 shrink-0 items-center gap-3 pr-1.5 pl-4">
+      <div className="flex h-11 shrink-0 items-center gap-3 pr-1.5 pl-4" {...drag}>
         <p className="min-w-0 flex-1 truncate text-[14px] font-semibold">{title}</p>
         <PinClose pinned={pinned} onPin={onPin} />
       </div>

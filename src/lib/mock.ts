@@ -19,6 +19,8 @@ export const DEFAULT_SETTINGS: Settings = {
   context_size: 4096,
   threads: null,
   idle_unload_minutes: 10,
+  unload_on_close: true,
+  card_size: null,
   prompts: { simpler: null, plain: null, clearer: null },
   extra_server_args: [],
   appearance: { theme: "system", accent: "ink", reading_font: "plex", font_size: 15, line_height: 1.6 },
@@ -295,6 +297,9 @@ async function call<T>(command: string, args: Record<string, unknown> = {}): Pro
       }
       return undefined as T;
     case "popup_focus":
+      return undefined as T;
+    case "set_card_size":
+      settings = { ...settings, card_size: args.size as Settings["card_size"] };
       return undefined as T;
     case "explain_now":
       if (args.id === demoId && pendingAi) void pendingAi(demoId);

@@ -122,10 +122,14 @@ mod stub {
     /// Calls back when the mouse is pressed outside a rectangle (Windows only).
     pub struct ClickOutsideWatcher;
     impl ClickOutsideWatcher {
-        pub fn start(_on_click_outside: impl Fn() + Send + Sync + 'static) -> Self {
+        pub fn start(
+            _on_click_outside: impl Fn() + Send + Sync + 'static,
+            _on_focus_area: impl Fn() + Send + Sync + 'static,
+        ) -> Self {
             ClickOutsideWatcher
         }
         pub fn set_rect(&self, _rect: Option<Rect>) {}
+        pub fn set_focus_rect(&self, _rect: Option<Rect>) {}
     }
 }
 

@@ -182,12 +182,27 @@ function Tuning() {
           )}
         </Field>
         <Field label={t.idle}>
-          {numberSelect(
-            "idle_unload_minutes",
-            t.idle,
-            [[0, t.idleNever], ...[5, 10, 30, 60].map((m) => [m, t.idleMinutes(m)] as [number, string])],
-            settings.idle_unload_minutes,
-          )}
+          {/* "The card closes" is its own setting; the rest are idle minutes. */}
+          <select
+            aria-label={t.idle}
+            className={inputClass}
+            value={settings.unload_on_close ? "close" : String(settings.idle_unload_minutes)}
+            onChange={(e) =>
+              void update(
+                e.target.value === "close"
+                  ? { unload_on_close: true }
+                  : { unload_on_close: false, idle_unload_minutes: Number(e.target.value) },
+              )
+            }
+          >
+            {[["close", t.idleClose] as const, ["0", t.idleNever] as const, ...[5, 10, 30, 60].map((m) => [String(m), t.idleMinutes(m)] as const)].map(
+              ([v, label]) => (
+                <option key={v} value={v}>
+                  {label}
+                </option>
+              ),
+            )}
+          </select>
         </Field>
         <Field label={t.serverArgs} hint={t.serverArgsHint}>
           <input

@@ -2,7 +2,7 @@
 // screenshots) a mock answers instead, so every screen can be built and checked anywhere.
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { AiTask, AppInfo, ExportFormat, FoundModel, Level, Lookup, NewWord, Page, SavedWord, Settings, UpdateStatus } from "./types";
+import type { AiTask, AppInfo, CardSize, ExportFormat, FoundModel, Level, Lookup, NewWord, Page, SavedWord, Settings, UpdateStatus } from "./types";
 
 /** Where the card's content area is, in CSS pixels from the window's top left. */
 export interface WebBounds {
@@ -33,7 +33,9 @@ export const api = {
   cancelDownload: () => call<void>("cancel_download"),
   deleteModel: (id: string) => call<void>("delete_model", { id }),
   unloadModel: () => call<void>("unload_model"),
-  popupResize: (height: number) => call<void>("popup_resize", { height }),
+  popupResize: (width: number, height: number, byPerson: boolean) => call<void>("popup_resize", { width, height, byPerson }),
+  popupMove: (dx: number, dy: number, first: boolean) => call<void>("popup_move", { dx, dy, first }),
+  setCardSize: (size: CardSize | null) => call<void>("set_card_size", { size }),
   popupClose: () => call<void>("popup_close"),
   popupPin: (pinned: boolean) => call<void>("popup_pin", { pinned }),
   setLevel: (level: Level) => call<void>("set_level", { level }),

@@ -1,8 +1,10 @@
 //! The reading card's window: opened next to the selection without taking focus, resized
 //! to its content as text streams in, and closed by Esc, a click elsewhere, or its X.
 //! Web source tabs show their page in a child web view placed over the card's content
-//! area (private, no access to the app, never focused on its own).
+//! area (private, no access to the app, never focused on its own). The person can drag
+//! the card by its header and resize it from its corner; the size is remembered.
 
+use std::sync::OnceLock;
 use std::sync::atomic::Ordering;
 
 use serde::{Deserialize, Serialize};
@@ -22,11 +24,18 @@ use crate::state::{AppState, PopupPlacement};
 const CARD_WIDTH: f64 = 480.0;
 const MARGIN: f64 = 12.0;
 const INITIAL_HEIGHT: f64 = 140.0;
+/// The window's size before the page first measures the card (CSS pixels, with margin).
+pub const INITIAL_SIZE: (f64, f64) = (CARD_WIDTH + 2.0 * MARGIN, INITIAL_HEIGHT + 2.0 * MARGIN);
 pub const MAX_CARD_HEIGHT: f64 = 560.0;
 const GAP: f64 = 4.0;
 pub const ESCAPE: &str = "Escape";
 /// The card's web view (one, reused by every web tab).
 const WEB_LABEL: &str = "popup-web";
+/// Phones' pages fit a card-sized view; desktop pages scroll sideways in one.
+const WEB_USER_AGENT: &str = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36";
+/// The popup's window handle, for the mouse hook's thread (asking Tauri for it there
+/// would wait on the main thread).
+static POPUP_HWND: OnceLock<isize> = OnceLock::new();
 
 /// Everything the popup page is told.
 #[derive(Clone, Serialize)]
@@ -97,9 +106,9 @@ fn hwnd(app: &AppHandle) -> Option<isize> {
 
 /// Makes the popup window non-activating. Called once at startup.
 pub fn prepare(app: &AppHandle) {
-    if let Some(h) = hwnd(app)
-        && let Err(e) = te_win::prepare_popup_window(h)
-    {
+    let Some(h) = hwnd(app) else { return };
+    let _ = POPUP_HWND.set(h);
+    if let Err(e) = te_win::prepare_popup_window(h) {
         tracing::warn!("couldn't prepare the popup window: {e}");
     }
 }
@@ -110,6 +119,7 @@ pub fn open(app: &AppHandle, selection: Option<Rect>) {
     // The last request's page stays hidden until the new card asks for a web tab.
     web_hide(app);
     let state = app.state::<AppState>();
+    release_focus(&state, h);
     let (cx, cy) = te_win::cursor_position().unwrap_or((200, 200));
     let pointer = Rect::new(cx, cy - 12, cx, cy + 20);
     let work = te_win::work_area_at(cx, cy).unwrap_or(Rect::new(0, 0, 1280, 720));
@@ -125,44 +135,124 @@ pub fn open(app: &AppHandle, selection: Option<Rect>) {
         .flatten()
         .map_or(1.0, |m| m.scale_factor());
     let px = |css: f64| (css * scale).round() as i32;
-    let size = (
-        px(CARD_WIDTH + 2.0 * MARGIN),
-        px(INITIAL_HEIGHT + 2.0 * MARGIN),
-    );
-    let side = choose_side(anchor, px(MAX_CARD_HEIGHT + 2.0 * MARGIN), work, px(GAP));
+    // The card as the page last measured it: the page reports only when that changes, and
+    // the next card is often the same size (a web tab's height, or the size set by hand).
+    let (width, height) = *state.card_size.lock().expect("card size lock");
+    let size = (px(width), px(height));
+    let tallest = px(MAX_CARD_HEIGHT + 2.0 * MARGIN).max(size.1);
+    let side = choose_side(anchor, tallest, work, px(GAP));
     let (x, y) = place_on_side(anchor, size, work, px(GAP), side);
     let rect = Rect::new(x, y, x + size.0, y + size.1);
     if let Err(e) = te_win::show_window_at(h, x, y, size.0, size.1) {
         tracing::warn!("couldn't show the popup: {e}");
         return;
     }
-    *state.popup.lock().expect("popup lock") = Some(PopupPlacement {
+    let placement = PopupPlacement {
         anchor,
         work,
         side,
         scale,
         rect,
-    });
-    if !state.pinned.load(Ordering::SeqCst) {
-        state.click_watcher.set_rect(Some(rect));
-    }
+        placed: false,
+        moved_from: rect,
+        web: None,
+    };
+    *state.popup.lock().expect("popup lock") = Some(placement);
+    watch(&state, &placement);
     let _ = app.global_shortcut().register(ESCAPE);
 }
 
-/// Fits the window to the card's height (CSS pixels, including the margin).
-pub fn resize(app: &AppHandle, css_height: f64) {
+/// Fits the window to the card (CSS pixels, including the margin). `by_person` is true
+/// while the person drags the card's corner: from then on it keeps its top left corner.
+pub fn resize(app: &AppHandle, width: f64, height: f64, by_person: bool) {
+    let state = app.state::<AppState>();
+    *state.card_size.lock().expect("card size lock") = (width, height);
+    let Some(h) = hwnd(app) else { return };
+    let mut popup = state.popup.lock().expect("popup lock");
+    let Some(p) = popup.as_mut() else { return };
+    p.placed |= by_person;
+    let px = |css: f64| (css * p.scale).round() as i32;
+    let size = (
+        px(width).clamp(px(100.0), p.work.width()),
+        px(height).clamp(px(60.0), p.work.height()),
+    );
+    let (x, y) = if p.placed {
+        (p.rect.left, p.rect.top)
+    } else {
+        place_on_side(p.anchor, size, p.work, px(GAP), p.side)
+    };
+    p.rect = Rect::new(x, y, x + size.0, y + size.1);
+    let _ = te_win::show_window_at(h, x, y, size.0, size.1);
+    watch(&state, p);
+}
+
+/// Moves the card by (`dx`, `dy`) CSS pixels from where it was when the drag started
+/// (`first` starts a drag). Measuring from the start keeps rounding from adding up.
+pub fn move_by(app: &AppHandle, dx: f64, dy: f64, first: bool) {
     let Some(h) = hwnd(app) else { return };
     let state = app.state::<AppState>();
     let mut popup = state.popup.lock().expect("popup lock");
     let Some(p) = popup.as_mut() else { return };
+    if first {
+        p.moved_from = p.rect;
+    }
+    p.placed = true;
+    let (dx, dy) = ((dx * p.scale).round() as i32, (dy * p.scale).round() as i32);
+    let from = p.moved_from;
+    p.rect = Rect::new(
+        from.left + dx,
+        from.top + dy,
+        from.right + dx,
+        from.bottom + dy,
+    );
+    let _ = te_win::show_window_at(h, p.rect.left, p.rect.top, from.width(), from.height());
+    watch(&state, p);
+}
+
+/// Tells the mouse hook where the card is (clicks outside close it, unless pinned) and
+/// where its web page is (a click there lets the card take focus).
+fn watch(state: &AppState, p: &PopupPlacement) {
+    let pinned = state.pinned.load(Ordering::SeqCst);
+    state.click_watcher.set_rect((!pinned).then_some(p.rect));
     let px = |css: f64| (css * p.scale).round() as i32;
-    let height = css_height.clamp(60.0, MAX_CARD_HEIGHT + 2.0 * MARGIN);
-    let size = (px(CARD_WIDTH + 2.0 * MARGIN), px(height));
-    let (x, y) = place_on_side(p.anchor, size, p.work, px(GAP), p.side);
-    p.rect = Rect::new(x, y, x + size.0, y + size.1);
-    let _ = te_win::show_window_at(h, x, y, size.0, size.1);
-    if !state.pinned.load(Ordering::SeqCst) {
-        state.click_watcher.set_rect(Some(p.rect));
+    state.click_watcher.set_focus_rect(p.web.map(|b| {
+        Rect::new(
+            p.rect.left + px(b.x),
+            p.rect.top + px(b.y),
+            p.rect.left + px(b.x + b.width),
+            p.rect.top + px(b.y + b.height),
+        )
+    }));
+}
+
+/// The person clicked into the card's web page (to type in its search box, say). Runs on
+/// the mouse hook's thread before the click arrives, so the card is focusable in time for
+/// that click to focus it. The card gives focus back when it closes.
+pub fn focus_web(app: &AppHandle) {
+    let Some(state) = app.try_state::<AppState>() else {
+        return;
+    };
+    let Some(&h) = POPUP_HWND.get() else { return };
+    if state.web_focused.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    if let Err(e) = te_win::set_popup_focus(h, true) {
+        tracing::warn!("couldn't let the web page take focus: {e}");
+    }
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        if let Some(view) = handle.get_webview(WEB_LABEL) {
+            let _ = view.set_focus();
+        }
+    });
+}
+
+/// Makes the card non-activating again after the web page had focus.
+fn release_focus(state: &AppState, h: isize) {
+    if state.web_focused.swap(false, Ordering::SeqCst)
+        && let Err(e) = te_win::set_popup_focus(h, false)
+    {
+        tracing::warn!("couldn't give focus back: {e}");
     }
 }
 
@@ -187,7 +277,8 @@ pub fn set_focus(app: &AppHandle, focus: bool) {
     }
 }
 
-/// Hides the card and stops any answer still being written.
+/// Hides the card and stops any answer still being written. Unless the person chose to
+/// keep it loaded, the model's memory is freed too (the AI tab loads it again).
 pub fn close(app: &AppHandle) {
     let state = app.state::<AppState>();
     if let Some(task) = state.task.lock().expect("task lock").take() {
@@ -199,25 +290,38 @@ pub fn close(app: &AppHandle) {
     }
     *state.web_url.lock().expect("web lock") = None;
     state.click_watcher.set_rect(None);
+    state.click_watcher.set_focus_rect(None);
     state.pinned.store(false, Ordering::SeqCst);
-    *state.popup.lock().expect("popup lock") = None;
+    let was_open = state.popup.lock().expect("popup lock").take().is_some();
     if let Some(h) = hwnd(app) {
         te_win::hide_window(h);
+        release_focus(&state, h);
     }
     let _ = app.global_shortcut().unregister(ESCAPE);
+    if was_open && state.settings().unload_on_close {
+        let handle = app.clone();
+        tauri::async_runtime::spawn(async move {
+            let state = handle.state::<AppState>();
+            let mut engine = state.engine.lock().await;
+            // A new card may have opened while an answer held the engine.
+            if state.popup.lock().expect("popup lock").is_none() && engine.is_loaded() {
+                tracing::info!("the card closed: freeing the model's memory");
+                engine.unload().await;
+            }
+        });
+    }
 }
 
 pub fn set_pinned(app: &AppHandle, pinned: bool) {
     let state = app.state::<AppState>();
     state.pinned.store(pinned, Ordering::SeqCst);
-    let rect = state.popup.lock().expect("popup lock").map(|p| p.rect);
-    state
-        .click_watcher
-        .set_rect(if pinned { None } else { rect });
+    if let Some(p) = *state.popup.lock().expect("popup lock") {
+        watch(&state, &p);
+    }
 }
 
 /// Where the card's content area is, in CSS pixels from the window's top left.
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize)]
 pub struct WebBounds {
     pub x: f64,
     pub y: f64,
@@ -275,6 +379,7 @@ pub fn web_show(
         let mut builder = WebviewBuilder::new(WEB_LABEL, WebviewUrl::External(url.clone()))
             // A private profile: nothing is kept after the card closes.
             .incognito(true)
+            .user_agent(WEB_USER_AGENT)
             // Reading never takes focus from the app underneath; clicking into it does.
             .focused(false)
             .on_navigation(|u| matches!(u.scheme(), "https" | "http"))
@@ -293,6 +398,7 @@ pub fn web_show(
             .map_err(|e| e.to_string())?;
     }
     *shown = Some(url.to_string());
+    set_web_bounds(&state, Some(bounds));
     Ok(url.to_string())
 }
 
@@ -300,6 +406,15 @@ pub fn web_show(
 pub fn web_hide(app: &AppHandle) {
     if let Some(view) = app.get_webview(WEB_LABEL) {
         let _ = view.hide();
+    }
+    set_web_bounds(&app.state::<AppState>(), None);
+}
+
+fn set_web_bounds(state: &AppState, bounds: Option<WebBounds>) {
+    let mut popup = state.popup.lock().expect("popup lock");
+    if let Some(p) = popup.as_mut() {
+        p.web = bounds;
+        watch(state, p);
     }
 }
 

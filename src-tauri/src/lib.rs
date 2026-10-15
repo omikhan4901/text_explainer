@@ -56,10 +56,14 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let click_app = handle.clone();
-    let click_watcher = ClickOutsideWatcher::start(move || {
-        let app = click_app.clone();
-        let _ = click_app.run_on_main_thread(move || popup::close(&app));
-    });
+    let focus_app = handle.clone();
+    let click_watcher = ClickOutsideWatcher::start(
+        move || {
+            let app = click_app.clone();
+            let _ = click_app.run_on_main_thread(move || popup::close(&app));
+        },
+        move || popup::focus_web(&focus_app),
+    );
 
     let dictionary = te_core::dictionary::Dictionary::open(&paths.dictionary)
         .map_err(|e| tracing::warn!("dictionary unavailable: {e}"))
@@ -74,6 +78,8 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         last: Mutex::new(None),
         ai_task: Mutex::new((0, popup::AiTask::Explain, None)),
         popup: Mutex::new(None),
+        card_size: Mutex::new(popup::INITIAL_SIZE),
+        web_focused: AtomicBool::new(false),
         pinned: AtomicBool::new(false),
         paused: AtomicBool::new(false),
         hotkey: Mutex::new(None),
@@ -209,6 +215,8 @@ pub fn run() {
             commands::delete_model,
             commands::unload_model,
             commands::popup_resize,
+            commands::popup_move,
+            commands::set_card_size,
             commands::popup_close,
             commands::popup_pin,
             commands::set_level,

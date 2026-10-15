@@ -35,6 +35,16 @@ Try each in **Notepad**, **Edge or Chrome**, **Microsoft Word** (if you have it)
       in Notepad and the text goes into Notepad, not the card.
 - [ ] **Esc** closes the card. Clicking anywhere else closes it. The X closes it.
 - [ ] The **pin** keeps it open when you click elsewhere.
+- [ ] The card comes up whole (header, tabs, page and footer), never cut off, also the
+      second and third time.
+- [ ] Drag the card by its header: it follows the mouse smoothly. Drag its bottom right
+      corner: it resizes, and the next card opens at that size. Double-click the corner:
+      it fits its content again.
+- [ ] Google and Bing pages fit the card (no sideways scrolling). Click into Google's
+      search box and type: the text goes into the box. Close the card: you are back in
+      the app you were reading in.
+- [ ] Open "Explain with AI", then close the card: within a few seconds
+      `llama-server.exe` is gone from Task Manager.
 - [ ] **Simpler / Plain / Clearer** rewrites the same text again.
 - [ ] **Copy** puts the rewrite on the clipboard (paste it into Notepad).
 - [ ] Press **Ctrl+C twice quickly** on selected text: the card appears for that text.

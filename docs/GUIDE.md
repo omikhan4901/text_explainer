@@ -24,7 +24,12 @@ A guide to the code for anyone changing it. Keep it true when you change how thi
    (or the mouse), on the right monitor, on the side with room (`crates/win/src/placement.rs`),
    shown with `SWP_NOACTIVATE` so the reading app keeps focus. Esc is registered as a
    global shortcut only while it's open; a low-level mouse hook closes it on clicks
-   elsewhere.
+   elsewhere. It opens at the size the page last reported (`AppState::card_size`): the
+   page reports only changes, so starting from a fixed height left a card that kept its
+   size cut off. The person can drag it by its header (`popup_move`, measured from where
+   the drag started) and resize it from its bottom right corner; after either it stays
+   where they put it, and the size is saved (`settings.card_size`; double-click the
+   corner to fit the card to its content again).
 3. **Tabs** (`trigger.rs`, `crates/core/src/sources.rs`). The `open` event lists the
    card's web tabs (`sources::tabs_for`: enabled sources for words or for passages, none
    while Offline only is on) and the selection's kind. For one word or a short term the
@@ -38,7 +43,12 @@ A guide to the code for anyone changing it. Keep it true when you change how thi
    the page address from the source's template (`sources::build_url`: the selection is
    percent-encoded and can't change the host) and shows one child web view (`popup-web`,
    Tauri's `unstable` multi-webview) over that area: incognito, never focused on its own,
-   http(s) navigation only, new windows sent to the default browser. It gets no app
+   http(s) navigation only, new windows sent to the default browser. It asks for phone
+   pages (a mobile user agent), which fit a card; desktop pages scrolled sideways. The
+   card sends the area again when it changes size. Clicking into the page lets the card
+   take focus so the person can type there (the mouse hook sees the click first and makes
+   the card focusable in time, `popup::focus_web`); the card gives focus back when it
+   closes. It gets no app
    permissions (it's remote content). Other tabs call `web_hide`; closing the card closes
    the web view to free its memory. The main window's Sources page edits the list
    (`settings.sources`, `offline_only`, `translate_to`).
@@ -52,7 +62,8 @@ A guide to the code for anyone changing it. Keep it true when you change how thi
    `Popup.tsx` renders them). Tabs (`tabs()` in `state.ts`): web searches, then the
    dictionary for words, then "Explain with AI", pinned at the right of the tab row. With
    web tabs every tab keeps the page's height so switching doesn't resize the card;
-   otherwise the window is resized to the card as text streams in. The level switch and
+   otherwise the window is resized to the card as text streams in. Once the person sizes
+   the card, every tab fills it instead. The level switch and
    grade sit in the AI tab's footer on passages.
 
 ## The Look up box
@@ -154,7 +165,9 @@ checked by `e2e/a11y.spec.ts`.
 with a random port and a random API key, from its own folder (for its DLLs), with no
 console window, and logs to `%LOCALAPPDATA%\dev.omikhan.textexplainer\logs`. A Windows job
 object (`te_win::kill_with_app`) ensures it dies with the app. It's started on the first
-request, restarted if it crashes, and stopped after the idle time in Settings.
+request, restarted if it crashes, and stopped when the card closes (`unload_on_close`,
+on by default: the owner saw it hold memory after the card was gone) or, if the person
+chose to keep it, after the idle time in Settings ("Free memory after").
 
 ## Private translation
 
@@ -193,7 +206,8 @@ model like an explanation, so the text never leaves the computer.
   text's own language can't be picked. A pick is for that card only (sent with
   `set_ai_task`); the main translation language (`translate_to`, on the Sources page)
   stays as set. The card takes keyboard focus only while this list is open
-  (`popup_focus`, which also hands Esc from the global shortcut to the field).
+  (`popup_focus`, which also hands Esc from the global shortcut to the field), or after
+  the person clicks into a web page (step 4).
 - Which language by default (`translate::offer`): the setting's, unless the text is
   already in it; then English, as Google Translate does (Bangla text with "Translate
   into" Bangla goes into English).

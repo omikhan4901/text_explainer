@@ -44,6 +44,11 @@ export interface WebTab {
   name: string;
 }
 
+export interface CardSize {
+  width: number;
+  height: number;
+}
+
 export interface Settings {
   version: number;
   hotkey: string;
@@ -57,6 +62,10 @@ export interface Settings {
   context_size: number;
   threads: number | null;
   idle_unload_minutes: number;
+  /** Free the model's memory as soon as the card closes. */
+  unload_on_close: boolean;
+  /** The card's size after the person resized it (CSS pixels); null fits it to its content. */
+  card_size: CardSize | null;
   prompts: CustomPrompts;
   extra_server_args: string[];
   appearance: Appearance;

@@ -92,6 +92,14 @@ by security, database and AI engineers before it reaches `main`:
 - [x] Website (15 October 2026, owner): one page at plainly.omikhan.com, Next.js in
       `site/`, hosted on Vercel next to omikhan.com. Waiting on the owner to import the
       project and add the subdomain (`site/README.md`).
+- [x] Fixes from the owner's first real-PC test (15 October 2026): the card came up cut
+      off (it opened at a fixed start height and the page reports only size changes; it
+      now opens at the last measured size), it can be dragged by its header and resized
+      from its corner (size remembered, double-click to fit), web pages ask for their
+      phone layout so they fit, clicking into a web page lets you type there, and the
+      model's memory is freed when the card closes ("Free memory after: The card closes",
+      the new default). Needs the owner's check on Windows: dragging and resizing a
+      non-activating window, typing in the web page, the memory going back.
 - [ ] Not verified on Windows yet: the Look up box's focus and placement, app rules on
       real apps, the Windows voice, export through the save dialog
 
@@ -105,9 +113,9 @@ Decisions that belong to the owner (not built until decided):
 
 ## Numbers (for the marketing kit; measured, not estimated)
 
-- Tests (15 October 2026): 194 Rust (core and Windows crate, including end-to-end engine
+- Tests (15 October 2026): 198 Rust (core and Windows crate, including end-to-end engine
   tests against a stand-in llama-server, download tests against a flaky local server, and
-  the word book's SQLite tests), 35 front-end unit tests, 92 Playwright checks (journeys
+  the word book's SQLite tests), 37 front-end unit tests, 100 Playwright checks (journeys
   and WCAG 2.2 AA scans, each in light and dark).
 - Model evaluation (4-vCPU GitHub runner, no GPU, 56 rewrites per model; `docs/models.md`):
   Gemma 4 E2B 17.3 tok/s, 5.8 s median per answer (first words after 2.2 s), 3.9 GB
