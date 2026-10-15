@@ -7,6 +7,7 @@ mod popup;
 mod state;
 mod tray;
 mod trigger;
+mod words;
 
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::{Arc, Mutex};
@@ -61,6 +62,7 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let dictionary = te_core::dictionary::Dictionary::open(&paths.dictionary)
         .map_err(|e| tracing::warn!("dictionary unavailable: {e}"))
         .ok();
+    let history = te_core::history::History::open(&paths.history);
     app.manage(AppState {
         paths,
         settings: Mutex::new(settings.clone()),
@@ -76,6 +78,7 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         download: Mutex::new(None),
         dictionary: Mutex::new(dictionary),
         web_url: Mutex::new(None),
+        history: Mutex::new(history),
     });
 
     popup::prepare(&handle);
@@ -188,6 +191,14 @@ pub fn run() {
             commands::validate_hotkey,
             commands::set_paused,
             commands::tiers,
+            words::save_word,
+            words::remove_word,
+            words::is_saved,
+            words::list_words,
+            words::list_history,
+            words::clear_history,
+            words::export_words,
+            words::speak,
         ])
         .on_window_event(|window, event| {
             // Closing the main window keeps the app running in the tray.

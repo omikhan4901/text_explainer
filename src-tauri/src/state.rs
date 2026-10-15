@@ -10,6 +10,7 @@ use tauri_plugin_global_shortcut::Shortcut;
 use te_core::dictionary::Dictionary;
 use te_core::download::Cancel;
 use te_core::engine::{Backend, Engine, ServerConfig};
+use te_core::history::History;
 use te_core::models;
 use te_core::settings::{ModelChoice, Settings};
 use te_win::{ClickOutsideWatcher, Rect, Side};
@@ -20,6 +21,8 @@ pub struct Paths {
     pub logs: PathBuf,
     pub llama_server: PathBuf,
     pub dictionary: PathBuf,
+    /// The Word book and lookup history (`history.rs`).
+    pub history: PathBuf,
 }
 
 impl Paths {
@@ -36,6 +39,7 @@ impl Paths {
                 .join("llama")
                 .join("llama-server.exe"),
             dictionary: resources.join("resources").join("dictionary.sqlite"),
+            history: data.join("history.sqlite"),
         })
     }
 
@@ -78,6 +82,8 @@ pub struct AppState {
     pub dictionary: Mutex<Option<Dictionary>>,
     /// The address last loaded in the card's web view, so reopening a tab doesn't reload.
     pub web_url: Mutex<Option<String>>,
+    /// Saved words and lookup history (in memory if the file can't be used).
+    pub history: Mutex<History>,
 }
 
 impl AppState {

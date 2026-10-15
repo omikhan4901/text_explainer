@@ -547,6 +547,46 @@ fn like_pattern(search: &str) -> Option<String> {
 
 // ---- Export ---------------------------------------------------------------------------
 
+/// The file formats the Words page exports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ExportFormat {
+    /// A spreadsheet (Excel, Sheets).
+    Csv,
+    /// Anki's text import (tab-separated, HTML fields).
+    Anki,
+}
+
+impl ExportFormat {
+    pub fn render(self, words: &[SavedWord]) -> String {
+        match self {
+            ExportFormat::Csv => to_csv(words),
+            ExportFormat::Anki => to_anki(words),
+        }
+    }
+
+    /// The file to write: `path` if it is absolute and has this format's extension, with
+    /// the extension added if it has another one; `None` for a relative or empty path.
+    pub fn file_path(self, path: &Path) -> Option<PathBuf> {
+        let name = path.file_name().filter(|_| path.is_absolute())?;
+        let allowed: &[&str] = match self {
+            ExportFormat::Csv => &["csv"],
+            ExportFormat::Anki => &["txt", "tsv"],
+        };
+        let ext = path
+            .extension()
+            .map(|e| e.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        if allowed.contains(&ext.as_str()) {
+            return Some(path.to_path_buf());
+        }
+        let mut name = name.to_os_string();
+        name.push(".");
+        name.push(allowed[0]);
+        Some(path.with_file_name(name))
+    }
+}
+
 /// Spreadsheet-friendly CSV (RFC 4180: every field quoted, quotes doubled, CRLF line ends)
 /// with a UTF-8 byte order mark so Excel reads Bangla and other scripts correctly. Cells
 /// that a spreadsheet would run as a formula are prefixed with `'`.
@@ -1094,6 +1134,24 @@ mod tests {
         let parsed: NewWord = serde_json::from_str(r#"{"term":"x","kind":"phrase"}"#).unwrap();
         assert_eq!(parsed.kind, Some(Kind::Phrase));
         assert!(serde_json::from_str::<NewWord>(r#"{"term":"x","kind":"empty"}"#).is_err());
+    }
+
+    #[test]
+    fn export_paths_get_the_format_extension() {
+        let base = std::env::temp_dir();
+        let p = |s: &str| base.join(s);
+        let csv = |s: &str| ExportFormat::Csv.file_path(&p(s)).unwrap();
+        let anki = |s: &str| ExportFormat::Anki.file_path(&p(s)).unwrap();
+        assert_eq!(csv("words.csv"), p("words.csv"));
+        assert_eq!(csv("words.CSV"), p("words.CSV"));
+        assert_eq!(csv("words"), p("words.csv"));
+        assert_eq!(anki("words.exe"), p("words.exe.txt"));
+        assert_eq!(anki("deck.tsv"), p("deck.tsv"));
+        assert_eq!(ExportFormat::Csv.file_path(Path::new("words.csv")), None);
+        assert_eq!(ExportFormat::Csv.file_path(Path::new("")), None);
+        let parsed: ExportFormat = serde_json::from_str("\"anki\"").unwrap();
+        assert_eq!(parsed, ExportFormat::Anki);
+        assert!(serde_json::from_str::<ExportFormat>("\"xlsx\"").is_err());
     }
 
     fn sample(term: &str, definition: Option<&str>, explanation: Option<&str>) -> SavedWord {
