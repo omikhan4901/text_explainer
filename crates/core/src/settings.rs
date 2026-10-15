@@ -45,6 +45,10 @@ pub struct Settings {
     pub offline_only: bool,
     /// Language code for `{lang}` in source addresses (the Translate tab's target).
     pub translate_to: String,
+    /// Keep a list of what the card opened on (`history.rs`), on this computer only.
+    pub keep_history: bool,
+    /// Lookups older than this many days are deleted (1 to 365).
+    pub history_days: u32,
 }
 
 impl Default for Settings {
@@ -70,6 +74,8 @@ impl Default for Settings {
             sources: sources::defaults(),
             offline_only: false,
             translate_to: "en".into(),
+            keep_history: true,
+            history_days: 30,
         }
     }
 }
@@ -190,6 +196,7 @@ impl Settings {
         } else {
             "en".into()
         };
+        self.history_days = self.history_days.clamp(1, 365);
         self
     }
 
@@ -355,6 +362,29 @@ mod tests {
             .translate_to,
             "zh-Hans"
         );
+    }
+
+    #[test]
+    fn history_settings_default_and_clamp() {
+        // Settings files from before the word book have neither field.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(&path, r#"{"level":"plain","offline_only":true}"#).unwrap();
+        let loaded = Settings::load(&path);
+        assert!(loaded.keep_history);
+        assert_eq!(loaded.history_days, 30);
+        assert!(loaded.offline_only);
+
+        std::fs::write(&path, r#"{"keep_history":false,"history_days":0}"#).unwrap();
+        let loaded = Settings::load(&path);
+        assert!(!loaded.keep_history);
+        assert_eq!(loaded.history_days, 1);
+        let long = Settings {
+            history_days: 10_000,
+            ..Default::default()
+        }
+        .sanitized();
+        assert_eq!(long.history_days, 365);
     }
 
     #[test]
