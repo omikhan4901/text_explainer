@@ -21,6 +21,7 @@ import {
   reduce,
   tabs,
   webSourceOf,
+  webTab,
   type Explaining,
   type TabId,
 } from "./state";
@@ -197,7 +198,7 @@ function ExplainCard({
         {state.dictionary && <DictionaryPane entry={state.dictionary} copyText={copyable(state)} />}
       </Tabs.Content>
       <Tabs.Content value="explain" className="flex min-h-0 flex-col focus-visible:outline-none" style={steady}>
-        <ExplainPane state={state} level={level} onTask={onTask} />
+        <ExplainPane state={state} level={level} onTask={onTask} onTab={onTab} />
       </Tabs.Content>
     </Tabs.Root>
   );
@@ -358,9 +359,29 @@ function CopyButton({ text }: { text: string }) {
 }
 
 /** Explain or Translate: what the AI tab does for this selection. */
-function TaskSwitch({ state, onTask }: { state: Explaining; onTask: (task: AiTask) => void }) {
+/** The card's web translator tab (Google Translate, or Bing Translator), when it's on. */
+function webTranslator(state: Explaining) {
+  return state.web.find((w) => w.id === "translate" || w.id === "bing-translator") ?? null;
+}
+
+/** A small text button that opens another tab of the card. */
+function TabLink({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex min-w-0 items-center gap-1 text-[12px] font-medium text-muted underline-offset-2 transition-colors hover:text-text hover:underline"
+    >
+      <Globe size={13} aria-hidden className="shrink-0" />
+      <span className="truncate">{children}</span>
+    </button>
+  );
+}
+
+function TaskSwitch({ state, onTask, onTab }: { state: Explaining; onTask: (task: AiTask) => void; onTab: (tab: TabId) => void }) {
   const tr = state.translate;
   const why = tr.state === "same_language" ? strings.translate.already(tr.name) : tr.state === "unsupported" ? strings.translate.webOnly(tr.name) : undefined;
+  const web = webTranslator(state);
   return (
     <div className="flex items-center gap-2.5 px-4 pt-3">
       <Segmented<AiTask>
@@ -373,12 +394,17 @@ function TaskSwitch({ state, onTask }: { state: Explaining; onTask: (task: AiTas
           { value: "translate", label: strings.translate.to(tr.name), title: why, disabled: tr.state !== "available" },
         ]}
       />
-      {why && <span className="min-w-0 truncate text-[12px] text-muted">{why}</span>}
+      {tr.state === "unsupported" && web ? (
+        <TabLink onClick={() => onTab(webTab(web.id))}>{strings.translate.onTheWeb(web.name)}</TabLink>
+      ) : (
+        why && <span className="min-w-0 truncate text-[12px] text-muted">{why}</span>
+      )}
     </div>
   );
 }
 
-function ExplainPane({ state, level, onTask }: { state: Explaining; level: Level; onTask: (task: AiTask) => void }) {
+function ExplainPane({ state, level, onTask, onTab }: { state: Explaining; level: Level; onTask: (task: AiTask) => void; onTab: (tab: TabId) => void }) {
+  const web = webTranslator(state);
   const text = answerText(state);
   const streaming = isStreaming(state);
   const badge = gradeBadge(state);
@@ -398,13 +424,18 @@ function ExplainPane({ state, level, onTask }: { state: Explaining; level: Level
         >
           {t.setUp}
         </button>
+        {web && (
+          <p className="pt-1">
+            <TabLink onClick={() => onTab(webTab(web.id))}>{strings.translate.onTheWeb(web.name)}</TabLink>
+          </p>
+        )}
       </div>
     );
   }
 
   return (
     <>
-      <TaskSwitch state={state} onTask={onTask} />
+      <TaskSwitch state={state} onTask={onTask} onTab={onTab} />
       <div key={`${state.id}-${state.task}`} className="card-in min-h-0 overflow-y-auto px-4 pt-3 pb-4" aria-live="polite" aria-busy={!state.done}>
         {state.error ? (
           <ErrorBlock message={state.error.message} detail={state.error.detail} />
@@ -417,6 +448,11 @@ function ExplainPane({ state, level, onTask }: { state: Explaining; level: Level
           </div>
         )}
         {state.truncated && !state.error && <p className="mt-3 text-[12px] text-muted">{t.truncated}</p>}
+        {state.task === "translate" && state.done && !state.error && web && (
+          <p className="mt-3">
+            <TabLink onClick={() => onTab(webTab(web.id))}>{strings.translate.compare(web.name)}</TabLink>
+          </p>
+        )}
       </div>
 
       {flagged && (

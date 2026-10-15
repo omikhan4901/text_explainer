@@ -30,6 +30,7 @@ export const DEFAULT_SETTINGS: Settings = {
     source("duckduckgo", "DuckDuckGo", "https://duckduckgo.com/?q={query}", true, true, true),
     source("wikipedia", "Wikipedia", "https://en.wikipedia.org/w/index.php?search={query}", true, true, false),
     source("translate", "Translate", "https://translate.google.com/?sl=auto&tl={lang}&text={query}&op=translate", true, true, true),
+    source("bing-translator", "Bing Translator", "https://www.bing.com/translator?from=auto&to={lang}&text={query}", false, true, true),
     source("wiktionary", "Wiktionary", "https://en.wiktionary.org/w/index.php?search={query}", false, true, false),
     source("cambridge", "Cambridge", "https://dictionary.cambridge.org/search/english/direct/?q={query}", false, true, false),
     source("brave", "Brave", "https://search.brave.com/search?q={query}", false, true, true),

@@ -99,6 +99,14 @@ pub fn defaults() -> Vec<WebSource> {
             true,
         ),
         source(
+            "bing-translator",
+            "Bing Translator",
+            "https://www.bing.com/translator?from=auto&to={lang}&text={query}",
+            false,
+            true,
+            true,
+        ),
+        source(
             "wiktionary",
             "Wiktionary",
             "https://en.wiktionary.org/w/index.php?search={query}",
@@ -196,8 +204,19 @@ pub fn build_url(template: &str, selection: &str, lang: &str) -> Result<Url, Sou
     let filled = template
         .trim()
         .replace("{query}", &encode(&query_text(selection)))
-        .replace("{lang}", &encode(lang.trim()));
+        .replace("{lang}", &encode(lang_for(template, lang.trim())));
     Url::parse(&filled).map_err(|_| SourceError::Invalid)
+}
+
+/// The language code a site expects: Bing names Chinese by script ("zh-Hans"), where the
+/// setting uses Google's region codes ("zh-CN").
+fn lang_for<'a>(template: &str, lang: &'a str) -> &'a str {
+    let bing = Url::parse(template).is_ok_and(|u| u.host_str() == Some("www.bing.com"));
+    match (bing, lang) {
+        (true, "zh-CN") => "zh-Hans",
+        (true, "zh-TW") => "zh-Hant",
+        _ => lang,
+    }
 }
 
 /// Percent-encodes everything but RFC 3986 unreserved characters, so the text is safe in a
@@ -229,11 +248,55 @@ pub fn sanitize(sources: &mut Vec<WebSource>) {
             s.enabled = false;
         }
     }
+    // Built-in sources can't be removed, so one missing was added in a later version:
+    // it joins the end of the list as it ships (Bing Translator, for one, starts off).
+    for d in defaults() {
+        if sources.len() < MAX_SOURCES && !sources.iter().any(|s| s.id == d.id) {
+            sources.push(d);
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn older_lists_get_new_built_in_sources() {
+        let mut old: Vec<WebSource> = defaults()
+            .into_iter()
+            .filter(|s| s.id != "bing-translator")
+            .collect();
+        old[0].enabled = false;
+        sanitize(&mut old);
+        let added = old.last().unwrap();
+        assert_eq!(added.id, "bing-translator");
+        assert!(!added.enabled);
+        assert!(!old[0].enabled, "the person's choices stay");
+        let again = old.clone();
+        sanitize(&mut old);
+        assert_eq!(old, again);
+    }
+
+    #[test]
+    fn bing_gets_chinese_by_script() {
+        let bing = "https://www.bing.com/translator?from=auto&to={lang}&text={query}";
+        let url = build_url(bing, "hello", "zh-CN").unwrap();
+        assert!(url.as_str().contains("to=zh-Hans&"), "{url}");
+        let google = "https://translate.google.com/?sl=auto&tl={lang}&text={query}";
+        assert!(
+            build_url(google, "hello", "zh-CN")
+                .unwrap()
+                .as_str()
+                .contains("tl=zh-CN&")
+        );
+        assert!(
+            build_url(bing, "hello", "bn")
+                .unwrap()
+                .as_str()
+                .contains("to=bn&")
+        );
+    }
 
     #[test]
     fn built_in_sources_are_valid_and_unique() {
@@ -379,7 +442,9 @@ mod tests {
         ];
         sanitize(&mut list);
         let ids: Vec<_> = list.iter().map(|s| s.id.as_str()).collect();
-        assert_eq!(ids, ["a", "bad", "long"]);
+        assert_eq!(ids[..3], ["a", "bad", "long"]);
+        // The built-in sources the file lacked follow.
+        assert_eq!(ids.len(), 3 + defaults().len());
         assert_eq!(list[0].name, "a");
         assert!(!list[1].enabled);
         assert_eq!(list[2].name.chars().count(), 40);

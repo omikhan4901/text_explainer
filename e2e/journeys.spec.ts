@@ -105,12 +105,22 @@ test("the AI tab translates on the computer, and says when it can't", async ({ p
   await page.getByRole("radio", { name: "Translate to Bangla" }).click();
   await expect(page.getByText(/ভাড়াটিয়াকে/)).toBeVisible({ timeout: 5000 });
   await expect(page.getByRole("radio", { name: "Simpler" })).toHaveCount(0);
+  // One click compares it with the web translator.
+  await page.getByRole("button", { name: "Compare in the Translate tab" }).click();
+  await expect(page.getByRole("tab", { name: "Translate", exact: true, selected: true })).toBeVisible();
+  await page.getByRole("tab", { name: "Explain with AI" }).click();
   await page.getByRole("radio", { name: "Explain" }).click();
   await expect(page.getByText(/Whatever else this agreement says/)).toBeVisible({ timeout: 5000 });
 
   await page.goto("/popup.html?demo=passage&tab=explain");
   await expect(page.getByRole("radio", { name: "Translate to English" })).toBeDisabled();
   await expect(page.getByText("Already in English")).toBeVisible();
+
+  // A language only the web can do points to the web translator.
+  await page.goto("/popup.html?demo=passage&tab=explain&lang=th");
+  await expect(page.getByRole("radio", { name: "Translate to Thai" })).toBeDisabled();
+  await page.getByRole("button", { name: "Use the Translate tab" }).click();
+  await expect(page.getByRole("tab", { name: "Translate", exact: true, selected: true })).toBeVisible();
 });
 
 test("the reading level switch redoes the text", async ({ page }) => {

@@ -180,6 +180,13 @@ model like an explanation, so the text never leaves the computer.
   a translation rightly writes them the target's way ("Geneva" becomes "Ginebra").
 - Token budgets are per target script (`prompt::max_tokens_for_translation`): Bangla,
   Hindi, Arabic and CJK take many more tokens per word than English.
+- The web translators work alongside it: the Translate tab (Google Translate) is on by
+  default and Bing Translator can be turned on in Sources (it names Chinese "zh-Hans", so
+  `sources::build_url` maps the setting's "zh-CN" for it). After an AI translation the
+  card offers "Compare in the Translate tab"; when the AI can't translate into a language
+  (web only), or no model is set up, it offers that tab instead.
+- Built-in sources added in a later version join a saved list at its end, as they ship
+  (`sources::sanitize`), since built-in sources can't be removed.
 - Quality per model and language is measured with the eval harness's translate task
   (`docs/models.md`).
 
