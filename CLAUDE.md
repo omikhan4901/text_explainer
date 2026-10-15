@@ -2,7 +2,7 @@
 
 Offline desktop app: select text anywhere, press a hotkey, get a readable version next to
 the cursor. Runs a small local model (llama.cpp) on an 8 GB CPU-only laptop.
-The plan is `docs/IMPLEMENTATION_PLAN.md`; progress and the next step are in
+The plan is `docs/IMPLEMENTATION_PLAN.md` (the browser extension: `docs/BROWSER_PLAN.md`); progress and the next step are in
 `docs/PROGRESS.md`. Read both before starting work, and update `PROGRESS.md` as you go.
 `docs/GUIDE.md` explains how everything works (keep it true when you change how things work).
 
@@ -44,7 +44,10 @@ The plan is `docs/IMPLEMENTATION_PLAN.md`; progress and the next step are in
 - Model output always goes through the language guard (grammar on the request, script check
   on the result) so a model can't answer in the wrong language.
 - The clipboard fallback restores the person's clipboard exactly, every time, even on error.
-- Nothing goes over the network except downloads the person starts (models, dictionary).
+- The desktop app makes no network requests except downloads the person starts (models,
+  dictionary). The browser extension may fetch only the web sources the person turned on
+  (`docs/BROWSER_PLAN.md`); AI and dictionary requests stay on the machine, and
+  "Offline only" turns web sources off.
 - Every UI string goes through `src/i18n` (English now; Bangla later).
 
 ## Working with the owner

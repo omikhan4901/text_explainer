@@ -28,7 +28,8 @@ The main job is **making text readable**, not dictionary lookups.
 - **PDF cleanup:** text copied from PDFs is repaired before anything else (hyphenation at
   line ends, hard-wrapped lines, ligatures, soft hyphens).
 
-Later (after the MVP): snip + OCR for text you can't select, history and topic word lists,
+Later (after the MVP): a browser extension with Definer-style sources and the local AI
+(`docs/BROWSER_PLAN.md`), snip + OCR for text you can't select, history and topic word lists,
 "select to show" dot (off by default), macOS and Linux, Bangla UI.
 
 ## 2. Model
