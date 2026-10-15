@@ -59,6 +59,30 @@ AI Translate and the offline dictionary. Desktop software only, never a browser 
 - [ ] S5 Triggers and rules
 - [ ] S6 Polish
 
+## Release 1.0 plan (15 October 2026)
+
+The owner asked for a product that can be sold. Who buys: students, language learners
+and people who read hard text at work (contracts, research, government letters), on
+Windows. Why us over Definer: works in every app (not only the browser), explains and
+translates with a local model so private text stays on the computer, and keeps the words
+you looked up.
+
+Built in parallel (each engineer in their own worktree, merged by the PM), then reviewed
+by security, database and AI engineers before it reaches `main`:
+
+- [ ] Look up box: tray, the hotkey with nothing selected, an optional own shortcut (S1)
+- [ ] App rules: never read selections in chosen apps, password managers by default (S5)
+- [ ] Word book: save words from the card, history, export to CSV and Anki, Listen
+- [ ] Private AI Translate in the AI tab, with the language and meaning guards (S4)
+
+Decisions that belong to the owner (not built until decided):
+
+- Price and how to take payments (one-time licence or yearly; a merchant of record such
+  as Paddle or Lemon Squeezy handles tax). Costs money and has legal terms.
+- Code signing: unsigned installers get a SmartScreen warning, which hurts sales. A
+  certificate costs money every year.
+- A product website (GitHub Pages is free) and where the download lives.
+
 ## Numbers (for the marketing kit; measured, not estimated)
 
 - Tests: 111 Rust (core, Windows crate and real-dictionary checks, including 13 end-to-end
