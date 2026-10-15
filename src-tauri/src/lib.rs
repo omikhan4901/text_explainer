@@ -71,6 +71,7 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let history = te_core::history::History::open(&paths.history);
     app.manage(AppState {
         paths,
+        started: std::time::Instant::now(),
         settings: Mutex::new(settings.clone()),
         engine: Arc::new(tokio::sync::Mutex::new(engine)),
         task: Mutex::new(None),
@@ -149,9 +150,12 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 /// startup then left the shortcut dead until the next restart.
 fn spawn_shortcut_retry(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
+        let mut told = false;
         loop {
-            tokio::time::sleep(Duration::from_secs(5)).await;
             let state = app.state::<AppState>();
+            // Every second while starting (the person shouldn't notice), then every 5.
+            let starting = state.started.elapsed() < hotkey::GRACE;
+            tokio::time::sleep(Duration::from_secs(if starting { 1 } else { 5 })).await;
             let settings = state.settings();
             let mut changed = false;
             if state.hotkey.lock().expect("hotkey lock").is_none()
@@ -171,8 +175,11 @@ fn spawn_shortcut_retry(app: AppHandle) {
                 tracing::info!("registered {} on a later try", settings.lookup_hotkey);
                 changed = true;
             }
-            if changed {
-                // The main window's "another app uses this shortcut" notice goes away.
+            // The main window's notice goes away, or (once, after the grace period)
+            // appears: only then is the shortcut really taken.
+            let taken = hotkey::status(&state) == hotkey::Status::Taken;
+            if changed || (taken && !told) {
+                told = taken;
                 let _ = app.emit_to("main", "te://settings", ());
             }
         }

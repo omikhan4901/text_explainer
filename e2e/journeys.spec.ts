@@ -187,6 +187,12 @@ test("home warns when another app owns the shortcut", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Shortcuts" })).toBeVisible();
 });
 
+test("home doesn't warn while the shortcut is still being tried after starting", async ({ page }) => {
+  await page.goto("/index.html?state=ready&hotkey=starting");
+  await expect(page.getByText("Try it")).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
 test("a word has its dictionary tab; Explain with AI starts the model", async ({ page }) => {
   await page.goto("/popup.html?demo=word");
   await expect(page.getByRole("tab", { name: "Google", selected: true })).toBeVisible();

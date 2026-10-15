@@ -108,8 +108,8 @@ pub struct AppInfo {
     model_loaded: bool,
     downloading: Option<String>,
     paused: bool,
-    /// False when the shortcut couldn't be registered (another app has it).
-    hotkey_active: bool,
+    /// Whether the shortcut works, is still being tried, or another app has it.
+    hotkey: hotkey::Status,
     /// The built-in prompts, shown in the prompt editor.
     default_prompts: DefaultPrompts,
 }
@@ -176,7 +176,7 @@ pub async fn app_info(app: AppHandle, state: State<'_, AppState>) -> CmdResult<A
             .as_ref()
             .map(|(id, _)| id.clone()),
         paused: state.paused.load(Ordering::SeqCst),
-        hotkey_active: state.hotkey.lock().expect("hotkey lock").is_some(),
+        hotkey: hotkey::status(&state),
         default_prompts: DefaultPrompts {
             simpler: named(Level::Simpler).replace("English", "{language}"),
             plain: named(Level::Plain).replace("English", "{language}"),
@@ -498,5 +498,5 @@ pub fn validate_app(name: String) -> CmdResult<String> {
 /// "Check now" on the About page: asks and installs when there is a new version.
 #[tauri::command]
 pub async fn check_updates(app: AppHandle) -> CmdResult<crate::updater::Status> {
-    crate::updater::check(&app).await
+    crate::updater::check(&app, true).await
 }

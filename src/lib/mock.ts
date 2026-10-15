@@ -210,7 +210,7 @@ function info(): AppInfo {
     model_loaded: false,
     downloading,
     paused: false,
-    hotkey_active: !(typeof location !== "undefined" && new URLSearchParams(location.search).get("hotkey") === "taken"),
+    hotkey: ((typeof location !== "undefined" && new URLSearchParams(location.search).get("hotkey")) || "active") as AppInfo["hotkey"],
     default_prompts: {
       simpler: SYSTEM("Write for a 12-year-old: sentences under 12 words, the most common everyday words, one idea per sentence."),
       plain: SYSTEM("Use plain language: sentences under 20 words, common words, active voice."),

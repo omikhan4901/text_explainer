@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use tauri::async_runtime::JoinHandle;
 use tauri::{AppHandle, Manager};
@@ -71,6 +72,8 @@ pub struct PopupPlacement {
 
 pub struct AppState {
     pub paths: Paths,
+    /// When the app started (a busy shortcut is tried quietly for a while first).
+    pub started: Instant,
     pub settings: Mutex<Settings>,
     pub engine: Arc<tokio::sync::Mutex<Engine>>,
     pub task: Mutex<Option<JoinHandle<()>>>,

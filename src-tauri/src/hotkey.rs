@@ -3,12 +3,41 @@
 
 use std::str::FromStr;
 use std::sync::atomic::Ordering;
+use std::time::Duration;
+
+use serde::Serialize;
 
 use tauri::{AppHandle, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutEvent, ShortcutState};
 
 use crate::state::AppState;
 use crate::{lookup, popup, trigger};
+
+/// How long after starting a shortcut that can't be registered is still being tried
+/// before the person is told: right after an update or a restart, the copy of the app
+/// that is closing can hold it for a while.
+pub const GRACE: Duration = Duration::from_secs(30);
+
+/// Whether the main shortcut works.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Status {
+    Active,
+    /// Not registered yet, still being tried (within `GRACE` of starting).
+    Starting,
+    /// Another app has it.
+    Taken,
+}
+
+pub fn status(state: &AppState) -> Status {
+    if state.hotkey.lock().expect("hotkey lock").is_some() {
+        Status::Active
+    } else if state.started.elapsed() < GRACE {
+        Status::Starting
+    } else {
+        Status::Taken
+    }
+}
 
 pub fn parse(hotkey: &str) -> Result<Shortcut, String> {
     let shortcut = Shortcut::from_str(hotkey).map_err(|e| e.to_string())?;

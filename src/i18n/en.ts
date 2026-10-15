@@ -260,7 +260,7 @@ export const en = {
     updates: "Updates",
     autoUpdate: "Check for updates",
     autoUpdateHint:
-      "Every few hours the app looks for a new version on GitHub and asks before installing it. Updates are signed, and one that isn't is refused.",
+      "Every hour the app looks for a new version on GitHub and asks before installing it. Updates are signed, and one that isn't is refused.",
     checkNow: "Check now",
     checking: "Checking…",
     upToDate: "You have the newest version.",

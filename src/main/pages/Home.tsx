@@ -25,7 +25,7 @@ export function HomePage({ go }: { go: (p: PageId) => void }) {
   return (
     <>
       <h1 className="sr-only">{t.title}</h1>
-      {!info.hotkey_active && (
+      {info.hotkey === "taken" && (
         <div role="alert" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-warn-soft px-3.5 py-2.5 text-[13px] text-warn">
           <span>{t.hotkeyTaken(settings.hotkey)}</span>
           <LinkButton className="text-warn" onClick={() => go("shortcuts")}>

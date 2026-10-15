@@ -128,6 +128,12 @@ by security, database and AI engineers before it reaches `main`:
 - [x] Reading fonts never changed (owner): the font stacks sat in Tailwind's @theme, which
       leaves out variables no class uses, so every choice fell back to Geist. Moved to
       plain variables; a journey now checks the preview's font and that it loads.
+- [x] The shortcut warning showed after every update until a retry got the shortcut back
+      (the closing copy still held it). The first 30 seconds are now a quiet retry every
+      second; Home warns only after that. Updates (owner): checked 10 seconds after
+      starting and then every hour (was 90 seconds and 6 hours, so new builds were
+      rarely noticed), asked over the main window so the question is seen, quiet when
+      offline; "Later" isn't asked again for that version by the hourly check.
 - [ ] Not verified on Windows yet: the Look up box's focus and placement, app rules on
       real apps, the Windows voice, export through the save dialog
 

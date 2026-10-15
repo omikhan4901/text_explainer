@@ -277,12 +277,16 @@ memory fit as the catalog (size plus half). The Model page and first run list th
 Every push to `main` builds version `0.1.<run number>` (`installer.yml`). When the
 repository holds the update key, the installer is signed (minisign, Tauri's updater) and
 `latest.json` is published beside it on the `latest-build` release. Installed apps read it
-90 seconds after starting and then every 6 hours (`src-tauri/src/updater.rs`, when "Check
-for updates" is on), and on "Check now" (About). A newer version brings up a native dialog:
+10 seconds after starting and then every hour (`src-tauri/src/updater.rs`, when "Check
+for updates" is on), and on "Check now" (About). Offline, a check fails quietly (logged;
+the next one is an hour later) and gives up after 30 seconds without an answer; "Check
+now" says it couldn't check. A newer version opens the main window
+with a native dialog over it (with only the tray icon showing, a dialog of its own could
+open behind the app the person is in):
 "Install and restart" opens the main window over a progress screen (`te://update`:
 downloading with the size, then installing), downloads it, **checks the signature against
 the public key built into the app**, runs the installer (passive: progress only, no questions) and opens the new
-version; "Later" asks again next time. A build without the key (local builds, or before
+version; "Later" puts that version off until "Check now" or a newer one. A build without the key (local builds, or before
 the key is set) never checks.
 
 Setting up the key, once (it stays on the owner's PC and in GitHub's secrets):

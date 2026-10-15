@@ -3,6 +3,7 @@
 //! key and the app refuses one that isn't (the key's public half is built in), so a file
 //! changed on GitHub can't reach anyone. Builds without the key (local ones) never check.
 
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
@@ -13,11 +14,20 @@ use tauri_plugin_updater::UpdaterExt;
 
 use crate::state::AppState;
 
-const FIRST_CHECK: Duration = Duration::from_secs(90);
-const EVERY: Duration = Duration::from_secs(6 * 60 * 60);
+/// Soon after starting (the owner's call): an app that was closed may be behind.
+const FIRST_CHECK: Duration = Duration::from_secs(10);
+/// A check that gets no answer (a captive portal, a dead connection) gives up after this,
+/// so it never holds up the next one. The download itself has no limit.
+const CHECK_TIMEOUT: Duration = Duration::from_secs(30);
+/// Hourly: a check is one small file from GitHub, and every 6 hours meant a new version
+/// was rarely noticed by an app that restarts now and then (the owner's report).
+const EVERY: Duration = Duration::from_secs(60 * 60);
 
 /// One check at a time, so a manual check and the timer never ask twice.
 static CHECKING: AtomicBool = AtomicBool::new(false);
+/// The version the person said "Later" to: the hourly check doesn't ask about it again
+/// ("Check now" does).
+static DECLINED: Mutex<Option<String>> = Mutex::new(None);
 
 #[derive(Serialize, Debug)]
 #[serde(tag = "state", rename_all = "snake_case")]
@@ -83,7 +93,7 @@ pub fn init(app: &AppHandle) {
         tokio::time::sleep(FIRST_CHECK).await;
         loop {
             if app.state::<AppState>().settings().check_updates
-                && let Err(e) = check(&app).await
+                && let Err(e) = check(&app, false).await
             {
                 tracing::info!("update check failed: {e}");
             }
@@ -93,30 +103,44 @@ pub fn init(app: &AppHandle) {
 }
 
 /// Looks for a newer version; if there is one, asks, then downloads, verifies the
-/// signature, installs and restarts. Returns only when nothing was installed.
-pub async fn check(app: &AppHandle) -> Result<Status, String> {
+/// signature, installs and restarts. Returns only when nothing was installed. `manual`:
+/// the person pressed "Check now" (asks even about a version they put off).
+pub async fn check(app: &AppHandle, manual: bool) -> Result<Status, String> {
     if !available(app) {
         return Ok(Status::Unavailable);
     }
     if CHECKING.swap(true, Ordering::SeqCst) {
         return Ok(Status::Busy);
     }
-    let result = check_once(app).await;
+    let result = check_once(app, manual).await;
     CHECKING.store(false, Ordering::SeqCst);
     result
 }
 
-async fn check_once(app: &AppHandle) -> Result<Status, String> {
+async fn check_once(app: &AppHandle, manual: bool) -> Result<Status, String> {
     let updater = app.updater().map_err(|e| e.to_string())?;
-    let Some(update) = updater.check().await.map_err(|e| e.to_string())? else {
+    // Offline, this fails quietly: the hourly check logs it and tries again later, and
+    // "Check now" says it couldn't check.
+    let Some(update) = tokio::time::timeout(CHECK_TIMEOUT, updater.check())
+        .await
+        .map_err(|_| "the update check timed out".to_string())?
+        .map_err(|e| e.to_string())?
+    else {
         return Ok(Status::UpToDate);
     };
     let version = update.version.clone();
+    let declined = DECLINED.lock().expect("declined lock").clone();
+    if !manual && declined.as_deref() == Some(version.as_str()) {
+        return Ok(Status::Declined { version });
+    }
+    // Asked over the main window, so the question is in front: with only the tray icon
+    // showing, a dialog of its own could open behind the app the person is in.
+    crate::show_main(app);
     let asker = app.clone();
     let question = version.clone();
     // The native dialog waits for an answer; never on the async runtime's threads.
     let install = tauri::async_runtime::spawn_blocking(move || {
-        asker
+        let mut dialog = asker
             .dialog()
             .message(format!(
                 "Plainly {question} is ready. Install it now? The app closes, updates \
@@ -127,12 +151,16 @@ async fn check_once(app: &AppHandle) -> Result<Status, String> {
             .buttons(MessageDialogButtons::OkCancelCustom(
                 "Install and restart".into(),
                 "Later".into(),
-            ))
-            .blocking_show()
+            ));
+        if let Some(main) = asker.get_webview_window("main") {
+            dialog = dialog.parent(&main);
+        }
+        dialog.blocking_show()
     })
     .await
     .unwrap_or(false);
     if !install {
+        *DECLINED.lock().expect("declined lock") = Some(version.clone());
         return Ok(Status::Declined { version });
     }
     tracing::info!("installing version {version}");
