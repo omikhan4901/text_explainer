@@ -1,103 +1,128 @@
+<div align="center">
+
+<img src="src-tauri/icons/128x128@2x.png" alt="" width="88">
+
 # Text Explainer
 
-Select a word or hard text anywhere, press one key, and a card opens right next to it:
-web searches first (Google, Bing, Wikipedia, Translate, any site you add), the dictionary,
-and **Explain with AI**, a local model that rewrites it in plain language on an ordinary
-8 GB laptop with no graphics card. Like the Definer extension, but for every app on
-Windows, and with an AI that never leaves your computer.
+**Select hard text anywhere on Windows. Read it in plain words, right next to it.**
 
-**[Download for Windows](https://github.com/omikhan4901/text_explainer/releases/download/latest-build/TextExplainer-x64-setup.exe)**
-(64-bit, Windows 10 and 11). This is the newest build, rebuilt and smoke-tested on a
-Windows runner on every change ([all builds](https://github.com/omikhan4901/text_explainer/releases)).
-It isn't code-signed yet, so SmartScreen warns: choose "More info", then "Run anyway".
+Web searches, a dictionary and a private AI in one small card.<br>
+For contracts, papers, letters and any word you don't know, in every app, not only the browser.
 
-> **Status: ongoing work.** The Windows MVP is built; the first test on a real Windows
-> desktop and the first numbered release are next. macOS and Linux come after.
-> Progress: [`docs/PROGRESS.md`](docs/PROGRESS.md).
+### [Download for Windows](https://github.com/omikhan4901/text_explainer/releases/download/latest-build/TextExplainer-x64-setup.exe)
 
-**This, from a lease:**
+<sub>Free preview · Windows 10 and 11, 64-bit · [all builds](https://github.com/omikhan4901/text_explainer/releases)</sub>
 
-> Notwithstanding any provision of this Agreement to the contrary, the Lessee shall remit
-> payment of the monthly rent of $1,200 no later than the 5th day of each calendar month,
-> failing which a late fee equivalent to 5% of the outstanding amount shall accrue.
+<br>
 
-**becomes this, next to your cursor:**
+<img src="docs/screenshots/demo.gif" alt="The card: it opens on a Google search, then Explain with AI rewrites a lease clause in plain English, then translates it into Bangla on the computer" width="480">
 
+</div>
+
+<br>
+
+## Before and after
+
+<table>
+<tr>
+<th width="50%">In the lease</th>
+<th width="50%">On the card, at the Plain level</th>
+</tr>
+<tr>
+<td>Notwithstanding any provision of this Agreement to the contrary, the Lessee shall remit payment of the monthly rent of $1,200 no later than the 5th day of each calendar month, failing which a late fee equivalent to 5% of the outstanding amount shall accrue.</td>
+<td>Whatever else this agreement says, the tenant (the Lessee) must pay the monthly rent of $1,200 by the 5th day of each month. If they don't, a late fee of 5% of the unpaid amount is added.<br><br><sub>Reading grade 17 → 9</sub></td>
+</tr>
+</table>
+
+## What's in it
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/screenshots/card-passage-light.png" alt="The card with the lease clause rewritten in plain language and the Simpler, Plain, Clearer switch">
+<h3>Explain in plain words</h3>
+A small AI on your own computer rewrites jargon at the level you pick, keeps every number,
+date and name, and shows the reading grade before and after.
+</td>
+<td width="50%" valign="top">
+<img src="docs/screenshots/card-translate-light.png" alt="The AI tab set to Translate to Bangla, with the lease clause in Bangla">
+<h3>Translate privately</h3>
+The same AI translates, so private text never goes to a translation site. Google
+Translate is one tab away to compare.
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/screenshots/lookup-light.png" alt="The Look up box with the word serendipity typed in">
+<h3>Look up anything</h3>
+Heard a word in a lecture? Press the shortcut with nothing selected and type it. The same
+card opens.
+</td>
+<td width="50%" valign="top">
+<img src="docs/screenshots/main-words-light.png" alt="The Words page: saved words with their meanings, Listen and Remove, and Export CSV and Export for Anki">
+<h3>Keep your words</h3>
+Save a word from the card, hear it read aloud, and export your list to Excel or Anki.
+</td>
+</tr>
+</table>
+
+**And:**
+
+- **Searches first, AI when you ask.** Google, Bing, Wikipedia and any site you add open
+  inside the card. The AI only runs when you open its tab, so quick lookups cost nothing.
+- **A dictionary for single words**, built in and offline (WordNet).
+- **It checks itself.** If an answer drops or invents a number, date or name, the card
+  says so. A grammar keeps the model in the right language, token by token.
+- **Any local model.** It recommends one that fits your PC, finds models you already have
+  (LM Studio, Ollama, Jan, GPT4All, Hugging Face) and works with a local Ollama or LM
+  Studio server.
+- **Never in your way.** The card doesn't take focus from the app you're reading in. Esc
+  or a click elsewhere closes it.
+
+## Private by design
+
+- The AI, the dictionary, your word book and your history stay on your computer.
+- Web tabs are like visiting those sites, and load only when opened. **Offline only**
+  turns them all off.
+- It never reads selections in apps you choose. Password managers are on the list from
+  the start.
+- No account, no analytics, no server.
+
+## Install
+
+1. [Download the installer](https://github.com/omikhan4901/text_explainer/releases/download/latest-build/TextExplainer-x64-setup.exe)
+   and run it. It isn't code-signed yet, so Windows shows a warning: choose
+   **More info**, then **Run anyway**.
+2. First run asks one question (search the web first, or offline only) and helps you pick
+   a model that fits your memory, or use one you already have.
+3. Select text anywhere and press **Ctrl+Shift+Space**, or press **Ctrl+C** twice.
+
+The installer is rebuilt from every change and smoke-tested on a Windows machine before
+it replaces the download.
+
+<details>
+<summary><b>More screenshots</b></summary>
+<br>
 <p>
-  <img src="docs/screenshots/card-passage-light.png" alt="The reading card: the lease sentence rewritten in plain language, with the Simpler / Plain / Clearer switch and the grade going from 17 to 9" width="440">
-  <img src="docs/screenshots/card-passage-dark.png" alt="The same card in dark mode" width="440">
-</p>
-
-## What it does
-
-- **Readable rewrites, not definitions.** Long sentences, jargon and acronyms become plain
-  language at the level you choose (Simpler, Plain, Clearer), keeping every number, date
-  and name. The card shows the reading grade before and after.
-- **Never in your way.** The card appears beside what you're reading without taking focus
-  from the app you're in. Esc or a click elsewhere closes it.
-- **Two ways in.** Select text and press the shortcut (Ctrl+Shift+Space by default), or
-  press Ctrl+C twice.
-- **Look up anything.** Press the shortcut with nothing selected (or use the tray menu)
-  and type a word or phrase; the card opens with the same tabs.
-- **Translate privately.** The AI tab can translate instead of explain, on your computer,
-  with the same checks for numbers and the wrong language. The web Translate tab is there
-  too.
-- **Keep your words.** Save a word from the card, find it again on the Words page, hear it
-  read aloud by the Windows voice, and export your list to Excel (CSV) or Anki. A history
-  of what you looked up stays on your computer and can be turned off.
-- **Private where it matters.** The card never reads selections in apps you choose;
-  password managers are on the list from the start.
-- **It checks itself.** If a rewrite drops or invents a number, date or name, the card
-  says so. Answers can't drift into another language: a grammar constrains the model
-  token by token.
-- **Single words get a dictionary.** A WordNet entry appears instantly. Its Explain tab
-  gives the meaning in this text, and the model only runs if you open that tab.
-- **Searches first, AI when you ask.** The card opens on a web search; each source is a
-  tab, shown in the card itself with "Open in browser" a click away. Explain with AI is the
-  last tab and runs only when you open it, so lookups cost no model time.
-- **Runs on your machine.** A small open model through llama.cpp: what the AI and the
-  dictionary read never leaves your computer. Web tabs are like visiting those sites, and
-  Offline only turns them all off.
-- **Your model, your rules.** Pick a model that fits your memory (it recommends one for
-  your PC and says when one is too big), use one you already downloaded (it finds models
-  from LM Studio, Ollama, Jan, GPT4All and Hugging Face), bring any GGUF file or a local
-  Ollama / LM Studio server, and tune every setting, including the instructions.
-
-<p>
-  <img src="docs/screenshots/card-check-light.png" alt="A card warning that 5% was not found in the rewrite" width="440">
-  <img src="docs/screenshots/card-word-dark.png" alt="A single word, ubiquitous: its dictionary tab, after the web search tabs and before Explain with AI, in dark mode" width="440">
-</p>
-
-## The app
-
-A calm settings window: the shortcut, the model, how the card reads. White by default,
-dark when the system is.
-
-<p>
-  <img src="docs/screenshots/main-home-light.png" alt="Home: how to use it, a paragraph to try it on, and the model in use; the sidebar shows it is ready" width="440">
-  <img src="docs/screenshots/main-model-light.png" alt="Model: the catalog with sizes, licenses and whether each fits this computer's memory" width="440">
+  <img src="docs/screenshots/card-word-dark.png" alt="A single word: its dictionary tab, after the web search tabs, in dark mode" width="420">
+  <img src="docs/screenshots/card-check-light.png" alt="A card warning that 5% was not found in the rewrite" width="420">
 </p>
 <p>
-  <img src="docs/screenshots/main-sources-light.png" alt="Sources: Offline only, the web search tabs to show for words and passages in order, adding any site, and the translation language" width="440">
-  <img src="docs/screenshots/main-reading-dark.png" alt="Reading: level, output language, font, size, spacing, theme and accent, in dark mode" width="440">
+  <img src="docs/screenshots/main-home-light.png" alt="Home: how to use it, a paragraph to try it on, and the model in use" width="420">
+  <img src="docs/screenshots/main-model-light.png" alt="Model: the catalog with sizes and whether each fits this computer's memory" width="420">
 </p>
-
-First run is three steps: one screen to say what it does, one to download a model that
-fits, one to try it.
-
 <p>
-  <img src="docs/screenshots/main-welcome-light.png" alt="First run: Make anything readable" width="440">
-  <img src="docs/screenshots/main-firstrun-model-light.png" alt="First run: download the recommended model" width="440">
+  <img src="docs/screenshots/main-sources-light.png" alt="Sources: Offline only, the web tabs in order, adding any site, and the translation language" width="420">
+  <img src="docs/screenshots/main-shortcuts-light.png" alt="Shortcuts: the shortcut, the Look up shortcut, and the apps the card never opens in" width="420">
 </p>
-
-<sub>Screenshots are the real interface rendered against the app's built-in mock; shots of
-the installed app come with the first release.</sub>
+<sub>The real interface rendered against the app's built-in demo data.</sub>
+</details>
 
 ## Measured, not guessed
 
 The default model was chosen by an evaluation harness that runs 28 passages (legal,
 medical, government, finance, news, plus Spanish, Bangla, Hindi and French) through each
-model exactly as the app does. On a 4-core CI runner with no GPU
+model exactly as the app does, on a 4-core CI machine with no GPU
 ([full results](docs/models.md)):
 
 | | Gemma 4 E2B (default) | Qwen3.5 4B | Qwen3.5 2B |
@@ -108,10 +133,8 @@ model exactly as the app does. On a 4-core CI runner with no GPU
 | Answers with a fact flagged as missing | 1 of 56 | 2 of 56 | 8 of 56 |
 | Answers in the wrong language | 0 | 0 | 0 |
 
-The same evaluation runs on a Windows runner with the engine build the installer ships.
-The harness also changed the product: it picked the default model, cut false alarms in
-the meaning check, and sized the engine's prompt cache after a memory-saving idea turned
-out to make answers 4 to 7 seconds slower.
+Translation quality per language isn't measured yet; the harness has a translate task
+for it.
 
 ## How it works
 
@@ -121,28 +144,32 @@ selection ─▶ UI Automation (or clipboard-safe copy) ─▶ repair PDF text �
           ─▶ meaning check + reading grade ─▶ the card
 ```
 
-More in [`docs/marketing/architecture.md`](docs/marketing/architecture.md) and
-[`docs/GUIDE.md`](docs/GUIDE.md).
+Rust · Tauri 2 · React + TypeScript · Tailwind CSS · Radix · llama.cpp · SQLite
 
-## Built with
+194 Rust tests, 30 front-end unit tests and 92 Playwright checks (journeys and WCAG 2.2 AA
+accessibility scans in light and dark) pass before every push. More in
+[`docs/GUIDE.md`](docs/GUIDE.md) and [`docs/marketing/architecture.md`](docs/marketing/architecture.md).
 
-Rust · Tauri 2 · React + TypeScript · Tailwind CSS · Radix · llama.cpp · SQLite (WordNet)
-
-111 Rust tests, 10 front-end unit tests and 38 Playwright checks (journeys and WCAG 2.2 AA
-scans in light and dark) run on every push, on Linux and on a Windows runner that also
-builds, installs and starts the app.
-
-## Development
+<details>
+<summary><b>Develop</b></summary>
 
 ```bash
 npm ci
-scripts/check.sh          # every check CI runs on Linux, including a Windows type-check
-npm run tauri dev         # run the app (on Windows)
-npx vite                  # the interface in a browser, against a mock (popup.html?demo=passage)
+scripts/check.sh          # lint, types, tests, build, Rust checks, Windows type-check
+E2E=1 scripts/check.sh    # plus the Playwright journeys and accessibility scans
+npx vite                  # the interface in a browser against a mock: /popup.html?demo=passage
+npm run tauri dev         # the app itself (Windows)
 ```
 
-See [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) for the plan and
-[`CLAUDE.md`](CLAUDE.md) for conventions.
+The plan is in [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md), progress in
+[`docs/PROGRESS.md`](docs/PROGRESS.md), conventions in [`CLAUDE.md`](CLAUDE.md).
+</details>
+
+## Status
+
+A free preview for Windows. Every feature above is built and tested; the first test on a
+real Windows desktop and the first numbered release are next. The interface is in English,
+with every string ready for Bangla. macOS and Linux come later.
 
 ## License
 
