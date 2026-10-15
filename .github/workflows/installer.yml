@@ -17,8 +17,8 @@ name: Installer (latest build)
 on:
   push:
     branches: [main]
-    # The website has its own workflow (site.yml).
-    paths-ignore: ["site/**", ".github/workflows/site.yml"]
+    # The website (site/) is built and hosted by Vercel.
+    paths-ignore: ["site/**"]
   workflow_dispatch:
 
 permissions:

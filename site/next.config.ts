@@ -1,11 +1,8 @@
 import type { NextConfig } from "next";
 
-// Static export: every page is pre-rendered to HTML at build time (full content for search
-// engines), then served as plain files by GitHub Pages.
+// Hosted on Vercel (site/README.md). The page is static: it is pre-rendered to HTML at
+// build time, so search engines get every word without running any JavaScript.
 const config: NextConfig = {
-  output: "export",
-  images: { unoptimized: true },
-  trailingSlash: true,
   poweredByHeader: false,
 };
 

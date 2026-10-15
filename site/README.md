@@ -1,7 +1,8 @@
 # Plainly website
 
-The one-page site at **https://plainly.omikhan.com**: Next.js (App Router) exported as
-static HTML (`output: "export"`), so every word is in the page for search engines, with
+The one-page site at **https://plainly.omikhan.com**, hosted on Vercel: Next.js (App
+Router), pre-rendered to static HTML at build time, so every word is in the page for
+search engines, with
 metadata, structured data (a free Windows app), `sitemap.xml`, `robots.txt` and a social
 preview image. Tailwind v4, Geist (self-hosted), Phosphor icons. Light and dark follow the
 system; motion is off under "reduce motion". Checked with axe (WCAG 2.2 AA, both themes).
@@ -10,29 +11,25 @@ system; motion is off under "reduce motion". Checked with axe (WCAG 2.2 AA, both
 cd site
 npm ci
 npm run dev        # http://localhost:3000
-npx next build     # static site in site/out
+npx next build     # the production build Vercel runs
 ```
 
-`scripts/check.sh` type-checks and builds it when `site/node_modules` exists. Pushing a
-change under `site/` publishes it (`.github/workflows/site.yml`); the Windows installer
-build skips site-only changes.
+`scripts/check.sh` type-checks and builds it when `site/node_modules` exists. Vercel
+redeploys on every push that changes `site/` (`vercel.json` skips the rest); the Windows
+installer build skips site-only changes.
 
-## Hosting it on plainly.omikhan.com (once)
+## Hosting it on plainly.omikhan.com with Vercel (once)
 
-1. **Turn on Pages.** GitHub, repository, **Settings > Pages**. Under "Build and
-   deployment", set **Source** to **GitHub Actions**.
-2. **Publish.** **Actions > Website > Run workflow** (or push any change under `site/`).
-   Wait for the green tick.
-3. **Point the subdomain at GitHub.** Where omikhan.com's DNS is managed (Cloudflare,
-   Namecheap, Vercel, your registrar), add a record:
-   - Type **CNAME**, Name/Host **plainly**, Value/Target **omikhan4901.github.io**, TTL Auto.
-   - On Cloudflare, set the cloud to grey (**DNS only**), at least until step 5 is done.
-4. **Tell GitHub the domain.** **Settings > Pages > Custom domain**: type
-   `plainly.omikhan.com`, **Save**. Wait for "DNS check successful" (minutes, sometimes up
-   to an hour).
-5. **HTTPS.** When the certificate is ready, tick **Enforce HTTPS**.
-6. **Optional, recommended:** verify the domain so nobody else can claim the subdomain:
-   your GitHub profile **Settings > Pages > Add a domain**, then add the TXT record it shows.
+1. **Import the repository.** vercel.com, **Add New... > Project**, pick
+   `omikhan4901/text_explainer` (if it isn't listed, **Adjust GitHub App Permissions** and
+   give Vercel access to it).
+2. **Point it at the site.** On the import screen, **Root Directory > Edit > `site`**. The
+   framework shows as Next.js; leave the build settings as they are. **Deploy**.
+3. **Add the subdomain.** The new project, **Settings > Domains**, add
+   `plainly.omikhan.com`.
+   - If omikhan.com uses Vercel's nameservers, that's all: it works within a minute.
+   - If its DNS is elsewhere, Vercel shows a record to add there: Type **CNAME**, Name
+     **plainly**, Value **cname.vercel-dns.com** (use exactly what Vercel shows).
+4. HTTPS is automatic once the domain checks out.
 
-Open the site at the custom domain; the `github.io` address isn't set up for it (assets
-load from the root).
+From then on, every push to `main` that changes `site/` redeploys it.

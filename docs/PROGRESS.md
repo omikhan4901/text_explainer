@@ -87,9 +87,9 @@ by security, database and AI engineers before it reaches `main`:
 - [x] Updates (15 October 2026, owner): each build is 0.1.<run number>; with the update
       key in GitHub, builds are signed and installed apps ask, then update themselves.
       Waiting on the owner to create the key (docs/GUIDE.md, "Updates").
-- [x] Website (15 October 2026, owner): one page at plainly.omikhan.com, Next.js static
-      export in `site/`, published by GitHub Pages (`site.yml`). Waiting on the owner to
-      turn on Pages and add the DNS record (`site/README.md`).
+- [x] Website (15 October 2026, owner): one page at plainly.omikhan.com, Next.js in
+      `site/`, hosted on Vercel next to omikhan.com. Waiting on the owner to import the
+      project and add the subdomain (`site/README.md`).
 - [ ] Not verified on Windows yet: the Look up box's focus and placement, app rules on
       real apps, the Windows voice, export through the save dialog
 
