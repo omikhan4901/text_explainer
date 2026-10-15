@@ -31,22 +31,19 @@ When work resumes:
 
 The hourly resume routine is switched off; nothing runs on its own while paused.
 
-## After the MVP: the browser extension
+## After the MVP: sources and translation
 
-Planned on 15 October 2026 (`docs/BROWSER_PLAN.md`): an extension for Chrome, Edge and
-Firefox that does everything Definer does (bubble, sources, custom sources, toolbar
-search, triggers, site rules) plus local Explain, AI Translate and the offline dictionary
-through the desktop app.
+Planned on 15 October 2026 (`docs/SOURCES_PLAN.md`): everything Definer does (tabs of
+sources, custom sources, a Look up box, triggers, app and site rules) plus local Explain,
+AI Translate and the offline dictionary. Desktop software only, never a browser extension.
 
-- [x] B0 Plan
-- [ ] B1 Extension shell
-- [ ] B2 Web sources
-- [ ] B3 Bridge to the app
-- [ ] B4 AI Translate
-- [ ] B5 Triggers and site rules
-- [ ] B6 Release
-
-Owner decision needed before B6: the one-time $5 Chrome Web Store registration.
+- [x] S0 Plan
+- [ ] S1 Tabs and Look up
+- [ ] S2 Web sources
+- [ ] S3 Page sources
+- [ ] S4 AI Translate
+- [ ] S5 Triggers and rules
+- [ ] S6 Polish
 
 ## Numbers (for the marketing kit; measured, not estimated)
 
