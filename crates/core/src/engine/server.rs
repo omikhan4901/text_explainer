@@ -98,52 +98,66 @@ impl LlamaServer {
         let mut config = config;
         config.exe = std::path::absolute(&config.exe).map_err(EngineError::Io)?;
         config.model = std::path::absolute(&config.model).map_err(EngineError::Io)?;
-        let port = free_port()?;
-        let api_key = random_key();
+        // The port is free when picked but released before the server binds it, so another
+        // program (or a parallel test) can take it first: then the server can't bind and
+        // exits, and a fresh port is tried.
+        let mut attempt = 0;
+        loop {
+            attempt += 1;
+            let port = free_port()?;
+            let api_key = random_key();
 
-        let mut cmd = tokio::process::Command::new(&config.exe);
-        cmd.args(config.args(port, &api_key))
-            .stdin(Stdio::null())
-            .kill_on_drop(true);
-        if let Some(dir) = config.exe.parent() {
-            // The DLLs next to llama-server.exe are found from its own folder.
-            cmd.current_dir(dir);
-        }
-        match &config.log {
-            Some(path) => {
-                if let Some(parent) = path.parent() {
-                    let _ = std::fs::create_dir_all(parent);
+            let mut cmd = tokio::process::Command::new(&config.exe);
+            cmd.args(config.args(port, &api_key))
+                .stdin(Stdio::null())
+                .kill_on_drop(true);
+            if let Some(dir) = config.exe.parent() {
+                // The DLLs next to llama-server.exe are found from its own folder.
+                cmd.current_dir(dir);
+            }
+            match &config.log {
+                Some(path) => {
+                    if let Some(parent) = path.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
+                    let file = std::fs::File::create(path).map_err(EngineError::Io)?;
+                    let file2 = file.try_clone().map_err(EngineError::Io)?;
+                    cmd.stdout(Stdio::from(file)).stderr(Stdio::from(file2));
                 }
-                let file = std::fs::File::create(path).map_err(EngineError::Io)?;
-                let file2 = file.try_clone().map_err(EngineError::Io)?;
-                cmd.stdout(Stdio::from(file)).stderr(Stdio::from(file2));
+                None => {
+                    cmd.stdout(Stdio::null()).stderr(Stdio::null());
+                }
             }
-            None => {
-                cmd.stdout(Stdio::null()).stderr(Stdio::null());
+            #[cfg(windows)]
+            {
+                // CREATE_NO_WINDOW: no console window flashes up.
+                cmd.creation_flags(0x0800_0000);
+            }
+            let child = cmd.spawn().map_err(EngineError::Io)?;
+            if let (Some(hook), Some(pid)) = (on_spawn, child.id()) {
+                hook(pid);
+            }
+            let target = Target {
+                base_url: format!("http://127.0.0.1:{port}"),
+                api_key: Some(api_key),
+                model: None,
+                llama_server: true,
+            };
+            let mut server = LlamaServer {
+                child,
+                target,
+                config: config.clone(),
+            };
+            match server.wait_ready(ready_timeout).await {
+                Ok(()) => return Ok(server),
+                Err(EngineError::Exited { ref log_tail, .. })
+                    if attempt < 3 && log_tail.to_lowercase().contains("bind") =>
+                {
+                    tracing::info!("the engine couldn't bind its port; trying another");
+                }
+                Err(e) => return Err(e),
             }
         }
-        #[cfg(windows)]
-        {
-            // CREATE_NO_WINDOW: no console window flashes up.
-            cmd.creation_flags(0x0800_0000);
-        }
-        let child = cmd.spawn().map_err(EngineError::Io)?;
-        if let (Some(hook), Some(pid)) = (on_spawn, child.id()) {
-            hook(pid);
-        }
-        let target = Target {
-            base_url: format!("http://127.0.0.1:{port}"),
-            api_key: Some(api_key),
-            model: None,
-            llama_server: true,
-        };
-        let mut server = LlamaServer {
-            child,
-            target,
-            config,
-        };
-        server.wait_ready(ready_timeout).await?;
-        Ok(server)
     }
 
     async fn wait_ready(&mut self, timeout: Duration) -> Result<(), EngineError> {
