@@ -86,6 +86,13 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         history: Mutex::new(history),
     });
 
+    // The windows are created only now (`"create": false` in tauri.conf.json), once the
+    // state exists: a page that calls a command while starting up must never find the app
+    // half set up (that panicked on a slow WebView2 start: "state() called before manage()").
+    for window in handle.config().app.windows.clone() {
+        tauri::WebviewWindowBuilder::from_config(&handle, &window)?.build()?;
+    }
+
     popup::prepare(&handle);
     if let Err(e) = hotkey::apply(&handle, &settings.hotkey) {
         tracing::warn!("couldn't register {}: {e}", settings.hotkey);

@@ -13,6 +13,7 @@
     "windows": [
       {
         "label": "main",
+        "create": false,
         "title": "Plainly",
         "url": "index.html",
         "width": 920,
@@ -24,6 +25,7 @@
       },
       {
         "label": "popup",
+        "create": false,
         "title": "Plainly",
         "url": "popup.html",
         "width": 460,
@@ -39,6 +41,7 @@
       },
       {
         "label": "lookup",
+        "create": false,
         "title": "Look up",
         "url": "lookup.html",
         "width": 584,
