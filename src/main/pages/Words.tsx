@@ -21,9 +21,25 @@ const DAYS = [7, 30, 90, 180, 365];
 /** The Word book (saved words) and the lookup history. */
 export function WordsPage() {
   const [tab, setTab] = useState(() => (new URLSearchParams(location.search).get("tab") === "history" ? "history" : "saved"));
+  const [onDisk, setOnDisk] = useState(true);
+  useEffect(() => {
+    let live = true;
+    api
+      .wordBookOnDisk()
+      .then((ok) => live && setOnDisk(ok))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
   return (
     <>
       <PageTitle lead={t.lead}>{t.title}</PageTitle>
+      {!onDisk && (
+        <p role="alert" className="mb-5 rounded-lg bg-warn-soft px-3.5 py-2.5 text-[13px] text-warn">
+          {t.notOnDisk}
+        </p>
+      )}
       <Tabs.Root value={tab} onValueChange={setTab}>
         <Tabs.List aria-label={t.tabs} className="mb-7 flex gap-0.5 border-b border-border pb-2">
           {(["saved", "history"] as const).map((id) => (

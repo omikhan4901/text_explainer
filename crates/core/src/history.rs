@@ -262,6 +262,18 @@ impl History {
         Ok(true)
     }
 
+    /// Deletes lookups older than `days` (after "Keep for" is shortened, before the next
+    /// lookup would).
+    pub fn prune(&mut self, days: u32) -> Result<()> {
+        let days = i64::from(days.clamp(1, 365));
+        let now = (self.clock)();
+        self.conn.execute(
+            "DELETE FROM lookups WHERE created_at < ?1",
+            params![now - days * DAY_MS],
+        )?;
+        Ok(())
+    }
+
     /// Newest first.
     pub fn history(&self, limit: u32, offset: u32) -> Result<Page<Lookup>> {
         let mut stmt = self.conn.prepare_cached(
@@ -459,8 +471,8 @@ fn set_aside(path: &Path, aside: &Path) {
         if from.exists()
             && let Err(e) = std::fs::rename(&from, &to)
         {
+            // Never delete it: the book falls back to memory and the file stays as it is.
             tracing::warn!("couldn't move {} aside: {e}", from.display());
-            let _ = std::fs::remove_file(&from);
         }
     }
 }
@@ -641,7 +653,15 @@ pub fn to_anki(words: &[SavedWord]) -> String {
             .flatten()
             .map(anki_html)
             .collect();
-        out.push_str(&anki_html(&w.term));
+        let front = anki_html(&w.term);
+        // Anki reads a line that starts with '#' as a comment and skips the note.
+        match front.strip_prefix('#') {
+            Some(rest) => {
+                out.push_str("&#35;");
+                out.push_str(rest);
+            }
+            None => out.push_str(&front),
+        }
         out.push('\t');
         out.push_str(&back.join("<br><br>"));
         out.push('\n');
@@ -1217,5 +1237,30 @@ mod tests {
         assert_eq!(iso_date(951_782_400_000), "2000-02-29");
         assert_eq!(iso_date(1_760_486_399_999), "2025-10-14");
         assert_eq!(iso_date(-1), "1969-12-31");
+    }
+
+    #[test]
+    fn anki_never_starts_a_line_with_a_hash() {
+        let (_dir, mut h, _) = book();
+        let mut w = word("#hashtag");
+        w.definition = Some("a tag".into());
+        h.save(&w).unwrap();
+        let out = to_anki(&h.words("", 10, 0).unwrap().items);
+        // Only Anki's own header lines (#separator, #html) start with '#'.
+        let notes: Vec<_> = out
+            .lines()
+            .filter(|l| !l.starts_with("#separator") && !l.starts_with("#html"))
+            .collect();
+        assert!(notes.iter().all(|l| !l.starts_with('#')), "{out}");
+        assert!(out.contains("&#35;hashtag\t"), "{out}");
+    }
+
+    #[test]
+    fn shorter_retention_prunes_on_demand() {
+        let (_dir, mut h, clock) = book();
+        h.record("old", Kind::Word, KEEP_30).unwrap();
+        clock.fetch_add(10 * DAY_MS, Ordering::SeqCst);
+        h.prune(1).unwrap();
+        assert_eq!(h.history(10, 0).unwrap().total, 0);
     }
 }

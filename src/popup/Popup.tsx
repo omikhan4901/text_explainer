@@ -476,7 +476,8 @@ function WordActions({ state }: { state: Explaining }) {
   const kind = target?.kind ?? null;
   const [saved, setSaved] = useState<{ id: number; on: boolean } | null>(null);
   const isSaved = saved?.id === state.id && saved.on;
-  const answer = state.done && !state.error ? answerText(state) : "";
+  // The Word book keeps the explanation; a translation isn't saved over it.
+  const answer = state.done && !state.error && state.task === "explain" ? answerText(state) : "";
   /** The last answer stored, so each one is saved once. */
   const stored = useRef("");
 

@@ -288,8 +288,9 @@ async fn run_inner(
             let cleaned = filter.finish();
             let drifted = allowed.violations(&cleaned).is_some();
             // A translation handed back in the source language is retried the same way.
-            let untranslated =
-                translate_to.is_some_and(|to| language::untranslated(part, &cleaned, to));
+            // Only passages: a word or brand ("iPhone") may rightly come back unchanged.
+            let untranslated = passage
+                && translate_to.is_some_and(|to| language::untranslated(part, &cleaned, to));
             if !drifted && !untranslated {
                 final_text = Some(cleaned);
                 break;

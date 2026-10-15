@@ -331,6 +331,8 @@ async function call<T>(command: string, args: Record<string, unknown> = {}): Pro
       return book.save(args.word as NewWord) as T;
     case "remove_word":
       return book.remove(String(args.term)) as T;
+    case "word_book_on_disk":
+      return true as T;
     case "is_saved":
       return book.isSaved(String(args.term)) as T;
     case "list_words":

@@ -59,12 +59,12 @@ pub fn check_translation(
     target: &Language,
     is_common_word: &dyn Fn(&str) -> bool,
 ) -> Report {
-    let same_script =
-        crate::language::dominant_script(source).is_none_or(|s| target.scripts.contains(&s));
+    // Names aren't compared: a translation rightly writes them the target's way
+    // ("Geneva" becomes "Ginebra", "WHO" becomes "OMS"), even in the same script.
     let rules = Rules {
         translation: true,
         word_numbers_required: target.code == "en",
-        terms: same_script,
+        terms: false,
     };
     compare(
         &normalize_numerals(source),
@@ -1126,7 +1126,7 @@ mod tests {
     }
 
     #[test]
-    fn names_are_checked_only_within_one_script() {
+    fn names_are_not_checked_in_translations() {
         let src = "Analysts at Goldman Sachs met the WHO in Geneva in 2025.";
         // Across scripts, names and acronyms are transliterated: no false alarm.
         let bn = translated(
@@ -1136,19 +1136,21 @@ mod tests {
         );
         assert!(bn.is_clean(), "{bn:?}");
         assert!(translated(src, "2025年，高盛的分析师在日内瓦会见了世卫组织。", "zh").is_clean());
-        // In the same script they must survive.
-        let es_ok = translated(
+        // In the same script a translation writes names its own way: still no alarm.
+        let es = translated(
             src,
-            "Analistas de Goldman Sachs se reunieron con la WHO en Geneva en 2025.",
+            "Analistas de Goldman Sachs se reunieron con la OMS en Ginebra en 2025.",
             "es",
         );
-        assert!(es_ok.is_clean(), "{es_ok:?}");
-        let es_bad = translated(src, "Unos analistas se reunieron en 2025.", "es");
-        assert_eq!(
-            texts(&es_bad.missing),
-            vec!["WHO", "Geneva", "Goldman Sachs"]
+        assert!(es.is_clean(), "{es:?}");
+        // Numbers are still checked.
+        let es_bad = translated(
+            src,
+            "Unos analistas se reunieron con la OMS en Ginebra.",
+            "es",
         );
-        // A Bangla source translated into English: different scripts, names not checked.
+        assert_eq!(texts(&es_bad.missing), vec!["2025"]);
+        // A Bangla source translated into English.
         assert!(translated("ঢাকায় ৫ জন এসেছিলেন।", "Five people came to Dhaka.", "en").is_clean());
     }
 

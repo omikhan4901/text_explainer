@@ -211,6 +211,7 @@ pub fn run() {
             words::clear_history,
             words::export_words,
             words::speak,
+            words::word_book_on_disk,
         ])
         .on_window_event(|window, event| match event {
             // Closing the main window keeps the app running in the tray.

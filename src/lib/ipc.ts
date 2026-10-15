@@ -63,4 +63,5 @@ export const api = {
   clearHistory: () => call<number>("clear_history"),
   exportWords: (format: ExportFormat, path: string) => call<number>("export_words", { format, path }),
   speak: (text: string) => call<void>("speak", { text }),
+  wordBookOnDisk: () => call<boolean>("word_book_on_disk"),
 };

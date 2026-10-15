@@ -176,8 +176,8 @@ model like an explanation, so the text never leaves the computer.
   punctuation, and Latin for names), and the script check retries a drifted answer, as
   for explanations.
 - The meaning guard compares numbers after turning native digits (Bangla, Devanagari,
-  Arabic-Indic, full-width) into ASCII ones, and dates likewise. Names are only compared
-  when both languages share a script, since translation rightly changes their script.
+  Arabic-Indic, full-width) into ASCII ones, and dates likewise. Names are not compared:
+  a translation rightly writes them the target's way ("Geneva" becomes "Ginebra").
 - Token budgets are per target script (`prompt::max_tokens_for_translation`): Bangla,
   Hindi, Arabic and CJK take many more tokens per word than English.
 - Quality per model and language is measured with the eval harness's translate task

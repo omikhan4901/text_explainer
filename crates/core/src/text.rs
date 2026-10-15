@@ -198,11 +198,14 @@ pub fn word_count(s: &str) -> usize {
 
 /// Decides how a (cleaned) selection is explained.
 pub fn classify(cleaned: &str) -> SelectionKind {
-    let n = word_count(cleaned);
-    if n == 0 {
+    if word_count(cleaned) == 0 {
         return SelectionKind::Empty;
     }
-    let ends_sentence = cleaned.trim_end().ends_with(['.', '!', '?', '।']);
+    // Chinese and Japanese have no spaces: a paragraph is one "word" by spaces alone.
+    let n = crate::prompt::source_words(cleaned);
+    let ends_sentence = cleaned
+        .trim_end()
+        .ends_with(['.', '!', '?', '।', '。', '！', '？']);
     if n == 1 && !cleaned.contains('\n') {
         return SelectionKind::Word;
     }
@@ -562,5 +565,15 @@ mod tests {
         assert!(!is_list_item("-milk"));
         assert!(!is_list_item("2026. was a year"));
         assert!(!is_list_item("Mr. Smith"));
+    }
+
+    #[test]
+    fn chinese_and_japanese_paragraphs_are_passages() {
+        assert_eq!(
+            classify("人工智能正在改变我们的工作方式，也改变了我们学习的方式。"),
+            SelectionKind::Passage
+        );
+        assert_eq!(classify("银行"), SelectionKind::Word);
+        assert_eq!(classify("東京は日本の首都です。"), SelectionKind::Passage);
     }
 }

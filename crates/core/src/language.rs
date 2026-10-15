@@ -495,7 +495,7 @@ impl AllowedScripts {
 ///
 /// - Target with its own script (Bangla, Hindi, Arabic, Chinese...): fewer than half of
 ///   the answer's letters are in that script (a few names in Latin are fine).
-/// - Otherwise: the answer is confidently detected as the source's language, and that
+/// - And for every target: the answer is confidently detected as the source's language, and that
 ///   isn't the target (English handed back for Spanish). Unknown stays allowed.
 pub fn untranslated(source: &str, output: &str, target: &Language) -> bool {
     if target.scripts.iter().any(|&s| s != Script::Latin) {
@@ -507,7 +507,11 @@ pub fn untranslated(source: &str, output: &str, target: &Language) -> bool {
             .map(|&(_, n)| n)
             .sum();
         // A very short answer (an acronym, a brand) can't be judged by its letters.
-        return total >= 4 && in_target * 2 < total;
+        if total >= 4 && in_target * 2 < total {
+            return true;
+        }
+        // Russian handed back for Ukrainian (or Arabic for Urdu) is all in the right
+        // script: only telling the language apart catches it.
     }
     match (detect_known(source), detect_known(output)) {
         (Some(from), Some(got)) => got == from && got.code != target.code,

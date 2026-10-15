@@ -85,6 +85,13 @@ pub async fn remove_word(app: AppHandle, term: String) -> CmdResult<bool> {
     with_book(app, move |b| b.remove(&term)).await
 }
 
+/// False when the word book couldn't use its file and keeps words in memory only (they
+/// are lost when the app quits); the Words page says so.
+#[tauri::command]
+pub async fn word_book_on_disk(app: AppHandle) -> CmdResult<bool> {
+    with_book(app, |b| Ok(b.is_persistent())).await
+}
+
 #[tauri::command]
 pub async fn is_saved(app: AppHandle, term: String) -> CmdResult<bool> {
     with_book(app, move |b| b.is_saved(&term)).await
@@ -105,7 +112,12 @@ pub async fn list_words(
 
 #[tauri::command]
 pub async fn list_history(app: AppHandle, limit: u32, offset: u32) -> CmdResult<Page<Lookup>> {
-    with_book(app, move |b| b.history(limit, offset)).await
+    let days = app.state::<AppState>().settings().history_days;
+    with_book(app, move |b| {
+        b.prune(days)?;
+        b.history(limit, offset)
+    })
+    .await
 }
 
 #[tauri::command]

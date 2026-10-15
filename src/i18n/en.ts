@@ -329,6 +329,7 @@ export const en = {
     historyEmpty: "Nothing here yet. What you open the card on shows up here.",
     historyOff: "History is off, so nothing new is kept.",
     justNow: "just now",
+    notOnDisk: "The word book file couldn't be opened, so words saved now are kept only until the app closes.",
     locale: "en",
   },
   translate: {
