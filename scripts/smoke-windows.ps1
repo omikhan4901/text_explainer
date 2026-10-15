@@ -80,6 +80,14 @@ function Test-AppStart($arguments, $label) {
     Measure-AppMemory $proc.Id $label
   } finally {
     if (Test-Path $log) { Write-Host "--- app.log ---"; Get-Content $log | Write-Host }
+    $panicLog = Join-Path (Split-Path $log) "panic.log"
+    if (Test-Path $panicLog) { Write-Host "--- panic.log ---"; Get-Content $panicLog | Write-Host }
+    if ($proc.HasExited -and $proc.ExitCode -ne 0) {
+      # Windows records what crashed (faulting module and exception) for any crash.
+      Write-Host "--- Windows crash record ---"
+      Get-WinEvent -FilterHashtable @{ LogName = "Application"; Id = 1000 } -MaxEvents 2 -ErrorAction SilentlyContinue |
+        ForEach-Object { Write-Host $_.TimeCreated; Write-Host $_.Message }
+    }
     if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
     Get-Process msedgewebview2 -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 2

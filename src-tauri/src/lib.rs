@@ -155,7 +155,26 @@ fn spawn_idle_unloader(app: AppHandle) {
     });
 }
 
+/// Writes a panic's message and backtrace straight to `logs/panic.log` before the process
+/// aborts (release builds abort on panic, and that can happen before logging starts).
+fn install_panic_log() {
+    let Some(base) = std::env::var_os("LOCALAPPDATA").or_else(|| std::env::var_os("HOME")) else {
+        return;
+    };
+    let dir = std::path::PathBuf::from(base)
+        .join("dev.omikhan.textexplainer")
+        .join("logs");
+    let default = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let _ = std::fs::create_dir_all(&dir);
+        let backtrace = std::backtrace::Backtrace::force_capture();
+        let _ = std::fs::write(dir.join("panic.log"), format!("{info}\n\n{backtrace}\n"));
+        default(info);
+    }));
+}
+
 pub fn run() {
+    install_panic_log();
     te_core::tls_init();
     tauri::Builder::default()
         // A second launch just opens the running app's window.
