@@ -6,8 +6,8 @@ A guide to the code for anyone changing it. Keep it true when you change how thi
 
 | Folder | What it is | Runs on |
 |---|---|---|
-| `crates/core` (`te-core`) | All logic: text repair, language and meaning guards, prompts, the model engine, dictionary, downloads, settings | Anywhere (tested on Linux and Windows) |
-| `crates/win` (`te-win`) | Windows integration: reading the selection, the clipboard, the popup window, mouse hook, job object | Windows (stubs elsewhere) |
+| `crates/core` (`te-core`) | All logic: text repair, language and meaning guards, prompts, the model engine, dictionary, downloads, settings, the Word book and history | Anywhere (tested on Linux and Windows) |
+| `crates/win` (`te-win`) | Windows integration: reading the selection, the clipboard, the popup window, mouse hook, job object, Listen (SAPI voice) | Windows (stubs elsewhere) |
 | `crates/eval` (`te-eval`) | The model evaluation (see `docs/models.md`) | Linux CI |
 | `src-tauri` | The app: tray, hotkey, popup placement, commands | Windows |
 | `src` | The interface: `popup/` (reading card) and `main/` (settings, first run) | WebView2 |
@@ -66,6 +66,55 @@ be Atkinson Hyperlegible or Source Serif. Icons are Phosphor. Shared pieces are 
 `Segmented`, `Kbd`, `Button`). Every pair of colours meets WCAG 2.2 AA in light and dark,
 checked by `e2e/a11y.spec.ts`.
 
+## The Word book, history and Listen
+
+- **Saving** (`src/popup/Popup.tsx`, `WordActions`). The card's header has Save (a
+  bookmark, `aria-pressed`) for any selection whose header isn't cut short (the header
+  holds 120 characters, the book takes terms up to 200), and Listen for words and short
+  terms. On open the card asks `is_saved`. Saving stores the term (a word without its
+  punctuation, `bareTerm`), its kind, the first dictionary sense and the AI answer if it
+  has finished; the app adds the paragraph around the selection as context when UI
+  Automation reported one. If the AI answer finishes after saving, the card saves again
+  and the answer becomes the explanation. Pressing Save again removes the word.
+- **History** (`trigger.rs` calls `words::record` as the card opens on a selection). Only
+  when `keep_history` is on (default); the query is kept as one line of at most 300
+  characters. Each insert prunes lookups older than `history_days` (1 to 365, default 30)
+  and keeps the newest 2,000.
+- **Storage** (`crates/core/src/history.rs`): `history.sqlite`, WAL journal,
+  `foreign_keys` on, a 5 second busy timeout. The schema version is `PRAGMA user_version`
+  and `migrate` brings it up step by step, each step in one transaction (running it again
+  changes nothing). Tables are `STRICT` with `CHECK`s for the kinds and lengths:
+  `lookups (id, query, kind, created_at)` indexed on `created_at`, and
+  `saved (id, term, term_key UNIQUE, kind, definition, explanation, context, created_at,
+  updated_at)`. `term_key` is the term trimmed, lowercased and with whitespace collapsed,
+  so "Ubiquitous" and " ubiquitous" are one entry (no Unicode normalisation: composed and
+  decomposed accents are different keys). Saving is an upsert on `term_key` that keeps
+  `created_at` and replaces only the texts it is given. Search is a bound `LIKE` with
+  `%`, `_` and `\` escaped. Limits are applied once, at the boundary: terms up to 200
+  characters (longer is refused), definition, explanation and context cut to 8,000.
+  A file that isn't a database or fails `quick_check` is renamed to
+  `history.broken.sqlite` and a new one starts; a newer schema or an unwritable folder
+  leaves the file alone and the book lives in memory for that run. Times are unix
+  milliseconds.
+- **Commands** (`src-tauri/src/words.rs`): `save_word`, `remove_word`, `is_saved`,
+  `list_words` (search, pages of at most 200), `list_history`, `clear_history`,
+  `export_words`, `speak`. Each runs on a blocking thread with the book's mutex held only
+  inside it.
+- **Words page** (`src/main/pages/Words.tsx`): Saved (search, Listen, Remove, export) and
+  History (Keep history, how long, the list, Clear history after a confirm; turning
+  history off offers to clear what is kept). Lists reload when the window is focused.
+- **Export** (`ExportFormat` in `history.rs`). The save dialog picks the file
+  (`dialog:allow-save`); the app writes it next to the target and renames it into place.
+  CSV is RFC 4180 (every field quoted, CRLF), starts with a UTF-8 byte order mark so
+  Excel reads Bangla, and prefixes cells starting with `=`, `+`, `-`, `@`, tab or CR with
+  `'` so a spreadsheet never runs them. The Anki file is tab-separated with
+  `#separator:tab` and `#html:true` headers: front is the term, back is the definition and
+  explanation, HTML-escaped with line breaks as `<br>`.
+- **Listen** (`crates/win/src/imp/speech.rs`): one worker thread owns a SAPI `SpVoice`
+  (COM initialised on that thread) and speaks each text with `SPF_ASYNC |
+  SPF_PURGEBEFORESPEAK | SPF_IS_NOT_XML`, so a new word interrupts the last and text is
+  never read as SAPI markup. Windows' own voices, offline; at most 200 characters.
+
 ## The model engine
 
 `crates/core/src/engine/server.rs` starts the bundled `llama-server.exe` on 127.0.0.1
@@ -92,6 +141,8 @@ memory fit as the catalog (size plus half). The Model page and first run list th
 - Models: `%LOCALAPPDATA%\dev.omikhan.textexplainer\models` (downloads resume from
   `.part` files and are checked against SHA-256 before use).
 - Logs: `%LOCALAPPDATA%\dev.omikhan.textexplainer\logs` (`app.log`, `llama-server.log`).
+- Word book and history: `%LOCALAPPDATA%\dev.omikhan.textexplainer\history.sqlite`
+  (an unusable file is kept as `history.broken.sqlite`).
 
 ## Updating pinned things
 
@@ -107,5 +158,7 @@ memory fit as the catalog (size plus half). The Model page and first run list th
 `popup.html?demo=passage|word|word_offline|check|no_model|loading|error`, plus
 `&tab=explain` (or `dictionary`, `web:bing`) to open a tab and `&offline=1` for Offline
 only; a web tab shows its loading placeholder there (the page itself needs the app). And
-`index.html?state=ready&page=model`. `scripts/wincheck.sh clippy -p text-explainer`
+`index.html?state=ready&page=model` (or `page=words`, `&tab=history`); the mock
+keeps a small Word book in memory (`WordBook` in `src/lib/words.ts`, the same rules as
+`history.rs`). `scripts/wincheck.sh clippy -p text-explainer`
 type-checks the Windows app from Linux.
