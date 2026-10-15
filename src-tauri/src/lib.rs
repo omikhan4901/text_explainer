@@ -3,6 +3,7 @@
 
 mod commands;
 mod hotkey;
+mod lookup;
 mod popup;
 mod state;
 mod tray;
@@ -76,11 +77,16 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         download: Mutex::new(None),
         dictionary: Mutex::new(dictionary),
         web_url: Mutex::new(None),
+        lookup_hotkey: Mutex::new(None),
+        last_app: Mutex::new(None),
     });
 
     popup::prepare(&handle);
     if let Err(e) = hotkey::apply(&handle, &settings.hotkey) {
         tracing::warn!("couldn't register {}: {e}", settings.hotkey);
+    }
+    if let Err(e) = hotkey::apply_lookup(&handle, &settings.lookup_hotkey) {
+        tracing::warn!("couldn't register {}: {e}", settings.lookup_hotkey);
     }
 
     let copy_app = handle.clone();
@@ -188,15 +194,22 @@ pub fn run() {
             commands::validate_hotkey,
             commands::set_paused,
             commands::tiers,
+            commands::look_up,
+            commands::lookup_hide,
+            commands::last_app,
+            commands::validate_app,
         ])
-        .on_window_event(|window, event| {
+        .on_window_event(|window, event| match event {
             // Closing the main window keeps the app running in the tray.
-            if let WindowEvent::CloseRequested { api, .. } = event
-                && window.label() == "main"
-            {
+            WindowEvent::CloseRequested { api, .. } if window.label() == "main" => {
                 api.prevent_close();
                 let _ = window.hide();
             }
+            // Clicking elsewhere hides the Look up box.
+            WindowEvent::Focused(false) if window.label() == lookup::LABEL => {
+                lookup::hide(window.app_handle());
+            }
+            _ => {}
         })
         .run(tauri::generate_context!())
         .expect("error while running Text Explainer");

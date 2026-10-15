@@ -1,23 +1,47 @@
 //! From "the person asked" to an answer streaming into the card: the hotkey reads the
 //! selection (UI Automation, then the clipboard fallback); a double Ctrl+C hands us the
-//! copied text directly.
+//! copied text directly. Neither does anything in an app on the "Don't open in these
+//! apps" list (`te_core::rules`).
 
 use std::sync::atomic::Ordering;
 
 use tauri::{AppHandle, Manager};
 use te_core::engine::{Backend, Sampling};
 use te_core::explain::{self, Event, Request};
+use te_core::rules;
 use te_core::sources;
 use te_core::text::{self, SelectionKind};
 use te_win::Rect;
 
+use crate::lookup;
 use crate::popup::{self, AiMode, PopupEvent};
 use crate::state::{AppState, LastRequest};
+
+/// Notes the app in front (for "Add <app>" in Settings) and says whether the card may
+/// read from it: false for apps on the "Don't open in these apps" list.
+fn allowed_in_foreground(app: &AppHandle) -> bool {
+    let Some(name) = te_win::foreground_process_name().and_then(|n| rules::normalize(&n).ok())
+    else {
+        return true;
+    };
+    let state = app.state::<AppState>();
+    let own = std::env::current_exe()
+        .ok()
+        .and_then(|p| rules::normalize(&p.to_string_lossy()).ok());
+    if own.as_ref() != Some(&name) {
+        *state.last_app.lock().expect("last app lock") = Some(name.clone());
+    }
+    if rules::is_excluded(&state.settings().excluded_apps, &name) {
+        tracing::debug!("not opening in {name} (on the excluded list)");
+        return false;
+    }
+    true
+}
 
 /// The hotkey was pressed.
 pub fn on_hotkey(app: &AppHandle) {
     let state = app.state::<AppState>();
-    if state.paused.load(Ordering::SeqCst) {
+    if state.paused.load(Ordering::SeqCst) || !allowed_in_foreground(app) {
         return;
     }
     let allow_clipboard = state.settings().clipboard_fallback;
@@ -28,10 +52,13 @@ pub fn on_hotkey(app: &AppHandle) {
         let main = app.clone();
         let _ = main.run_on_main_thread(move || match result {
             Ok(Some(sel)) => start(&app, sel.text, sel.context, sel.bounds),
+            // Nothing selected: type what to look up instead.
             Ok(None) => {
-                popup::open(&app, None);
-                let hotkey = app.state::<AppState>().settings().hotkey;
-                popup::emit(&app, PopupEvent::NoSelection { hotkey });
+                if !lookup::show(&app) {
+                    popup::open(&app, None);
+                    let hotkey = app.state::<AppState>().settings().hotkey;
+                    popup::emit(&app, PopupEvent::NoSelection { hotkey });
+                }
             }
             Err(e) => {
                 popup::open(&app, None);
@@ -49,7 +76,10 @@ pub fn on_hotkey(app: &AppHandle) {
 /// Ctrl+C was pressed twice on the same text.
 pub fn on_double_copy(app: &AppHandle, text: String) {
     let state = app.state::<AppState>();
-    if state.paused.load(Ordering::SeqCst) || !state.settings().double_copy {
+    if state.paused.load(Ordering::SeqCst)
+        || !state.settings().double_copy
+        || !allowed_in_foreground(app)
+    {
         return;
     }
     start(app, text, None, None);

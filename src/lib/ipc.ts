@@ -50,4 +50,8 @@ export const api = {
   openUrl: (url: string) => call<void>("open_url", { url }),
   validateHotkey: (hotkey: string) => call<void>("validate_hotkey", { hotkey }),
   setPaused: (paused: boolean) => call<void>("set_paused", { paused }),
+  lookUp: (text: string) => call<void>("look_up", { text }),
+  lookupHide: () => call<void>("lookup_hide"),
+  lastApp: () => call<string | null>("last_app"),
+  validateApp: (name: string) => call<string>("validate_app", { name }),
 };

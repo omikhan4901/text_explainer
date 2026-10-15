@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "lookup",
+  "description": "The Look up box only listens for the app's events; it calls the app's own commands (look_up, lookup_hide, get_settings).",
+  "windows": [
+    "lookup"
+  ],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten"
+  ]
+}

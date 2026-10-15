@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 test("first run: download the recommended model, then try it", async ({ page }) => {
   await page.goto("/index.html");
@@ -54,7 +54,7 @@ test("settings: changing the theme applies it at once", async ({ page }) => {
 
 test("settings: a new shortcut is recorded from the keyboard", async ({ page }) => {
   await page.goto("/index.html?state=ready&page=shortcuts");
-  await page.getByRole("button", { name: "Change" }).click();
+  await page.getByRole("button", { name: "Change", exact: true }).click();
   await expect(page.getByText("Press the new shortcut…")).toBeVisible();
   await page.keyboard.press("Control+Alt+KeyR");
   await expect(page.getByRole("main").getByText("R", { exact: true })).toBeVisible();
@@ -112,4 +112,66 @@ test("models already on the computer are found and can be used", async ({ page }
   await expect(page.getByRole("button", { name: "Use llama3.2:3b" })).toHaveCount(0);
   await page.getByRole("button", { name: "Look again" }).click();
   await expect(page.getByText("Qwen3-4B-Instruct-2507-Q4_K_M")).toBeVisible();
+});
+
+type MockCall = { command: string; args: Record<string, unknown> };
+const mockCalls = (page: Page) => page.evaluate(() => (window as unknown as { __teMockCalls: MockCall[] }).__teMockCalls);
+
+test("look up box: Enter looks the text up, Esc hides it", async ({ page }) => {
+  await page.goto("/lookup.html");
+  const box = page.getByRole("textbox", { name: "Look up a word or phrase" });
+  await expect(box).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("alert")).toHaveText("Type a word or phrase first.");
+  await box.fill("ubiquitous");
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await box.press("Enter");
+  await expect(box).toHaveValue("");
+  expect((await mockCalls(page)).filter((c) => c.command === "look_up")).toEqual([{ command: "look_up", args: { text: "ubiquitous" } }]);
+  await box.fill("half typed");
+  await page.keyboard.press("Escape");
+  await expect(box).toHaveValue("");
+  expect((await mockCalls(page)).map((c) => c.command)).toContain("lookup_hide");
+  expect((await mockCalls(page)).filter((c) => c.command === "look_up")).toHaveLength(1);
+});
+
+test("settings: the Look up box gets its own shortcut, never the main one", async ({ page }) => {
+  await page.goto("/index.html?state=ready&page=shortcuts");
+  await page.getByRole("button", { name: "Set Look up shortcut" }).click();
+  await page.keyboard.press("Control+Shift+Space");
+  await expect(page.getByText("That's already used by the other shortcut.")).toBeVisible();
+  await page.getByRole("button", { name: "Set Look up shortcut" }).click();
+  await expect(page.getByText("Press the new shortcut…")).toBeVisible();
+  await page.keyboard.press("Control+Alt+KeyL");
+  await expect(page.getByRole("button", { name: "Change Look up shortcut" })).toBeVisible();
+  await expect(page.getByRole("main").getByText("L", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Turn off" }).click();
+  await expect(page.getByRole("button", { name: "Set Look up shortcut" })).toBeVisible();
+});
+
+test("settings: apps the card doesn't open in", async ({ page }) => {
+  await page.goto("/index.html?state=ready&page=shortcuts");
+  const list = page.getByRole("list", { name: "Apps the card doesn't open in" });
+  await expect(list.getByText("keepass.exe", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Remove keepass.exe" }).click();
+  await expect(list.getByText("keepass.exe", { exact: true })).toHaveCount(0);
+  await expect(list.getByText("keepassxc.exe", { exact: true })).toBeVisible();
+
+  const field = page.getByLabel("Program name");
+  const add = page.getByRole("button", { name: "Add", exact: true });
+  await field.fill("Notes");
+  await add.click();
+  await expect(page.getByRole("alert")).toContainText(".exe");
+  await field.fill("C:\\Apps\\Notes.EXE");
+  await add.click();
+  await expect(list.getByText("notes.exe", { exact: true })).toBeVisible();
+  await expect(field).toHaveValue("");
+  await field.fill("NOTES.exe");
+  await add.click();
+  await expect(page.getByRole("alert")).toHaveText("notes.exe is already on the list.");
+
+  // The app that was in front at the last shortcut is one click away.
+  await page.getByRole("button", { name: "Add notepad.exe" }).click();
+  await expect(list.getByText("notepad.exe", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add notepad.exe" })).toHaveCount(0);
 });
