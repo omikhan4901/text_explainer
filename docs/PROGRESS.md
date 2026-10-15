@@ -115,6 +115,10 @@ by security, database and AI engineers before it reaches `main`:
 - [x] Owner's decision after that: a click anywhere in the card makes it the active
       window, so moving and resizing are Windows' own (header, corner and edges) and
       the card handles Esc itself once clicked. Opening a card still never takes focus.
+- [x] Fourth test: dragging and resizing work. The level switch stayed on the old level
+      (the card kept its own copy of the settings and wasn't told to reload it after a
+      change; the answer itself was redone at the new level). The shortcut warning stays:
+      something else holds Ctrl+Shift+Space on the owner's PC (being checked).
 - [ ] Not verified on Windows yet: the Look up box's focus and placement, app rules on
       real apps, the Windows voice, export through the save dialog
 

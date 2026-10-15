@@ -289,6 +289,7 @@ async function call<T>(command: string, args: Record<string, unknown> = {}): Pro
     }
     case "set_level":
       settings = { ...settings, level: args.level as Settings["level"] };
+      emit("te://popup", { type: "settings" });
       if (pendingAi) void pendingAi(demoId);
       return undefined as T;
     case "set_ai_task":

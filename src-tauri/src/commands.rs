@@ -324,7 +324,8 @@ pub fn popup_close(app: AppHandle) {
 }
 
 /// Changes the reading level from the card and explains the same text again (the card
-/// stays on its AI tab).
+/// stays on its AI tab). The card and the main window reload settings, so the switch and
+/// the answer's heading show the new level.
 #[tauri::command]
 pub async fn set_level(app: AppHandle, level: Level) -> CmdResult<()> {
     let state = app.state::<AppState>();
@@ -335,6 +336,8 @@ pub async fn set_level(app: AppHandle, level: Level) -> CmdResult<()> {
             .save(&state.paths.settings)
             .map_err(|e| format!("Couldn't save settings: {e}"))?;
         *state.settings.lock().expect("settings lock") = settings;
+        popup::emit(&app, PopupEvent::Settings);
+        let _ = app.emit_to("main", "te://settings", ());
     }
     trigger::explain_again(&app);
     Ok(())

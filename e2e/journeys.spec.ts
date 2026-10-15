@@ -147,8 +147,13 @@ test("the AI tab shows what you selected and translates it, with the language a 
 test("the reading level switch redoes the text", async ({ page }) => {
   await page.goto("/popup.html?demo=passage&tab=explain");
   await expect(page.getByText(/Whatever else this agreement says/)).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole("radio", { name: "Plain", exact: true })).toBeChecked();
   await page.getByRole("radio", { name: "Simpler" }).click();
   await expect(page.getByText(/The tenant \(the Lessee\) must pay \$1,200 rent every month/)).toBeVisible({ timeout: 8000 });
+  // The switch and the answer's heading follow the new level.
+  await expect(page.getByRole("radio", { name: "Simpler" })).toBeChecked();
+  await expect(page.getByRole("radio", { name: "Plain", exact: true })).not.toBeChecked();
+  await expect(page.getByText("Simpler English", { exact: true })).toBeVisible();
 });
 
 test("the meaning check is shown when a fact is missing", async ({ page }) => {
