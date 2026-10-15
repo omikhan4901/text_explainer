@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="src-tauri/icons/128x128@2x.png" alt="" width="88">
+<img src="docs/logo.png" alt="" width="88">
 
 # Text Explainer
 
