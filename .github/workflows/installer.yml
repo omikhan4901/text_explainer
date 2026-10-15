@@ -7,6 +7,12 @@ name: Installer (latest build)
 # Stable download link (the file name never changes):
 # https://github.com/omikhan4901/text_explainer/releases/download/latest-build/TextExplainer-x64-setup.exe
 # Numbered releases still come from "Release (draft)".
+#
+# Updates: each build is version 0.1.<run number>. When the repository has the update key
+# (secrets TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD, variable
+# TAURI_UPDATER_PUBKEY; docs/GUIDE.md, "Updates"), the installer is signed and latest.json
+# is published next to it; installed apps read it, ask, and update themselves. Without the
+# key the build is the same, minus updates.
 
 on:
   push:
@@ -37,7 +43,33 @@ jobs:
       - run: python scripts/fetch-llama.py
       - run: python scripts/build-dictionary.py
       - run: cargo test --workspace
-      - run: npx tauri build --ci
+      - name: Version this build, and turn on updates when the key is set
+        shell: pwsh
+        env:
+          PUBKEY: ${{ vars.TAURI_UPDATER_PUBKEY }}
+          HAS_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+        run: |
+          $conf = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $base = $conf.version.Split(".")
+          $version = "$($base[0]).$($base[1]).$env:GITHUB_RUN_NUMBER"
+          $extra = @{ version = $version }
+          if ($env:HAS_KEY -eq "true" -and $env:PUBKEY) {
+            $extra.bundle = @{ createUpdaterArtifacts = $true }
+            $extra.plugins = @{ updater = @{
+              pubkey = $env:PUBKEY
+              endpoints = @("https://github.com/${{ github.repository }}/releases/download/latest-build/latest.json")
+              windows = @{ installMode = "passive" }
+            } }
+            Write-Host "Version $version, signed for updates"
+          } else {
+            Write-Host "Version $version, no update key: updates off"
+          }
+          $extra | ConvertTo-Json -Depth 6 | Set-Content "$env:RUNNER_TEMP/build.conf.json"
+          "VERSION=$version" >> $env:GITHUB_ENV
+      - run: npx tauri build --ci --config "${{ runner.temp }}/build.conf.json"
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       - name: Smoke test (install, run the engine, start the app)
         run: ./scripts/smoke-windows.ps1
         timeout-minutes: 5
@@ -49,11 +81,29 @@ jobs:
           $built = Get-ChildItem target/release/bundle/nsis/*.exe | Select-Object -First 1
           $exe = Join-Path $env:RUNNER_TEMP "TextExplainer-x64-setup.exe"
           Copy-Item $built.FullName $exe
+          $assets = @($exe)
+          # The update manifest installed apps read: the signature covers the file's bytes,
+          # so the renamed copy verifies.
+          $sig = "$($built.FullName).sig"
+          if (Test-Path $sig) {
+            $manifest = @{
+              version = $env:VERSION
+              notes = "Built from commit $($env:GITHUB_SHA.Substring(0, 7))."
+              pub_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+              platforms = @{ "windows-x86_64" = @{
+                signature = (Get-Content $sig -Raw).Trim()
+                url = "https://github.com/${{ github.repository }}/releases/download/latest-build/TextExplainer-x64-setup.exe"
+              } }
+            }
+            $json = Join-Path $env:RUNNER_TEMP "latest.json"
+            $manifest | ConvertTo-Json -Depth 5 | Set-Content $json -Encoding utf8NoBOM
+            $assets += $json
+          }
           $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
           $short = $env:GITHUB_SHA.Substring(0, 7)
           $date = (Get-Date).ToUniversalTime().ToString("d MMMM yyyy, HH:mm 'UTC'")
           $notes = @"
-          The newest build of Text Explainer for Windows 10 and 11 (64-bit), made from
+          Text Explainer $env:VERSION for Windows 10 and 11 (64-bit), the newest build, made from
           commit $short on $date. It is replaced on every change, so it may have rough edges;
           numbered releases are the stable ones.
 
@@ -67,4 +117,4 @@ jobs:
           # (The first time there is none, and that's fine.)
           try { gh release delete latest-build --cleanup-tag --yes } catch { }
           $global:LASTEXITCODE = 0
-          gh release create latest-build $exe --latest --title "Text Explainer (preview build)" --notes $notes --target $env:GITHUB_SHA
+          gh release create latest-build @assets --latest --title "Text Explainer (preview build)" --notes $notes --target $env:GITHUB_SHA

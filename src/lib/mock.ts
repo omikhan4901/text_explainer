@@ -41,6 +41,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lookup_hotkey: "",
   excluded_apps: ["keepass.exe", "keepassxc.exe", "1password.exe", "bitwarden.exe"],
   keep_history: true,
+  check_updates: true,
   history_days: 30,
 };
 
@@ -197,6 +198,7 @@ function info(): AppInfo {
     ],
     translate_languages: TRANSLATE_LANGUAGES,
     engine_found: true,
+    updates: true,
     model_loaded: false,
     downloading,
     paused: false,
@@ -335,6 +337,9 @@ async function call<T>(command: string, args: Record<string, unknown> = {}): Pro
       return book.save(args.word as NewWord) as T;
     case "remove_word":
       return book.remove(String(args.term)) as T;
+    case "check_updates":
+      await new Promise((r) => setTimeout(r, 300));
+      return { state: "up_to_date" } as T;
     case "word_book_on_disk":
       return true as T;
     case "is_saved":

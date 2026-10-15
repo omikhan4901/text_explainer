@@ -103,6 +103,8 @@ pub struct AppInfo {
     /// The "Translate into" choices; `ai` is false for those only the web tab can do.
     translate_languages: Vec<TranslateLanguage>,
     engine_found: bool,
+    /// This build can update itself (it carries the update key).
+    updates: bool,
     model_loaded: bool,
     downloading: Option<String>,
     paused: bool,
@@ -120,7 +122,7 @@ pub struct DefaultPrompts {
 }
 
 #[tauri::command]
-pub async fn app_info(state: State<'_, AppState>) -> CmdResult<AppInfo> {
+pub async fn app_info(app: AppHandle, state: State<'_, AppState>) -> CmdResult<AppInfo> {
     let memory = te_win::memory();
     let total = memory.map(|m| m.total_bytes);
     let models = CATALOG
@@ -165,6 +167,7 @@ pub async fn app_info(state: State<'_, AppState>) -> CmdResult<AppInfo> {
             })
             .collect(),
         engine_found: state.paths.llama_server.is_file(),
+        updates: crate::updater::available(&app),
         model_loaded,
         downloading: state
             .download
@@ -487,4 +490,10 @@ pub fn last_app(state: State<'_, AppState>) -> Option<String> {
 #[tauri::command]
 pub fn validate_app(name: String) -> CmdResult<String> {
     te_core::rules::normalize(&name).map_err(|e| e.to_string())
+}
+
+/// "Check now" on the About page: asks and installs when there is a new version.
+#[tauri::command]
+pub async fn check_updates(app: AppHandle) -> CmdResult<crate::updater::Status> {
+    crate::updater::check(&app).await
 }

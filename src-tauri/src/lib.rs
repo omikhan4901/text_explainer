@@ -8,6 +8,7 @@ mod popup;
 mod state;
 mod tray;
 mod trigger;
+mod updater;
 mod words;
 
 use std::sync::atomic::{AtomicBool, AtomicU64};
@@ -126,6 +127,7 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         hotkey_registered = state.hotkey.lock().is_ok_and(|h| h.is_some()),
         "Text Explainer started"
     );
+    updater::init(&handle);
     Ok(())
 }
 
@@ -213,6 +215,7 @@ pub fn run() {
             words::export_words,
             words::speak,
             words::word_book_on_disk,
+            commands::check_updates,
         ])
         .on_window_event(|window, event| match event {
             // Closing the main window keeps the app running in the tray.

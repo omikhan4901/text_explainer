@@ -54,6 +54,8 @@ pub struct Settings {
     pub keep_history: bool,
     /// Lookups older than this many days are deleted (1 to 365).
     pub history_days: u32,
+    /// Look for a new version on GitHub every few hours and offer to install it.
+    pub check_updates: bool,
 }
 
 impl Default for Settings {
@@ -83,6 +85,7 @@ impl Default for Settings {
             excluded_apps: rules::defaults(),
             keep_history: true,
             history_days: 30,
+            check_updates: true,
         }
     }
 }

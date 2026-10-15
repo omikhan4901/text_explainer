@@ -71,6 +71,7 @@ export interface Settings {
   excluded_apps: string[];
   keep_history: boolean;
   history_days: number;
+  check_updates: boolean;
 }
 
 export type Tier = "fastest" | "fast" | "balanced" | "best";
@@ -121,6 +122,8 @@ export interface AppInfo {
   /** The "Translate into" choices; `ai` is false for those only the web Translate tab can do. */
   translate_languages: TranslateLanguage[];
   engine_found: boolean;
+  /** This build can update itself (it carries the update key). */
+  updates: boolean;
   model_loaded: boolean;
   downloading: string | null;
   paused: boolean;
@@ -271,3 +274,6 @@ export interface TranslateLanguage {
   /** The language guard's code for it ("zh" for "zh-CN"), or null when only the web can. */
   lang: string | null;
 }
+
+/** What a manual update check found (when there is a new version, the app asks itself). */
+export type UpdateStatus = { state: "unavailable" } | { state: "up_to_date" } | { state: "busy" } | { state: "declined"; version: string };

@@ -288,3 +288,10 @@ test("settings: apps the card doesn't open in", async ({ page }) => {
   await expect(list.getByText("notepad.exe", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Add notepad.exe" })).toHaveCount(0);
 });
+
+test("about: check for updates now", async ({ page }) => {
+  await page.goto("/index.html?state=ready&page=about");
+  await expect(page.getByRole("switch", { name: "Check for updates" })).toBeChecked();
+  await page.getByRole("button", { name: "Check now" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "You have the newest version." })).toBeVisible();
+});

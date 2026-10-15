@@ -244,11 +244,22 @@ export const en = {
     privacyTitle: "Privacy",
     help: "Help",
     privacy:
-      "The AI and the dictionary run on this computer: what they read is never sent anywhere. The card's web tabs are like visiting those sites: the open tab sends what you selected to that site. Turn on Offline only in Sources and nothing leaves this computer, except model downloads you start. No account, no analytics.",
+      "The AI and the dictionary run on this computer: what they read is never sent anywhere. The card's web tabs are like visiting those sites: the open tab sends what you selected to that site. Turn on Offline only in Sources and nothing leaves this computer, except model downloads you start and update checks (which send nothing about you). No account, no analytics.",
     credits: "Built with",
     creditsList: "Tauri, React, llama.cpp (MIT), WordNet (Princeton WordNet licence), Geist, Atkinson Hyperlegible, Source Serif, Phosphor Icons.",
     logs: "Open logs folder",
     source: "Source code",
+    updates: "Updates",
+    autoUpdate: "Check for updates",
+    autoUpdateHint:
+      "Every few hours the app looks for a new version on GitHub and asks before installing it. Updates are signed, and one that isn't is refused.",
+    checkNow: "Check now",
+    checking: "Checking…",
+    upToDate: "You have the newest version.",
+    declined: (v: string) => `Version ${v} is ready. Check again when you want to install it.`,
+    busy: "Already checking.",
+    unavailable: "This build can't update itself. Download the newest one from GitHub.",
+    failed: "Couldn't check for updates. Check your internet connection.",
   },
   firstRun: {
     welcome: "Make anything readable",

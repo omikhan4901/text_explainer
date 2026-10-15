@@ -2,7 +2,7 @@
 // screenshots) a mock answers instead, so every screen can be built and checked anywhere.
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { AiTask, AppInfo, ExportFormat, FoundModel, Level, Lookup, NewWord, Page, SavedWord, Settings } from "./types";
+import type { AiTask, AppInfo, ExportFormat, FoundModel, Level, Lookup, NewWord, Page, SavedWord, Settings, UpdateStatus } from "./types";
 
 /** Where the card's content area is, in CSS pixels from the window's top left. */
 export interface WebBounds {
@@ -65,4 +65,5 @@ export const api = {
   exportWords: (format: ExportFormat, path: string) => call<number>("export_words", { format, path }),
   speak: (text: string) => call<void>("speak", { text }),
   wordBookOnDisk: () => call<boolean>("word_book_on_disk"),
+  checkUpdates: () => call<UpdateStatus>("check_updates"),
 };

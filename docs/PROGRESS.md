@@ -84,6 +84,9 @@ by security, database and AI engineers before it reaches `main`:
       sentence under its original, a new logo (a line of text with one word highlighted),
       the README redone as a product page, and the installer published as the repo's
       Latest release
+- [x] Updates (15 October 2026, owner): each build is 0.1.<run number>; with the update
+      key in GitHub, builds are signed and installed apps ask, then update themselves.
+      Waiting on the owner to create the key (docs/GUIDE.md, "Updates").
 - [ ] Not verified on Windows yet: the Look up box's focus and placement, app rules on
       real apps, the Windows voice, export through the save dialog
 

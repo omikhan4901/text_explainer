@@ -236,6 +236,32 @@ memory fit as the catalog (size plus half). The Model page and first run list th
 - **Dictionary**: `npm` dev dependencies `wordnet-db` and `wink-lexicon`;
   `scripts/build-dictionary.py` rebuilds it.
 
+## Updates
+
+Every push to `main` builds version `0.1.<run number>` (`installer.yml`). When the
+repository holds the update key, the installer is signed (minisign, Tauri's updater) and
+`latest.json` is published beside it on the `latest-build` release. Installed apps read it
+90 seconds after starting and then every 6 hours (`src-tauri/src/updater.rs`, when "Check
+for updates" is on), and on "Check now" (About). A newer version brings up a native dialog:
+"Install and restart" downloads it, **checks the signature against the public key built
+into the app**, runs the installer (passive: progress only, no questions) and opens the new
+version; "Later" asks again next time. A build without the key (local builds, or before
+the key is set) never checks.
+
+Setting up the key, once (it stays on the owner's PC and in GitHub's secrets):
+
+1. On a PC with Node: `npx @tauri-apps/cli@2 signer generate -w "$env:USERPROFILE\.tauri\text-explainer.key"`
+   in PowerShell, with a password. It writes `text-explainer.key` (private) and
+   `text-explainer.key.pub` (public).
+2. GitHub → the repository → Settings → Secrets and variables → Actions:
+   Secrets → New repository secret `TAURI_SIGNING_PRIVATE_KEY` (the whole private key
+   file) and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`; Variables → New repository variable
+   `TAURI_UPDATER_PUBKEY` (the whole `.pub` file).
+3. Install the next build by hand once. From then on it updates itself.
+
+Losing the private key means installed apps can't take updates any more (they need one
+manual install of a build with a new key). Never commit it.
+
 ## Developing without Windows
 
 `npx vite` serves the interface in a browser against a mock (`src/lib/mock.ts`):
