@@ -1,6 +1,7 @@
 name: Model evaluation
 
-# Runs eval/corpus.jsonl through real models with the app's own prompts, grammar and
+# Runs eval/corpus.jsonl (or, for the translate task, eval/translate.jsonl into each
+# target language) through real models with the app's own prompts, grammar and
 # checks, one free runner per model. Results go to the job summary and an artifact;
 # docs/models.md records them.
 
@@ -21,6 +22,14 @@ on:
       server_args:
         description: Extra llama-server arguments, appended to the app's own (later ones win)
         default: ""
+      task:
+        description: Explain (eval/corpus.jsonl) or AI Translate (eval/translate.jsonl)
+        type: choice
+        options: [explain, translate]
+        default: explain
+      targets:
+        description: Languages to translate into (translate task only)
+        default: bn,es,hi,ar,zh
 
 permissions:
   contents: read
@@ -71,12 +80,15 @@ jobs:
         env:
           LD_LIBRARY_PATH: ${{ github.workspace }}/target/llama-linux
           SERVER_ARGS: ${{ inputs.server_args }}
+          TARGETS: ${{ inputs.targets }}
         run: >
           target/release/te-eval
           --server ${{ runner.os == 'Windows' && 'src-tauri/resources/llama/llama-server.exe' || 'target/llama-linux/llama-server' }}
           --models-dir models
           --model ${{ matrix.model }}
-          --corpus eval/corpus.jsonl
+          --task ${{ inputs.task }}
+          --corpus ${{ inputs.task == 'translate' && 'eval/translate.jsonl' || 'eval/corpus.jsonl' }}
+          --targets "$TARGETS"
           --out eval-results
           --levels ${{ inputs.levels }}
           --dictionary src-tauri/resources/dictionary.sqlite

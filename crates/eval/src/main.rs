@@ -8,11 +8,20 @@
 //! - chatter (preambles the output filter had to remove);
 //! - language drift with the grammar turned off (how much the guard is needed).
 //!
+//! With `--task translate` it runs the translation corpus (`eval/translate.jsonl`) into
+//! each `--targets` language the way AI Translate does, and measures speed, tokens used
+//! per source word (to check the token budgets), numbers and dates kept (the meaning
+//! guard), answers handed back untranslated, and the wrong-script rate with the grammar
+//! (should be 0) and without it on `--drift-subset` items per target.
+//!
 //! Usage:
 //!   te-eval --server PATH --models-dir DIR --model ID[,ID] --corpus FILE --out DIR
 //!           [--levels plain,simpler] [--drift-subset N] [--download]
+//!           [--task explain|translate] [--targets bn,es,hi,ar,zh]
 //!           [--server-args "--cache-ram 1024"]  (appended to the app's own llama-server
 //!           arguments, as the app's "Extra engine arguments" setting is; later ones win)
+
+mod translate;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -87,6 +96,8 @@ struct Args {
     download: bool,
     dictionary: Option<PathBuf>,
     server_args: Vec<String>,
+    /// Translation targets; empty for the explain task.
+    targets: Vec<&'static language::Language>,
 }
 
 fn parse_args() -> Args {
@@ -125,6 +136,14 @@ fn parse_args() -> Args {
         server_args: get("--server-args")
             .map(|a| a.split_whitespace().map(String::from).collect())
             .unwrap_or_default(),
+        targets: match get("--task").as_deref() {
+            None | Some("explain") => vec![],
+            Some("translate") => translate::parse_targets(
+                &get("--targets").unwrap_or_else(|| translate::DEFAULT_TARGETS.into()),
+            )
+            .unwrap_or_else(|e| panic!("{e}")),
+            Some(other) => panic!("unknown task {other} (explain or translate)"),
+        },
     }
 }
 
@@ -152,35 +171,54 @@ fn median(mut v: Vec<u64>) -> u64 {
 async fn main() {
     let args = parse_args();
     std::fs::create_dir_all(&args.out).expect("output folder");
-    let corpus: Vec<Passage> = std::fs::read_to_string(&args.corpus)
-        .expect("corpus")
+    let corpus_text = std::fs::read_to_string(&args.corpus).expect("corpus");
+    if !args.targets.is_empty() {
+        return translate::run(&args, &corpus_text).await;
+    }
+    let corpus: Vec<Passage> = corpus_text
         .lines()
         .filter(|l| !l.trim().is_empty())
         .map(|l| serde_json::from_str(l).expect("corpus line"))
         .collect();
     let mut summaries = Vec::new();
     for id in &args.models {
-        let model = models::by_id(id).unwrap_or_else(|| panic!("unknown model {id}"));
-        let path = args.models_dir.join(model.file_name);
-        if args.download && !path.exists() {
-            eprintln!("downloading {} ({} bytes)", model.name, model.size_bytes);
-            download(
-                Download {
-                    url: model.url,
-                    dest: &path,
-                    sha256: Some(model.sha256),
-                    size: Some(model.size_bytes),
-                },
-                &Cancel::new(),
-                |_| {},
-            )
-            .await
-            .expect("model download");
-        }
+        let (model, path) = prepare_model(&args, id).await;
         let summary = evaluate(&args, model, &path, &corpus).await;
         summaries.push(summary);
     }
-    let mut md = markdown(&summaries);
+    let md = markdown(&summaries);
+    report(&args, md);
+    std::fs::write(
+        args.out.join("summary.json"),
+        serde_json::to_vec_pretty(&summaries).unwrap(),
+    )
+    .unwrap();
+}
+
+/// The catalog model `id` and its file, downloaded first with `--download`.
+async fn prepare_model(args: &Args, id: &str) -> (&'static models::CatalogModel, PathBuf) {
+    let model = models::by_id(id).unwrap_or_else(|| panic!("unknown model {id}"));
+    let path = args.models_dir.join(model.file_name);
+    if args.download && !path.exists() {
+        eprintln!("downloading {} ({} bytes)", model.name, model.size_bytes);
+        download(
+            Download {
+                url: model.url,
+                dest: &path,
+                sha256: Some(model.sha256),
+                size: Some(model.size_bytes),
+            },
+            &Cancel::new(),
+            |_| {},
+        )
+        .await
+        .expect("model download");
+    }
+    (model, path)
+}
+
+/// Prints the results table with how it ran, and adds it to the GitHub job summary.
+fn report(args: &Args, mut md: String) {
     md.push_str(&format!(
         "\nRan on {} with {} CPU threads.\n",
         std::env::consts::OS,
@@ -199,19 +237,17 @@ async fn main() {
             .open(path)
             .and_then(|mut f| std::io::Write::write_all(&mut f, md.as_bytes()));
     }
-    std::fs::write(
-        args.out.join("summary.json"),
-        serde_json::to_vec_pretty(&summaries).unwrap(),
-    )
-    .unwrap();
 }
 
-async fn evaluate(
-    args: &Args,
-    model: &models::CatalogModel,
-    path: &Path,
-    corpus: &[Passage],
-) -> Summary {
+/// A model's engine, started and timed, with its memory watched until `stop` is set.
+struct Running {
+    engine: Engine,
+    load_ms: u64,
+    stop: Arc<AtomicBool>,
+    peak: Arc<AtomicU64>,
+}
+
+async fn start_engine(args: &Args, model: &models::CatalogModel, path: &Path) -> Running {
     let mut engine = Engine::new(Backend::Local(ServerConfig {
         exe: args.server.clone(),
         model: path.to_path_buf(),
@@ -231,11 +267,27 @@ async fn evaluate(
     if let Some(pid) = engine.server_pid() {
         watch_rss(pid, stop.clone(), peak.clone());
     }
+    Running {
+        engine,
+        load_ms,
+        stop,
+        peak,
+    }
+}
 
-    let dictionary = args
-        .dictionary
-        .as_deref()
-        .and_then(|p| Dictionary::open(p).ok());
+async fn evaluate(
+    args: &Args,
+    model: &models::CatalogModel,
+    path: &Path,
+    corpus: &[Passage],
+) -> Summary {
+    let Running {
+        mut engine,
+        load_ms,
+        stop,
+        peak,
+    } = start_engine(args, model, path).await;
+    let dictionary = open_dictionary(args);
     let mut rows = Vec::new();
     let mut first_request_ms = None;
     for passage in corpus {
@@ -332,6 +384,25 @@ async fn evaluate(
     summary
 }
 
+fn open_dictionary(args: &Args) -> Option<Dictionary> {
+    args.dictionary
+        .as_deref()
+        .and_then(|p| Dictionary::open(p).ok())
+}
+
+/// The same help the app gives the meaning check: capitalised ordinary words.
+fn common_words(dictionary: Option<&Dictionary>, source: &str) -> Vec<String> {
+    dictionary
+        .map(|d| {
+            meaning::single_word_names(source)
+                .into_iter()
+                .filter(|w| d.is_common_word(w))
+                .map(|w| w.to_lowercase())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 async fn run_one(
     engine: &mut Engine,
     passage: &Passage,
@@ -340,16 +411,7 @@ async fn run_one(
     dictionary: Option<&Dictionary>,
 ) -> Row {
     let source = text::clean(&passage.text);
-    // The same help the app gives the meaning check: capitalised ordinary words.
-    let common: Vec<String> = dictionary
-        .map(|d| {
-            meaning::single_word_names(&source)
-                .into_iter()
-                .filter(|w| d.is_common_word(w))
-                .map(|w| w.to_lowercase())
-                .collect()
-        })
-        .unwrap_or_default();
+    let common = common_words(dictionary, &source);
     let lang = language::language(&passage.lang).or_else(|| language::detect(&source));
     let out = lang.map_or(OutputLanguage::SameAsText, OutputLanguage::Named);
     let allowed = AllowedScripts::for_request(&source, lang);
