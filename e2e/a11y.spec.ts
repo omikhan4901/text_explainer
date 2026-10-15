@@ -29,7 +29,7 @@ for (const demo of [
   });
 }
 
-for (const p of ["home", "sources", "model", "reading", "shortcuts", "about"]) {
+for (const p of ["home", "words", "words&tab=history", "sources", "model", "reading", "shortcuts", "about"]) {
   test(`main window: ${p} is accessible`, async ({ page }) => {
     await page.goto(`/index.html?state=ready&page=${p}`);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

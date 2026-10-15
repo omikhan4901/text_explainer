@@ -24,6 +24,7 @@ pub fn tls_init() {
 pub mod dictionary;
 pub mod discover;
 pub mod download;
+pub mod history;
 pub mod models;
 pub mod rules;
 pub mod settings;

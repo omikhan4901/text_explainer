@@ -1,5 +1,73 @@
 import { expect, test, type Page } from "@playwright/test";
 
+test("the card saves a word to the Word book and removes it again", async ({ page }) => {
+  await page.goto("/popup.html?demo=word");
+  const saveButton = page.getByRole("button", { name: "Save to Words" });
+  await expect(saveButton).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("button", { name: "Listen" })).toBeVisible();
+  await saveButton.click();
+  await expect(saveButton).toHaveAttribute("aria-pressed", "true");
+  // The AI's answer arrives after saving; the button stays pressed.
+  await page.getByRole("tab", { name: "Explain with AI" }).click();
+  await expect(page.getByText(/smartphones are part of nearly every moment/)).toBeVisible({ timeout: 5000 });
+  await expect(saveButton).toHaveAttribute("aria-pressed", "true");
+  await saveButton.click();
+  await expect(saveButton).toHaveAttribute("aria-pressed", "false");
+});
+
+test("a long passage can't be saved or read aloud", async ({ page }) => {
+  await page.goto("/popup.html?demo=passage");
+  await expect(page.getByRole("tab", { name: "Google", selected: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save to Words" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Listen" })).toHaveCount(0);
+});
+
+test("words: search, remove and export saved words", async ({ page }) => {
+  await page.goto("/index.html?state=ready&page=words");
+  await expect(page.getByRole("heading", { name: "4 words" })).toBeVisible();
+  const search = page.getByRole("searchbox", { name: "Search saved words" });
+  await search.fill("CARTE");
+  await expect(page.getByText("carte blanche", { exact: true })).toBeVisible();
+  await expect(page.getByText("accrue", { exact: true })).toHaveCount(0);
+  await search.fill("50%");
+  await expect(page.getByText("Nothing saved matches “50%”.")).toBeVisible();
+  await search.fill("");
+  await expect(page.getByText("অভিধান", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Remove accrue" }).click();
+  await expect(page.getByText("accrue", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "3 words" })).toBeVisible();
+  await page.getByRole("button", { name: "Export CSV" }).click();
+  await expect(page.getByRole("status")).toHaveText("Saved 3 words to words.csv.");
+});
+
+test("words: history can be cleared after a confirm step, and turned off", async ({ page }) => {
+  await page.goto("/index.html?state=ready&page=words");
+  await page.getByRole("tab", { name: "History" }).click();
+  await expect(page.getByText("lessee", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Clear history" }).click();
+  await expect(page.getByText("Clear all history? This can't be undone.")).toBeVisible();
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByText("lessee", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Clear history" }).click();
+  await page.getByRole("button", { name: "Clear", exact: true }).click();
+  await expect(page.getByText("Nothing here yet.", { exact: false })).toBeVisible();
+  await page.getByLabel("Keep history").click();
+  await expect(page.getByLabel("Keep history")).not.toBeChecked();
+  await expect(page.getByText("History is off, so nothing new is kept.")).toBeVisible();
+  await expect(page.getByLabel("Keep for")).toHaveCount(0);
+});
+
+test("words: turning history off offers to clear it", async ({ page }) => {
+  await page.goto("/index.html?state=ready&page=words&tab=history");
+  await expect(page.getByText("lessee", { exact: true })).toBeVisible();
+  await page.getByLabel("Keep for").selectOption("90");
+  await expect(page.getByLabel("Keep for")).toHaveValue("90");
+  await page.getByLabel("Keep history").click();
+  await expect(page.getByText("History is off. Clear what's already kept?")).toBeVisible();
+  await page.getByRole("button", { name: "Clear history" }).first().click();
+  await expect(page.getByText("History is off, so nothing new is kept.")).toBeVisible();
+});
+
 test("first run: download the recommended model, then try it", async ({ page }) => {
   await page.goto("/index.html");
   await page.getByRole("button", { name: "Get started" }).click();

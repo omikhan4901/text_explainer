@@ -50,6 +50,10 @@ pub struct Settings {
     pub lookup_hotkey: String,
     /// Program files (`keepass.exe`) where the card never reads a selection (`rules.rs`).
     pub excluded_apps: Vec<String>,
+    /// Keep a list of what the card opened on (`history.rs`), on this computer only.
+    pub keep_history: bool,
+    /// Lookups older than this many days are deleted (1 to 365).
+    pub history_days: u32,
 }
 
 impl Default for Settings {
@@ -77,6 +81,8 @@ impl Default for Settings {
             translate_to: "en".into(),
             lookup_hotkey: String::new(),
             excluded_apps: rules::defaults(),
+            keep_history: true,
+            history_days: 30,
         }
     }
 }
@@ -202,6 +208,7 @@ impl Settings {
             self.lookup_hotkey.clear();
         }
         self.excluded_apps = rules::sanitize(std::mem::take(&mut self.excluded_apps));
+        self.history_days = self.history_days.clamp(1, 365);
         self
     }
 
@@ -416,6 +423,29 @@ mod tests {
         // An empty list stays empty: the person removed them all.
         std::fs::write(&path, r#"{"excluded_apps":[]}"#).unwrap();
         assert!(Settings::load(&path).excluded_apps.is_empty());
+    }
+
+    #[test]
+    fn history_settings_default_and_clamp() {
+        // Settings files from before the word book have neither field.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(&path, r#"{"level":"plain","offline_only":true}"#).unwrap();
+        let loaded = Settings::load(&path);
+        assert!(loaded.keep_history);
+        assert_eq!(loaded.history_days, 30);
+        assert!(loaded.offline_only);
+
+        std::fs::write(&path, r#"{"keep_history":false,"history_days":0}"#).unwrap();
+        let loaded = Settings::load(&path);
+        assert!(!loaded.keep_history);
+        assert_eq!(loaded.history_days, 1);
+        let long = Settings {
+            history_days: 10_000,
+            ..Default::default()
+        }
+        .sanitized();
+        assert_eq!(long.history_days, 365);
     }
 
     #[test]

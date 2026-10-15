@@ -1,4 +1,4 @@
-import { Cpu, Globe, House, Info, Keyboard, TextAa, X, type Icon } from "@phosphor-icons/react";
+import { BookBookmark, Cpu, Globe, House, Info, Keyboard, TextAa, X, type Icon } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Button } from "../components/ui/Button";
 import { Kbd } from "../components/ui/Kbd";
@@ -12,11 +12,13 @@ import { ModelPage } from "./pages/Model";
 import { ReadingPage } from "./pages/Reading";
 import { ShortcutsPage } from "./pages/Shortcuts";
 import { SourcesPage } from "./pages/Sources";
+import { WordsPage } from "./pages/Words";
 
-export type PageId = "home" | "sources" | "model" | "reading" | "shortcuts" | "about";
+export type PageId = "home" | "words" | "sources" | "model" | "reading" | "shortcuts" | "about";
 
 const PAGES: { id: PageId; icon: Icon; label: string }[] = [
   { id: "home", icon: House, label: strings.nav.home },
+  { id: "words", icon: BookBookmark, label: strings.nav.words },
   { id: "sources", icon: Globe, label: strings.nav.sources },
   { id: "reading", icon: TextAa, label: strings.nav.reading },
   { id: "model", icon: Cpu, label: strings.nav.model },
@@ -70,6 +72,7 @@ function Shell() {
         <div className="max-w-[640px]">
           <ErrorBanner />
           {page === "home" && <HomePage go={setPage} />}
+          {page === "words" && <WordsPage />}
           {page === "sources" && <SourcesPage />}
           {page === "model" && <ModelPage />}
           {page === "reading" && <ReadingPage />}

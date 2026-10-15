@@ -134,6 +134,7 @@ pub fn run(app: &AppHandle) {
     } else {
         AiMode::Running
     };
+    crate::words::record(app, &cleaned, kind);
     popup::emit(
         app,
         PopupEvent::Open {
