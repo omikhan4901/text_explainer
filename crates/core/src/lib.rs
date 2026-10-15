@@ -25,5 +25,6 @@ pub mod dictionary;
 pub mod discover;
 pub mod download;
 pub mod models;
+pub mod rules;
 pub mod settings;
 pub mod sources;

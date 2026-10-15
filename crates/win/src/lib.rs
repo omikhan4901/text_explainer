@@ -10,7 +10,7 @@ pub mod placement;
 #[cfg(windows)]
 mod imp;
 
-pub use placement::{Rect, Side, choose_side, place_on_side};
+pub use placement::{Rect, Side, choose_side, place_lookup, place_on_side};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -51,9 +51,9 @@ pub struct Memory {
 
 #[cfg(windows)]
 pub use imp::{
-    ClickOutsideWatcher, DoubleCopyWatcher, capture_selection, cursor_position, hide_window,
-    kill_with_app, memory, prepare_popup_window, process_memory, set_clipboard_text,
-    show_window_at, work_area_at,
+    ClickOutsideWatcher, DoubleCopyWatcher, capture_selection, cursor_position,
+    foreground_process_name, hide_window, kill_with_app, memory, prepare_popup_window,
+    process_memory, set_clipboard_text, show_window_at, work_area_at,
 };
 
 #[cfg(not(windows))]
@@ -80,6 +80,10 @@ mod stub {
         Err(Error::Unsupported)
     }
     pub fn memory() -> Option<Memory> {
+        None
+    }
+    /// The foreground app's program file name (Windows only).
+    pub fn foreground_process_name() -> Option<String> {
         None
     }
     /// Memory a process is using now (resident set, from Linux `/proc`), in bytes.

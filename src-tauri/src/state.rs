@@ -78,6 +78,11 @@ pub struct AppState {
     pub dictionary: Mutex<Option<Dictionary>>,
     /// The address last loaded in the card's web view, so reopening a tab doesn't reload.
     pub web_url: Mutex<Option<String>>,
+    /// The Look up box's own shortcut, when one is set and registered.
+    pub lookup_hotkey: Mutex<Option<Shortcut>>,
+    /// The program file of the app in front at the last hotkey or double Ctrl+C
+    /// (`keepass.exe`), so Settings can offer to add it to the excluded apps.
+    pub last_app: Mutex<Option<String>>,
 }
 
 impl AppState {

@@ -14,7 +14,7 @@ use te_core::settings::{ModelChoice, Settings};
 
 use crate::popup::{self, PopupEvent};
 use crate::state::AppState;
-use crate::{hotkey, trigger};
+use crate::{hotkey, lookup, trigger};
 
 type CmdResult<T> = Result<T, String>;
 
@@ -23,14 +23,21 @@ pub fn get_settings(state: State<'_, AppState>) -> Settings {
     state.settings()
 }
 
-/// Saves settings and applies what changed (hotkey, start with Windows, model).
+/// Saves settings and applies what changed (shortcuts, start with Windows, model).
 #[tauri::command]
 pub async fn save_settings(app: AppHandle, settings: Settings) -> CmdResult<Settings> {
+    if hotkey::same(&settings.hotkey, &settings.lookup_hotkey) {
+        return Err("That shortcut can't be used: it already opens the card.".into());
+    }
     let settings = settings.sanitized();
     let state = app.state::<AppState>();
     let previous = state.settings();
     if settings.hotkey != previous.hotkey {
         hotkey::apply(&app, &settings.hotkey)
+            .map_err(|e| format!("That shortcut can't be used: {e}"))?;
+    }
+    if settings.lookup_hotkey != previous.lookup_hotkey {
+        hotkey::apply_lookup(&app, &settings.lookup_hotkey)
             .map_err(|e| format!("That shortcut can't be used: {e}"))?;
     }
     settings
@@ -415,4 +422,35 @@ pub fn set_paused(app: AppHandle, paused: bool) {
 #[tauri::command]
 pub fn tiers() -> Vec<Tier> {
     vec![Tier::Fastest, Tier::Fast, Tier::Balanced, Tier::Best]
+}
+
+/// Looks up text typed in the Look up box: the box hides and the card opens where it was.
+/// Works while paused too: it's an explicit request, not a shortcut.
+#[tauri::command]
+pub fn look_up(app: AppHandle, text: String) -> CmdResult<()> {
+    // Whitespace collapsed, at most `MAX_QUERY_CHARS` characters.
+    let query = te_core::sources::query_text(&text);
+    if query.is_empty() {
+        return Err("Type a word or phrase to look up.".into());
+    }
+    let place = lookup::hide(&app);
+    trigger::start(&app, query, None, place);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn lookup_hide(app: AppHandle) {
+    lookup::hide(&app);
+}
+
+/// The app that was in front at the last shortcut (`keepass.exe`), if known.
+#[tauri::command]
+pub fn last_app(state: State<'_, AppState>) -> Option<String> {
+    state.last_app.lock().expect("last app lock").clone()
+}
+
+/// Checks an app name typed in Settings; returns it as the list keeps it.
+#[tauri::command]
+pub fn validate_app(name: String) -> CmdResult<String> {
+    te_core::rules::normalize(&name).map_err(|e| e.to_string())
 }

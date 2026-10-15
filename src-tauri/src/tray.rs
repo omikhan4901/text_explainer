@@ -10,6 +10,7 @@ use crate::state::AppState;
 
 fn menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let paused = app.state::<AppState>().paused.load(Ordering::SeqCst);
+    let lookup = MenuItem::with_id(app, "lookup", "Look up…", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
     let pause = MenuItem::with_id(
         app,
@@ -22,6 +23,7 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     Menu::with_items(
         app,
         &[
+            &lookup,
             &settings,
             &pause,
             &PredefinedMenuItem::separator(app)?,
@@ -48,6 +50,9 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .menu(&menu(app)?)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
+            "lookup" => {
+                crate::lookup::show(app);
+            }
             "settings" => crate::show_main(app),
             "pause" => {
                 let state = app.state::<AppState>();

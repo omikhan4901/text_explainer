@@ -65,6 +65,10 @@ export interface Settings {
   sources: WebSource[];
   offline_only: boolean;
   translate_to: string;
+  /** Shortcut for the Look up box; "" for none. */
+  lookup_hotkey: string;
+  /** Program files (`keepass.exe`) where the card never reads a selection. */
+  excluded_apps: string[];
 }
 
 export type Tier = "fastest" | "fast" | "balanced" | "best";

@@ -36,6 +36,8 @@ export const DEFAULT_SETTINGS: Settings = {
   ],
   offline_only: false,
   translate_to: "en",
+  lookup_hotkey: "",
+  excluded_apps: ["keepass.exe", "keepassxc.exe", "1password.exe", "bitwarden.exe"],
 };
 
 function source(id: string, name: string, url: string, enabled: boolean, words: boolean, passages: boolean): WebSource {
@@ -170,11 +172,36 @@ function info(): AppInfo {
   };
 }
 
+/** Every command the pages called, in order (tests read it as `window.__teMockCalls`). */
+const calls: { command: string; args: Record<string, unknown> }[] = [];
+if (typeof window !== "undefined") Object.assign(window, { __teMockCalls: calls });
+
+/** An app name as the list keeps it (`rules.rs`), or an error message. */
+export function normalizeApp(name: string): string {
+  const file = name.trim().split(/[\\/]/).pop()!.trim();
+  if (!file) throw "type the app's program name, such as notepad.exe";
+  if ([...file].some((c) => c < " " || '<>:"|?*'.includes(c))) throw "the program name has characters a file name can't have";
+  const lower = file.toLowerCase();
+  if (!lower.endsWith(".exe") || !lower.slice(0, -4).replace(/^[. ]+|[. ]+$/g, "")) throw "the program name must end in .exe";
+  if ([...lower].length > 64) throw "the program name is too long";
+  return lower;
+}
+
 async function call<T>(command: string, args: Record<string, unknown> = {}): Promise<T> {
+  calls.push({ command, args });
   switch (command) {
+    case "look_up":
+      if (!String(args.text).trim()) throw "Type a word or phrase to look up.";
+      return undefined as T;
+    case "last_app":
+      return "notepad.exe" as T;
+    case "validate_app":
+      return normalizeApp(String(args.name)) as T;
     case "get_settings":
       return structuredClone(settings) as T;
     case "save_settings":
+      if ((args.settings as Settings).lookup_hotkey.toLowerCase() === (args.settings as Settings).hotkey.toLowerCase())
+        throw "That shortcut can't be used: it already opens the card.";
       settings = structuredClone(args.settings as Settings);
       emit("te://settings", null);
       return structuredClone(settings) as T;

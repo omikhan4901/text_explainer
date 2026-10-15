@@ -55,6 +55,39 @@ A guide to the code for anyone changing it. Keep it true when you change how thi
    otherwise the window is resized to the card as text streams in. The level switch and
    grade sit in the AI tab's footer on passages.
 
+## The Look up box
+
+`src-tauri/src/lookup.rs` and `src/lookup/` (`lookup.html`). A small frameless window
+(label `lookup`) to type a word or phrase, opened three ways: "Look up…" at the top of the
+tray menu, the main shortcut when nothing is selected (`trigger::on_hotkey`, the
+`Ok(None)` branch; the old "Nothing selected" card is only the fallback if the window is
+missing), and its own optional shortcut (`settings.lookup_hotkey`, empty for none,
+registered by `hotkey::apply_lookup`, never the same keys as the main shortcut; pressed
+again it hides the box). It opens centred in the upper third of the monitor with the mouse
+(`te_win::place_lookup`) and closes any open card first, which also frees Esc.
+
+Unlike the card, the box **takes focus**: it has a text field. Esc (handled in the page)
+or losing focus (`WindowEvent::Focused(false)` in `lib.rs`) hides it. Enter calls
+`look_up`: the text is collapsed and capped like any query (`sources::query_text`,
+`MAX_QUERY_CHARS`), empty text is refused, the box hides, and `trigger::start` opens the
+card with the box's top edge as its anchor, so the card appears where the box was. The
+card still never takes focus, and since nothing is clicked the click-outside hook doesn't
+close it. While paused, the box's shortcut is off like every shortcut, but "Look up…" in
+the tray still works: it's an explicit request. The window's capability
+(`capabilities/lookup.json`) only allows listening for events.
+
+## App rules
+
+"Don't open in these apps" (Shortcuts page). `crates/core/src/rules.rs` keeps the list:
+program file names, lowercase, without folders, ending in `.exe`, at most 64 characters,
+each once, at most 50 (`settings.excluded_apps`, default: KeePass, KeePassXC, 1Password,
+Bitwarden). Before the shortcut or a double Ctrl+C does anything, `trigger.rs` asks
+`te_win::foreground_process_name` (the foreground window's process, opened with
+`PROCESS_QUERY_LIMITED_INFORMATION`) and does nothing at all for an app on the list: no
+capture, no clipboard, no card. It also remembers that app (not Text Explainer itself) so
+Settings can offer "Add <app>" (`last_app`); names typed in Settings are checked by
+`validate_app`. The Look up box doesn't read from any app, so it isn't affected.
+
 ## The interface
 
 Design tokens are in `src/styles/tokens.css`: neutral surfaces, near-black controls
@@ -107,5 +140,6 @@ memory fit as the catalog (size plus half). The Model page and first run list th
 `popup.html?demo=passage|word|word_offline|check|no_model|loading|error`, plus
 `&tab=explain` (or `dictionary`, `web:bing`) to open a tab and `&offline=1` for Offline
 only; a web tab shows its loading placeholder there (the page itself needs the app). And
-`index.html?state=ready&page=model`. `scripts/wincheck.sh clippy -p text-explainer`
+`index.html?state=ready&page=model`, and `lookup.html` (the mock records every command in
+`window.__teMockCalls`, which the Playwright journeys read). `scripts/wincheck.sh clippy -p text-explainer`
 type-checks the Windows app from Linux.

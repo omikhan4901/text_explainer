@@ -3,7 +3,8 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
-// Two pages: the main window (settings, models, first run) and the reading card popup.
+// Three pages: the main window (settings, models, first run), the reading card popup and
+// the Look up box.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   clearScreen: false,
@@ -15,6 +16,7 @@ export default defineConfig({
       input: {
         main: resolve(import.meta.dirname, "index.html"),
         popup: resolve(import.meta.dirname, "popup.html"),
+        lookup: resolve(import.meta.dirname, "lookup.html"),
       },
     },
   },

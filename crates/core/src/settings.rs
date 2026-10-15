@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use crate::explain::OutputChoice;
 use crate::prompt::Level;
+use crate::rules;
 use crate::sources::{self, WebSource};
 
 pub const CURRENT_VERSION: u32 = 1;
@@ -45,6 +46,10 @@ pub struct Settings {
     pub offline_only: bool,
     /// Language code for `{lang}` in source addresses (the Translate tab's target).
     pub translate_to: String,
+    /// Shortcut that opens the Look up box, in the same format as `hotkey`; empty for none.
+    pub lookup_hotkey: String,
+    /// Program files (`keepass.exe`) where the card never reads a selection (`rules.rs`).
+    pub excluded_apps: Vec<String>,
 }
 
 impl Default for Settings {
@@ -70,6 +75,8 @@ impl Default for Settings {
             sources: sources::defaults(),
             offline_only: false,
             translate_to: "en".into(),
+            lookup_hotkey: String::new(),
+            excluded_apps: rules::defaults(),
         }
     }
 }
@@ -190,6 +197,11 @@ impl Settings {
         } else {
             "en".into()
         };
+        self.lookup_hotkey = self.lookup_hotkey.trim().to_string();
+        if self.lookup_hotkey.eq_ignore_ascii_case(&self.hotkey) {
+            self.lookup_hotkey.clear();
+        }
+        self.excluded_apps = rules::sanitize(std::mem::take(&mut self.excluded_apps));
         self
     }
 
@@ -355,6 +367,55 @@ mod tests {
             .translate_to,
             "zh-Hans"
         );
+    }
+
+    #[test]
+    fn look_up_shortcut_is_off_by_default_and_never_the_main_one() {
+        assert_eq!(Settings::default().lookup_hotkey, "");
+        let s = Settings {
+            lookup_hotkey: "  Ctrl+Alt+L ".into(),
+            ..Default::default()
+        }
+        .sanitized();
+        assert_eq!(s.lookup_hotkey, "Ctrl+Alt+L");
+        let same = Settings {
+            lookup_hotkey: "ctrl+shift+space".into(),
+            ..Default::default()
+        }
+        .sanitized();
+        assert_eq!(same.lookup_hotkey, "");
+    }
+
+    #[test]
+    fn excluded_apps_default_to_password_managers_and_are_cleaned() {
+        assert!(
+            Settings::default()
+                .excluded_apps
+                .contains(&"keepass.exe".to_string())
+        );
+
+        // Older settings files have no list: they get the password managers.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(&path, r#"{"level":"plain"}"#).unwrap();
+        let loaded = Settings::load(&path);
+        assert_eq!(loaded.excluded_apps, rules::defaults());
+        assert_eq!(loaded.lookup_hotkey, "");
+
+        // A junk list is cleaned.
+        std::fs::write(
+            &path,
+            r#"{"excluded_apps":["Notes.EXE","notes.exe","","calc","C:\\Apps\\Tool.exe"]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            Settings::load(&path).excluded_apps,
+            vec!["notes.exe", "tool.exe"]
+        );
+
+        // An empty list stays empty: the person removed them all.
+        std::fs::write(&path, r#"{"excluded_apps":[]}"#).unwrap();
+        assert!(Settings::load(&path).excluded_apps.is_empty());
     }
 
     #[test]

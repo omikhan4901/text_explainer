@@ -36,6 +36,20 @@
         "resizable": false,
         "focus": false,
         "shadow": false
+      },
+      {
+        "label": "lookup",
+        "title": "Look up",
+        "url": "lookup.html",
+        "width": 584,
+        "height": 120,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false
       }
     ],
     "security": {

@@ -119,6 +119,15 @@ pub fn place_on_side(
     (x, y.clamp(work.top, (work.bottom - h).max(work.top)))
 }
 
+/// Top-left corner for the Look up box of `size`: centred across `work` (the monitor with
+/// the mouse), its middle a quarter of the way down, so it sits in the upper third.
+pub fn place_lookup(size: (i32, i32), work: Rect) -> (i32, i32) {
+    let (w, h) = (size.0.min(work.width()), size.1.min(work.height()));
+    let x = work.left + (work.width() - w) / 2;
+    let y = work.top + work.height() / 4 - h / 2;
+    (x, y.clamp(work.top, (work.bottom - h).max(work.top)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -196,6 +205,18 @@ mod tests {
         let sel = Rect::new(0, 10, 1900, 1030);
         assert_eq!(choose_side(sel, 400, WORK, 8), Side::Bottom);
         assert_eq!(place_on_side(sel, (440, 200), WORK, 8, Side::Bottom).1, 840);
+    }
+
+    #[test]
+    fn look_up_box_sits_centred_in_the_upper_third() {
+        // Its middle at 260, a quarter of 1040.
+        assert_eq!(place_lookup((600, 120), WORK), (660, 200));
+        // A monitor to the left with the taskbar on top.
+        let work = Rect::new(-1600, 40, 0, 900);
+        assert_eq!(place_lookup((600, 120), work), (-1100, 195));
+        // A box wider or taller than the screen stays on it.
+        let tiny = Rect::new(0, 0, 400, 100);
+        assert_eq!(place_lookup((600, 120), tiny), (0, 0));
     }
 
     #[test]

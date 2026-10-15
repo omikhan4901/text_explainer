@@ -37,6 +37,16 @@ for (const p of ["home", "sources", "model", "reading", "shortcuts", "about"]) {
   });
 }
 
+test("look up box is accessible", async ({ page }) => {
+  await page.goto("/lookup.html");
+  await expect(page.getByRole("search")).toBeVisible();
+  await expectAccessible(page);
+  // With its message for an empty look-up.
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expectAccessible(page);
+});
+
 test("first run is accessible", async ({ page }) => {
   await page.goto("/index.html");
   await expectAccessible(page);
