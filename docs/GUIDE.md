@@ -190,8 +190,9 @@ model like an explanation, so the text never leaves the computer.
   may split or merge sentences). The model's prompt is unchanged.
 - The language over a translation is a button: it opens a searchable list of languages
   (type to filter, arrows and Enter to pick, Esc to close). Web-only languages and the
-  text's own language can't be picked. A pick becomes the default (`translate_to`) and
-  is sent with `set_ai_task`. The card takes keyboard focus only while this list is open
+  text's own language can't be picked. A pick is for that card only (sent with
+  `set_ai_task`); the main translation language (`translate_to`, on the Sources page)
+  stays as set. The card takes keyboard focus only while this list is open
   (`popup_focus`, which also hands Esc from the global shortcut to the field).
 - Which language by default (`translate::offer`): the setting's, unless the text is
   already in it; then English, as Google Translate does (Bangla text with "Translate

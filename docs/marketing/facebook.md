@@ -49,8 +49,8 @@ Suggested order: post 1 (launch), then one feature post every two or three days.
 > computer, so contracts, medical letters and private messages stay private.
 >
 > Your text stays on top and the translation sits right below it. Point at a sentence and
-> its partner lights up, so you can see which words became which. Click the language name
-> to search for any other. Text in another language goes into English on its own.
+> its partner lights up, so you can see which words became which. Everything goes into
+> your main language first; click the language name to search for any other. Text in another language goes into English on its own.
 >
 > It also checks itself: if a number or a date goes missing in the translation, the card
 > tells you, and the answer can't drift into the wrong language. You can translate into

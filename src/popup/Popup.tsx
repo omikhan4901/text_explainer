@@ -53,16 +53,11 @@ const ICON = 15;
 
 export function Popup() {
   const [state, dispatch] = useReducer(reduce, initialState);
-  // `remember`: the person picked the language, so it becomes the default.
-  const setTask = useCallback((id: number, task: AiTask, target?: LanguageName, remember?: boolean) => {
+  // A language picked in the card is for this card only: the main translation language
+  // (Sources) stays as set.
+  const setTask = useCallback((id: number, task: AiTask, target?: LanguageName) => {
     dispatch({ type: "set_task", task, target });
     void api.setAiTask(id, task, target?.code);
-    if (remember && target) {
-      void api
-        .getSettings()
-        .then((s) => api.saveSettings({ ...s, translate_to: target.code }))
-        .catch(() => undefined);
-    }
   }, []);
   const [languages, setLanguages] = useState<TranslateLanguage[]>([]);
   useEffect(() => {
@@ -161,7 +156,7 @@ export function Popup() {
             onPin={togglePin}
             onTab={(tab) => dispatch({ type: "select_tab", tab })}
             languages={languages}
-            onTask={(task, target, remember) => setTask(state.id, task, target, remember)}
+            onTask={(task, target) => setTask(state.id, task, target)}
           />
         ) : (
           <MessageCard state={state} pinned={pinned} onPin={togglePin} />
@@ -198,7 +193,7 @@ function ExplainCard({
   pinned: boolean;
   onPin: () => void;
   onTab: (tab: TabId) => void;
-  onTask: (task: AiTask, target?: LanguageName, remember?: boolean) => void;
+  onTask: (task: AiTask, target?: LanguageName) => void;
   languages: TranslateLanguage[];
 }) {
   const word = isWord(state);
@@ -644,7 +639,7 @@ function ExplainPane({
   state: Explaining;
   level: Level;
   languages: TranslateLanguage[];
-  onTask: (task: AiTask, target?: LanguageName, remember?: boolean) => void;
+  onTask: (task: AiTask, target?: LanguageName) => void;
   onTab: (tab: TabId) => void;
 }) {
   const [picking, setPicking] = useState(false);
@@ -707,7 +702,7 @@ function ExplainPane({
               source={state.translate.source}
               onPick={(l) => {
                 setPicking(false);
-                onTask("translate", l, true);
+                onTask("translate", l);
               }}
               onClose={() => setPicking(false)}
             />

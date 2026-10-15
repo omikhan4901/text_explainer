@@ -212,8 +212,8 @@ export const en = {
     addHint: "Put {query} where the selected text goes, and {lang} for the language below.",
     needName: "Give it a name.",
     translate: "Translation",
-    translateTo: "Translate into",
-    translateHint: "Used by the Translate tab.",
+    translateTo: "Main translation language",
+    translateHint: "Everything is translated into this first. In the card you can switch to another language for that text.",
   },
   shortcuts: {
     title: "Shortcuts",

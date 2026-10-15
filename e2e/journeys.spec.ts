@@ -124,6 +124,11 @@ test("the AI tab shows what you selected and translates it, with the language a 
   await page.keyboard.press("Enter");
   await expect(page.getByText(/Sin perjuicio/)).toBeVisible({ timeout: 5000 });
   await expect(page.getByRole("button", { name: /Translating into Spanish/ })).toBeVisible();
+  // That pick is for this card only: the main translation language isn't changed.
+  const saved = await page.evaluate(() =>
+    (window as unknown as { __teMockCalls: { command: string }[] }).__teMockCalls.filter((c) => c.command === "save_settings"),
+  );
+  expect(saved).toHaveLength(0);
 
   // English text with English as the language: Translate asks where to, and English is off.
   await page.goto("/popup.html?demo=passage&tab=explain");
