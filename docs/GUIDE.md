@@ -22,21 +22,26 @@ A guide to the code for anyone changing it. Keep it true when you change how thi
    same file and hands over the copied text directly.
 2. **Card opens** (`src-tauri/src/popup.rs`). Placed by the selection's screen rectangle
    (or the mouse), on the right monitor, on the side with room (`crates/win/src/placement.rs`),
-   shown with `SWP_NOACTIVATE` so the reading app keeps focus. It stays open until its X
-   is pressed (the owner's call, 15 October 2026: it closed too easily). Esc closes it
-   too, as a global shortcut registered while it's open, until the person clicks in
-   another app (a low-level mouse hook sees that click): from then on Esc belongs to that
-   app again. It opens at the size the page last reported (`AppState::card_size`): the
-   page reports only changes, so starting from a fixed height left a card that kept its
-   size cut off. Pressing its header (move) or its bottom right corner (resize) calls
-   `popup_drag_start`; the page holds the pointer and reports every move
-   (`popup_drag_move`) and the release (`popup_drag_end`), and the app places the window
-   from the real cursor position each time (`popup::drag_to`). Two things that failed on
-   a real PC: the page's own mouse coordinates go stale while its window moves (dragging
-   did nothing), and asking Windows whether the button is held reports "no" while
-   another app is in front, which it always is for a card that never takes focus. A moved card stays where it was put; a resized card's size is saved
-   (`settings.card_size`), and from then on the card fills its window instead of the
-   window following the card. Double-click the corner to fit it to its content again.
+   shown with `SWP_NOACTIVATE` so the reading app keeps focus: opening a card never takes
+   it. It stays open until its X is pressed (the owner's call, 15 October 2026: it closed
+   too easily). Esc closes it too: a global shortcut while the person is still in the
+   other app, released when they click in another app (a low-level mouse hook sees every
+   press). A press inside the card is seen by the same hook before the card gets it, and
+   makes the card activatable in time for that press to activate it (`popup::focus_card`,
+   the owner's decision, 15 October 2026: "whenever I click within the app, make it
+   active"). From then on it behaves like any window: its fields and the web page take
+   typing, Esc is handled by the page, and pressing its header or bottom right corner
+   (`popup_drag`) hands over to Windows' own moving and resizing (the window is
+   resizable, so its edges resize too). A subclass of the window
+   (`te_win::watch_size_move`) hears when that starts, the first resize step (the card
+   then fills its window) and where the window ended up: a moved card stays where it was
+   put, a resized card's size is saved (`settings.card_size`, at least 320 by 200). Two
+   attempts that drove the drag from the page failed on a real PC: the page's mouse
+   coordinates go stale while its window moves, and Windows reports the button as not
+   held while another app is in front. The card opens at the size the page last reported
+   (`AppState::card_size`): the page reports only changes, so starting from a fixed
+   height left a card that kept its size cut off. Double-click the corner to fit it to
+   its content again.
 3. **Tabs** (`trigger.rs`, `crates/core/src/sources.rs`). The `open` event lists the
    card's web tabs (`sources::tabs_for`: enabled sources for words or for passages, none
    while Offline only is on) and the selection's kind. For one word or a short term the
@@ -52,10 +57,8 @@ A guide to the code for anyone changing it. Keep it true when you change how thi
    Tauri's `unstable` multi-webview) over that area: incognito, never focused on its own,
    http(s) navigation only, new windows sent to the default browser. It asks for phone
    pages (a mobile user agent), which fit a card; desktop pages scrolled sideways. The
-   card sends the area again when it changes size. Clicking into the page lets the card
-   take focus so the person can type there (the mouse hook sees the click first and makes
-   the card focusable in time, `popup::focus_web`); the card gives focus back when it
-   closes. It gets no app
+   card sends the area again when it changes size. Clicking into the page activates the
+   card like any other click in it (step 2), so the person can type there. It gets no app
    permissions (it's remote content). Other tabs call `web_hide`; closing the card closes
    the web view to free its memory. The main window's Sources page edits the list
    (`settings.sources`, `offline_only`, `translate_to`).
@@ -221,9 +224,8 @@ model like an explanation, so the text never leaves the computer.
   (type to filter, arrows and Enter to pick, Esc to close). Web-only languages and the
   text's own language can't be picked. A pick is for that card only (sent with
   `set_ai_task`); the main translation language (`translate_to`, on the Sources page)
-  stays as set. The card takes keyboard focus only while this list is open
-  (`popup_focus`, which also hands Esc from the global shortcut to the field), or after
-  the person clicks into a web page (step 4).
+  stays as set. Opening the list was a click in the card, so the card has the keyboard;
+  the field keeps Esc for itself (it closes the list, not the card).
 - Which language by default (`translate::offer`): the setting's, unless the text is
   already in it; then English, as Google Translate does (Bangla text with "Translate
   into" Bangla goes into English).

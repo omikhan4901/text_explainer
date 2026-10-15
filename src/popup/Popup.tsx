@@ -12,7 +12,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { Tabs } from "radix-ui";
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState, type ReactNode } from "react";
 import { LinkButton } from "../components/ui/Button";
 import { IconButton } from "../components/ui/IconButton";
 import { Segmented } from "../components/ui/Segmented";
@@ -124,6 +124,16 @@ export function Popup() {
     };
   }, []);
 
+  // Once the person has clicked in the card it has the keyboard, and Esc closes it (the
+  // language search keeps its own Esc).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !e.defaultPrevented) void api.popupClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   // The AI tab starts the model once per request, when it is opened.
   const asked = useRef(0);
   const requestId = state.view === "explain" && state.ai === "requested" ? state.id : 0;
@@ -172,58 +182,42 @@ export function Popup() {
   );
 }
 
-/** Pointer handlers that let the person drag the card: the app moves (or resizes) it
- * to follow the real cursor on every move the page reports, until the button is let go.
- * Presses on buttons, links and tabs are left alone. */
-function dragHandlers(kind: "move" | "resize", onStart?: () => void) {
-  let frame = 0;
-  let dragging = false;
-  const end = () => {
-    if (!dragging) return;
-    dragging = false;
-    cancelAnimationFrame(frame);
-    frame = 0;
-    void api.popupDragEnd();
-  };
+/** Pressing the card's header lets the person move it: Windows' own moving takes over
+ * (the press made the card the active window). Buttons, links and tabs work as usual. */
+function useCardDrag() {
   return {
     onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
       if (e.button !== 0 || (e.target as Element).closest("button, a, input, select, [role=tab]")) return;
       e.preventDefault();
-      // Keeps the moves coming while the pointer is outside the window (a resize).
-      e.currentTarget.setPointerCapture(e.pointerId);
-      dragging = true;
-      onStart?.();
-      void api.popupDragStart(kind);
+      void api.popupDrag("move");
     },
-    onPointerMove: () => {
-      if (!dragging || frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        void api.popupDragMove();
-      });
-    },
-    onPointerUp: end,
-    onPointerCancel: end,
-    onLostPointerCapture: end,
   };
 }
 
-function useCardDrag() {
-  return useMemo(() => dragHandlers("move"), []);
-}
-
-/** The card's bottom right corner: drag to resize (the size is remembered), double-click
- * to fit the card to what it shows again. */
+/** The card's bottom right corner: drag to resize (Windows' own resizing; the size is
+ * remembered), double-click to fit the card to what it shows again. Windows takes over
+ * the mouse during a resize, so the double-click is told apart from the presses. */
 function ResizeGrip({ onStart, onReset }: { onStart: () => void; onReset: () => void }) {
-  const handlers = useMemo(() => dragHandlers("resize", onStart), [onStart]);
+  const lastPress = useRef(0);
   return (
     <div
       aria-hidden
       title={t.resize}
       data-testid="resize-grip"
       className="absolute right-0 bottom-0 z-10 flex size-4 cursor-nwse-resize items-end justify-end p-[3px] text-border-strong hover:text-muted"
-      {...handlers}
-      onDoubleClick={onReset}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        const now = e.timeStamp;
+        if (now - lastPress.current < 400) {
+          lastPress.current = 0;
+          onReset();
+          return;
+        }
+        lastPress.current = now;
+        onStart();
+        void api.popupDrag("resize");
+      }}
     >
       <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round">
         <path d="M7 1 1 7M7 4.5 4.5 7" />
@@ -630,13 +624,8 @@ function LanguageSearch({
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const input = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    void api
-      .popupFocus(true)
-      .catch(() => undefined)
-      .finally(() => input.current?.focus());
-    return () => void api.popupFocus(false).catch(() => undefined);
-  }, []);
+  // The card has focus: opening the search was a click in it.
+  useEffect(() => input.current?.focus(), []);
   const q = query.trim().toLowerCase();
   const list = languages
     .filter((l) => !q || [l.name, l.native, l.code].some((s) => s.toLowerCase().includes(q)))

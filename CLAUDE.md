@@ -39,17 +39,17 @@ The plan is `docs/IMPLEMENTATION_PLAN.md` (sources, translation and Definer pari
 - `crates/eval`: the model evaluation harness (`docs/models.md` has the results; run the
   "Model evaluation" workflow after changing prompts, guards or llama.cpp).
 - `src-tauri`: the Tauri 2 app. Tray, global hotkey, selection capture (UI Automation, then
-  a clipboard-safe Ctrl+C fallback), the popup window that never takes focus, IPC commands.
+  a clipboard-safe Ctrl+C fallback), the popup window that opens without taking focus, IPC commands.
 - `src/`: React + TypeScript + Tailwind v4 + Radix front end. `popup.html` is the reading
   card, `index.html` the main window (settings, models, first run). Design tokens in
   `src/styles/tokens.css` (`docs/GUIDE.md`, "The interface").
 
 ## Rules that are easy to break
 
-- The popup must never take focus from the app the person is reading in. The exceptions
-  are the person clicking to type: the AI tab's language search (`popup_focus`, focus
-  goes back when it closes) and clicking into the card's web page (`popup::focus_web`,
-  focus goes back when the card closes). Nothing else may make the card take focus.
+- Opening the card must never take focus from the app the person is reading in. It takes
+  focus only when the person clicks in it (`popup::focus_card`, the owner's decision, 15
+  October 2026), and is non-activating again when it closes or reopens. Nothing else may
+  make the card take focus.
 - Model output always goes through the language guard (grammar on the request, script check
   on the result) so a model can't answer in the wrong language.
 - The clipboard fallback restores the person's clipboard exactly, every time, even on error.

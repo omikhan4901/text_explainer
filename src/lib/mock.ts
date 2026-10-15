@@ -181,7 +181,6 @@ const book = new WordBook(() => Date.now() - ago);
   ago = 0;
 }
 let downloadTimer: ReturnType<typeof setInterval> | undefined;
-let mockDrag: string | null = null;
 let downloading: string | null = null;
 
 function emit(event: string, payload: unknown) {
@@ -299,14 +298,9 @@ async function call<T>(command: string, args: Record<string, unknown> = {}): Pro
         if (pendingAi) void pendingAi(demoId);
       }
       return undefined as T;
-    case "popup_focus":
-      return undefined as T;
-    case "popup_drag_start":
-      mockDrag = args.kind as string;
-      return undefined as T;
-    case "popup_drag_end":
-      // The app followed the mouse; it saves a resized card's size.
-      if (mockDrag === "resize") {
+    case "popup_drag":
+      // Windows moves or resizes the window; the app then saves a resized card's size.
+      if (args.kind === "resize") {
         settings = { ...settings, card_size: { width: innerWidth - 24, height: innerHeight - 24 } };
         emit("te://popup", { type: "settings" });
       }

@@ -37,9 +37,10 @@ Try each in **Notepad**, **Edge or Chrome**, **Microsoft Word** (if you have it)
       clicking elsewhere never closes it.
 - [ ] The card comes up whole (header, tabs, page and footer), never cut off, also the
       second and third time.
-- [ ] Drag the card by its header: it follows the mouse smoothly. Drag its bottom right
-      corner: the card and its web page resize together, and the next card opens at that
-      size. Double-click the corner: it fits its content again.
+- [ ] A new card doesn't take your typing. Click anywhere in it: it becomes the active
+      window. Drag it by its header: it follows the mouse. Drag its bottom right corner or
+      any edge: the card and its web page resize together, and the next card opens at
+      that size. Double-click the corner: it fits its content again.
 - [ ] Accept an update: the main window shows the download with its size, then
       "Installing", then the new version opens.
 - [ ] Google and Bing pages fit the card (no sideways scrolling). Click into Google's

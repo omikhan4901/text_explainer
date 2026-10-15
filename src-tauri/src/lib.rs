@@ -62,7 +62,7 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             let app = click_app.clone();
             let _ = click_app.run_on_main_thread(move || popup::clicked_elsewhere(&app));
         },
-        move || popup::focus_web(&focus_app),
+        move || popup::focus_card(&focus_app),
     );
 
     let dictionary = te_core::dictionary::Dictionary::open(&paths.dictionary)
@@ -79,7 +79,7 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         ai_task: Mutex::new((0, popup::AiTask::Explain, None)),
         popup: Mutex::new(None),
         card_size: Mutex::new(popup::INITIAL_SIZE),
-        web_focused: AtomicBool::new(false),
+        focused: AtomicBool::new(false),
         paused: AtomicBool::new(false),
         hotkey: Mutex::new(None),
         click_watcher,
@@ -250,15 +250,12 @@ pub fn run() {
             commands::delete_model,
             commands::unload_model,
             commands::popup_resize,
-            commands::popup_drag_start,
-            commands::popup_drag_move,
-            commands::popup_drag_end,
+            commands::popup_drag,
             commands::set_card_size,
             commands::popup_close,
             commands::set_level,
             commands::explain_now,
             commands::set_ai_task,
-            commands::popup_focus,
             commands::web_show,
             commands::web_hide,
             commands::validate_source,

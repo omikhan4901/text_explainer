@@ -112,6 +112,9 @@ by security, database and AI engineers before it reaches `main`:
       now the page reports each move and the app reads the real cursor. The shortcut
       warning with a dead shortcut: registration at startup can lose a race with the
       closing copy after an update; it is now retried every 5 seconds.
+- [x] Owner's decision after that: a click anywhere in the card makes it the active
+      window, so moving and resizing are Windows' own (header, corner and edges) and
+      the card handles Esc itself once clicked. Opening a card still never takes focus.
 - [ ] Not verified on Windows yet: the Look up box's focus and placement, app rules on
       real apps, the Windows voice, export through the save dialog
 

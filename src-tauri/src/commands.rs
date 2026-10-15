@@ -308,20 +308,8 @@ pub fn popup_resize(app: AppHandle, width: f64, height: f64) {
 
 /// The person pressed the card's header (move) or its corner (resize).
 #[tauri::command]
-pub fn popup_drag_start(app: AppHandle, kind: popup::Drag) {
-    popup::drag_start(&app, kind);
-}
-
-/// The mouse moved while the header or corner is held.
-#[tauri::command]
-pub fn popup_drag_move(app: AppHandle) {
-    popup::drag_to(&app);
-}
-
-/// The mouse button was released.
-#[tauri::command]
-pub fn popup_drag_end(app: AppHandle) {
-    popup::drag_end(&app);
+pub fn popup_drag(app: AppHandle, kind: popup::Drag) {
+    popup::drag(&app, kind);
 }
 
 /// Remembers the size the person gave the card (`None`: fit it to what it shows again).
@@ -363,13 +351,6 @@ pub fn explain_now(app: AppHandle, id: u64) {
 #[tauri::command]
 pub fn set_ai_task(app: AppHandle, id: u64, task: AiTask, to: Option<String>) {
     trigger::set_ai_task(&app, id, task, to);
-}
-
-/// The card's language search opened (`true`) or closed: the card takes keyboard focus
-/// only while it's open.
-#[tauri::command]
-pub fn popup_focus(app: AppHandle, focus: bool) {
-    popup::set_focus(&app, focus);
 }
 
 /// Shows a web source's page in the card's content area. Async: creating a web view from

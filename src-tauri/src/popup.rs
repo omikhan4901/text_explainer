@@ -1,12 +1,12 @@
-//! The reading card's window: opened next to the selection without taking focus, resized
-//! to its content as text streams in, and closed by its X (or Esc, until the person clicks
-//! in another app).
+//! The reading card's window: opened next to the selection without taking focus (the
+//! person keeps typing where they were), resized to its content as text streams in, and
+//! closed by its X (or Esc). It takes focus once the person clicks in it, so its own
+//! controls, the web page and Windows' own moving and resizing all work as in any window.
 //! Web source tabs show their page in a child web view placed over the card's content
-//! area (private, no access to the app, never focused on its own). The person can drag
-//! the card by its header and resize it from its corner; the size is remembered.
+//! area (private, no access to the app). The size the person gives the card is remembered.
 
-use std::sync::atomic::Ordering;
-use std::sync::{Mutex, OnceLock};
+use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use serde::{Deserialize, Serialize};
 use tauri::webview::{Color, NewWindowResponse, WebviewBuilder};
@@ -18,7 +18,7 @@ use te_core::settings::CardSize;
 use te_core::sources::{self, WebTab};
 use te_core::text::{self, SelectionKind};
 use te_core::translate::Offer;
-use te_win::{Rect, choose_side, place_on_side};
+use te_win::{Rect, SizeMove, choose_side, place_on_side};
 
 use crate::state::{AppState, PopupPlacement};
 
@@ -38,8 +38,9 @@ const WEB_USER_AGENT: &str = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebK
 /// The popup's window handle, for the mouse hook's thread (asking Tauri for it there
 /// would wait on the main thread).
 static POPUP_HWND: OnceLock<isize> = OnceLock::new();
-/// The drag in progress, if any: the page's size reports wait until it ends.
-static DRAG: Mutex<Option<Dragging>> = Mutex::new(None);
+/// The person is moving or resizing the card: the page's size reports wait until they
+/// let go.
+static DRAGGING: AtomicBool = AtomicBool::new(false);
 
 /// Everything the popup page is told.
 #[derive(Clone, Serialize)]
@@ -108,12 +109,21 @@ fn hwnd(app: &AppHandle) -> Option<isize> {
     window.hwnd().ok().map(|h| h.0 as isize)
 }
 
-/// Makes the popup window non-activating. Called once at startup.
+/// Makes the popup window non-activating and watches the person move and resize it.
+/// Called once at startup, on the main thread.
 pub fn prepare(app: &AppHandle) {
     let Some(h) = hwnd(app) else { return };
     let _ = POPUP_HWND.set(h);
     if let Err(e) = te_win::prepare_popup_window(h) {
         tracing::warn!("couldn't prepare the popup window: {e}");
+    }
+    let handle = app.clone();
+    let min = (
+        (CardSize::MIN.width + 2.0 * MARGIN) as i32,
+        (CardSize::MIN.height + 2.0 * MARGIN) as i32,
+    );
+    if let Err(e) = te_win::watch_size_move(h, min, move |change| size_move(&handle, change)) {
+        tracing::warn!("{e}");
     }
 }
 
@@ -161,7 +171,6 @@ pub fn open(app: &AppHandle, selection: Option<Rect>) {
         scale,
         rect,
         placed: false,
-        web: None,
     };
     *state.popup.lock().expect("popup lock") = Some(placement);
     watch(&state, &placement);
@@ -172,10 +181,10 @@ pub fn open(app: &AppHandle, selection: Option<Rect>) {
 /// sized fills its window instead, so this only applies to cards sized by their content.
 pub fn resize(app: &AppHandle, width: f64, height: f64) {
     let state = app.state::<AppState>();
-    if DRAG.lock().expect("drag lock").is_some() || state.settings().card_size.is_some() {
+    *state.card_size.lock().expect("card size lock") = (width, height);
+    if DRAGGING.load(Ordering::SeqCst) || state.settings().card_size.is_some() {
         return;
     }
-    *state.card_size.lock().expect("card size lock") = (width, height);
     let Some(h) = hwnd(app) else { return };
     let mut popup = state.popup.lock().expect("popup lock");
     let Some(p) = popup.as_mut() else { return };
@@ -202,97 +211,74 @@ pub enum Drag {
     Resize,
 }
 
-/// A drag in progress: what it does, where the cursor was pressed and where the card was.
-#[derive(Clone, Copy)]
-struct Dragging {
-    kind: Drag,
-    press: (i32, i32),
-    from: PopupPlacement,
-}
-
-/// The card's header or corner was pressed. The page then reports every mouse move
-/// (`drag_to`) and the release (`drag_end`); the card follows the real cursor position,
-/// since the page's own mouse coordinates go stale while its window moves.
-pub fn drag_start(app: &AppHandle, kind: Drag) {
-    let state = app.state::<AppState>();
-    let Some(from) = *state.popup.lock().expect("popup lock") else {
+/// The card's header or corner was pressed: Windows' own moving or resizing takes over
+/// (the card is the active window by now, see `focus_card`), and `size_move` hears how
+/// it went.
+pub fn drag(app: &AppHandle, kind: Drag) {
+    let Some(window) = app.get_window("popup") else {
         return;
     };
-    let Some(press) = te_win::cursor_position() else {
-        return;
+    let result = match kind {
+        Drag::Move => window.start_dragging(),
+        Drag::Resize => window.start_resize_dragging(tauri_runtime::ResizeDirection::SouthEast),
     };
-    tracing::info!("card drag: {kind:?}");
-    *DRAG.lock().expect("drag lock") = Some(Dragging { kind, press, from });
-}
-
-/// The mouse moved during a drag: move the card, or resize it from its corner (within the
-/// screen it started on), by as much as the cursor moved since the press.
-pub fn drag_to(app: &AppHandle) {
-    let Some(d) = *DRAG.lock().expect("drag lock") else {
-        return;
-    };
-    let (Some(h), Some((cx, cy))) = (hwnd(app), te_win::cursor_position()) else {
-        return;
-    };
-    let (dx, dy) = (cx - d.press.0, cy - d.press.1);
-    let from = d.from.rect;
-    let px = |css: f64| (css * d.from.scale).round() as i32;
-    let rect = match d.kind {
-        Drag::Move => Rect::new(
-            from.left + dx,
-            from.top + dy,
-            from.right + dx,
-            from.bottom + dy,
-        ),
-        Drag::Resize => {
-            let (min_w, min_h) = (
-                px(CardSize::MIN.width + 2.0 * MARGIN),
-                px(CardSize::MIN.height + 2.0 * MARGIN),
-            );
-            let work = d.from.work;
-            Rect::new(
-                from.left,
-                from.top,
-                from.left + (from.width() + dx).clamp(min_w, (work.right - from.left).max(min_w)),
-                from.top + (from.height() + dy).clamp(min_h, (work.bottom - from.top).max(min_h)),
-            )
-        }
-    };
-    let state = app.state::<AppState>();
-    let mut popup = state.popup.lock().expect("popup lock");
-    let Some(p) = popup.as_mut() else { return };
-    if p.rect == rect {
-        return;
+    if let Err(e) = result {
+        tracing::warn!("couldn't start {kind:?}: {e}");
     }
-    p.placed = true;
-    p.rect = rect;
-    let _ = te_win::show_window_at(h, rect.left, rect.top, rect.width(), rect.height());
-    watch(&state, p);
 }
 
-/// The button was released: a resized card's size is saved, and the card is told either
-/// way (it stops filling its window if the size didn't change).
-pub fn drag_end(app: &AppHandle) {
-    drag_to(app);
-    let Some(d) = DRAG.lock().expect("drag lock").take() else {
-        return;
-    };
-    if d.kind != Drag::Resize {
-        return;
-    }
+/// Windows reports the person moving or resizing the card (from its header, corner or
+/// edges). Runs on the main thread, inside the window's own message handling.
+fn size_move(app: &AppHandle, change: SizeMove) {
     let state = app.state::<AppState>();
-    let rect = state.popup.lock().expect("popup lock").map(|p| p.rect);
-    match rect {
-        Some(rect) if rect != d.from.rect => {
-            let size = CardSize {
-                width: f64::from(rect.width()) / d.from.scale - 2.0 * MARGIN,
-                height: f64::from(rect.height()) / d.from.scale - 2.0 * MARGIN,
-            };
-            if let Err(e) = save_card_size(app, Some(size)) {
-                tracing::warn!("{e}");
+    match change {
+        SizeMove::Start => DRAGGING.store(true, Ordering::SeqCst),
+        // The first resize step: from now on the card fills its window.
+        SizeMove::Sizing => {
+            let mut settings = state.settings.lock().expect("settings lock");
+            if settings.card_size.is_none() {
+                let (w, h) = *state.card_size.lock().expect("card size lock");
+                settings.card_size = Some(CardSize {
+                    width: w - 2.0 * MARGIN,
+                    height: h - 2.0 * MARGIN,
+                });
+                drop(settings);
+                emit(app, PopupEvent::Settings);
             }
         }
-        _ => emit(app, PopupEvent::Settings),
+        SizeMove::End(rect) => {
+            DRAGGING.store(false, Ordering::SeqCst);
+            let resized = {
+                let mut popup = state.popup.lock().expect("popup lock");
+                let Some(p) = popup.as_mut() else { return };
+                let resized = (rect.width(), rect.height()) != (p.rect.width(), p.rect.height());
+                if rect != p.rect {
+                    p.placed = true;
+                    p.rect = rect;
+                }
+                watch(&state, p);
+                resized.then_some(p.scale)
+            };
+            match resized {
+                Some(scale) => {
+                    let size = CardSize {
+                        width: f64::from(rect.width()) / scale - 2.0 * MARGIN,
+                        height: f64::from(rect.height()) / scale - 2.0 * MARGIN,
+                    };
+                    tracing::info!("card resized to {} x {}", size.width, size.height);
+                    if let Err(e) = save_card_size(app, Some(size)) {
+                        tracing::warn!("{e}");
+                    }
+                }
+                None => {
+                    // A move: fit any text that arrived meanwhile, and tell the page (a
+                    // press on the corner that didn't resize stops it filling the window).
+                    let (w, h) = *state.card_size.lock().expect("card size lock");
+                    resize(app, w, h);
+                    emit(app, PopupEvent::Settings);
+                }
+            }
+        }
     }
 }
 
@@ -316,70 +302,39 @@ pub fn clicked_elsewhere(app: &AppHandle) {
     let _ = app.global_shortcut().unregister(ESCAPE);
 }
 
-/// Tells the mouse hook where the card is (a click outside gives Esc back) and where its
-/// web page is (a click there lets the card take focus).
+/// Tells the mouse hook where the card is.
 fn watch(state: &AppState, p: &PopupPlacement) {
     state.click_watcher.set_rect(Some(p.rect));
-    let px = |css: f64| (css * p.scale).round() as i32;
-    state.click_watcher.set_focus_rect(p.web.map(|b| {
-        Rect::new(
-            p.rect.left + px(b.x),
-            p.rect.top + px(b.y),
-            p.rect.left + px(b.x + b.width),
-            p.rect.top + px(b.y + b.height),
-        )
-    }));
 }
 
-/// The person clicked into the card's web page (to type in its search box, say). Runs on
-/// the mouse hook's thread before the click arrives, so the card is focusable in time for
-/// that click to focus it. The card gives focus back when it closes.
-pub fn focus_web(app: &AppHandle) {
+/// The person pressed the mouse inside the card. Runs on the mouse hook's thread before
+/// the press arrives, so the card is activatable in time for that press to activate it:
+/// its buttons, the web page's search box and Windows' own moving and resizing then work
+/// as in any window. The card becomes non-activating again when it closes or reopens.
+pub fn focus_card(app: &AppHandle) {
     let Some(state) = app.try_state::<AppState>() else {
         return;
     };
     let Some(&h) = POPUP_HWND.get() else { return };
-    if state.web_focused.swap(true, Ordering::SeqCst) {
+    if state.focused.swap(true, Ordering::SeqCst) {
         return;
     }
     if let Err(e) = te_win::set_popup_focus(h, true) {
-        tracing::warn!("couldn't let the web page take focus: {e}");
+        tracing::warn!("couldn't let the card take focus: {e}");
     }
+    // The card has the keyboard now, and closes on Esc itself.
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
-        if let Some(view) = handle.get_webview(WEB_LABEL) {
-            let _ = view.set_focus();
-        }
+        let _ = handle.global_shortcut().unregister(ESCAPE);
     });
 }
 
-/// Makes the card non-activating again after the web page had focus.
+/// Makes the card non-activating again.
 fn release_focus(state: &AppState, h: isize) {
-    if state.web_focused.swap(false, Ordering::SeqCst)
+    if state.focused.swap(false, Ordering::SeqCst)
         && let Err(e) = te_win::set_popup_focus(h, false)
     {
         tracing::warn!("couldn't give focus back: {e}");
-    }
-}
-
-/// The card takes keyboard focus while the person types in it (the language search) and
-/// gives it up after. Esc belongs to the search field meanwhile, not to closing the card.
-pub fn set_focus(app: &AppHandle, focus: bool) {
-    let Some(h) = hwnd(app) else { return };
-    if let Err(e) = te_win::set_popup_focus(h, focus) {
-        tracing::warn!("couldn't change the card's focus: {e}");
-    }
-    let shortcuts = app.global_shortcut();
-    if focus {
-        let _ = shortcuts.unregister(ESCAPE);
-    } else if app
-        .state::<AppState>()
-        .popup
-        .lock()
-        .expect("popup lock")
-        .is_some()
-    {
-        let _ = shortcuts.register(ESCAPE);
     }
 }
 
@@ -396,7 +351,7 @@ pub fn close(app: &AppHandle) {
     }
     *state.web_url.lock().expect("web lock") = None;
     state.click_watcher.set_rect(None);
-    state.click_watcher.set_focus_rect(None);
+    DRAGGING.store(false, Ordering::SeqCst);
     let was_open = state.popup.lock().expect("popup lock").take().is_some();
     if let Some(h) = hwnd(app) {
         te_win::hide_window(h);
@@ -477,7 +432,7 @@ pub fn web_show(
             // A private profile: nothing is kept after the card closes.
             .incognito(true)
             .user_agent(WEB_USER_AGENT)
-            // Reading never takes focus from the app underneath; clicking into it does.
+            // Showing it never takes focus; clicking into it does (`focus_card`).
             .focused(false)
             .on_navigation(|u| matches!(u.scheme(), "https" | "http"))
             // Links that want a new window open in the person's browser instead.
@@ -495,7 +450,6 @@ pub fn web_show(
             .map_err(|e| e.to_string())?;
     }
     *shown = Some(url.to_string());
-    set_web_bounds(&state, Some(bounds));
     Ok(url.to_string())
 }
 
@@ -503,15 +457,6 @@ pub fn web_show(
 pub fn web_hide(app: &AppHandle) {
     if let Some(view) = app.get_webview(WEB_LABEL) {
         let _ = view.hide();
-    }
-    set_web_bounds(&app.state::<AppState>(), None);
-}
-
-fn set_web_bounds(state: &AppState, bounds: Option<WebBounds>) {
-    let mut popup = state.popup.lock().expect("popup lock");
-    if let Some(p) = popup.as_mut() {
-        p.web = bounds;
-        watch(state, p);
     }
 }
 

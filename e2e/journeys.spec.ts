@@ -301,7 +301,7 @@ test("the card moves by its header and resizes from its corner; a double-click f
   await page.goto("/popup.html?demo=passage");
   await expect(page.getByText("google.com")).toBeVisible();
   const card = page.getByRole("dialog");
-  const drags = async () => (await mockCalls(page)).filter((c) => c.command === "popup_drag_start").map((c) => c.args.kind);
+  const drags = async () => (await mockCalls(page)).filter((c) => c.command === "popup_drag").map((c) => c.args.kind);
   expect((await card.boundingBox())?.width).toBe(480);
 
   // Pressing the header hands the drag to the app; its tabs and buttons still just work.
@@ -310,26 +310,36 @@ test("the card moves by its header and resizes from its corner; a double-click f
   await expect(page.getByText("bing.com")).toBeVisible();
   expect(await drags()).toEqual(["move"]);
 
-  // Dragging the corner reports each move and the release (the stand-in app saves the
-  // window's size): the card fills its window from then on.
-  const grip = (await page.getByTestId("resize-grip").boundingBox())!;
-  await page.mouse.move(grip.x + 8, grip.y + 8);
-  await page.mouse.down();
-  await page.mouse.move(grip.x + 60, grip.y + 50, { steps: 4 });
-  await page.mouse.up();
+  // Pressing the corner hands the resize to Windows (the stand-in app saves the window's
+  // size): the card fills its window from then on.
+  await page.getByTestId("resize-grip").click();
   expect(await drags()).toEqual(["move", "resize"]);
-  const calls = (await mockCalls(page)).map((c) => c.command);
-  expect(calls).toContain("popup_drag_move");
-  expect(calls.lastIndexOf("popup_drag_end")).toBeGreaterThan(calls.lastIndexOf("popup_drag_move"));
   await expect.poll(async () => (await card.boundingBox())?.width).toBe(700 - 24);
   await expect
     .poll(async () => ((await mockCalls(page)).filter((c) => c.command === "web_show").at(-1)?.args.bounds as { width: number }).width)
     .toBe(700 - 24);
 
-  // Double-click fits it to its content again, and forgets the size.
+  // Double-click fits it to its content again, and forgets the size (without a resize).
+  await page.waitForTimeout(450);
   await page.getByTestId("resize-grip").dblclick();
+  expect(await drags()).toEqual(["move", "resize", "resize"]);
   await expect.poll(async () => (await card.boundingBox())?.width).toBe(480);
   expect((await mockCalls(page)).filter((c) => c.command === "set_card_size").at(-1)?.args).toEqual({ size: null });
+});
+
+test("Esc closes the card once it has the keyboard, but first closes the language search", async ({ page }) => {
+  await page.goto("/popup.html?demo=passage&tab=explain&lang=bn");
+  await page.getByRole("radio", { name: "Translate" }).click();
+  await expect(page.getByText(/ভাড়াটিয়াকে/)).toBeVisible({ timeout: 5000 });
+  const closes = async () => (await mockCalls(page)).filter((c) => c.command === "popup_close").length;
+
+  await page.getByRole("button", { name: /Translating into Bangla/ }).click();
+  await page.getByRole("combobox", { name: "Search languages" }).press("Escape");
+  await expect(page.getByRole("combobox")).toHaveCount(0);
+  expect(await closes()).toBe(0);
+
+  await page.keyboard.press("Escape");
+  await expect.poll(closes).toBe(1);
 });
 
 test("a card the person sized fills its window on every tab", async ({ page }) => {

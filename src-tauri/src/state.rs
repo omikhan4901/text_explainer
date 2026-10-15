@@ -15,7 +15,7 @@ use te_core::models;
 use te_core::settings::{ModelChoice, Settings};
 use te_win::{ClickOutsideWatcher, Rect, Side};
 
-use crate::popup::{AiTask, WebBounds};
+use crate::popup::AiTask;
 
 pub struct Paths {
     pub settings: PathBuf,
@@ -67,8 +67,6 @@ pub struct PopupPlacement {
     pub rect: Rect,
     /// The person moved or resized the card: it stays where they put it.
     pub placed: bool,
-    /// Where the web page shows inside the card, while it shows.
-    pub web: Option<WebBounds>,
 }
 
 pub struct AppState {
@@ -85,8 +83,8 @@ pub struct AppState {
     /// The card's last size as the page reported it (CSS pixels, with the shadow margin):
     /// a new card opens at it, since the page reports only changes.
     pub card_size: Mutex<(f64, f64)>,
-    /// The person clicked into the card's web page, so the card took focus to let them type.
-    pub web_focused: AtomicBool,
+    /// The person clicked in the card, so it can take focus (`popup::focus_card`).
+    pub focused: AtomicBool,
     pub paused: AtomicBool,
     pub hotkey: Mutex<Option<Shortcut>>,
     pub click_watcher: ClickOutsideWatcher,

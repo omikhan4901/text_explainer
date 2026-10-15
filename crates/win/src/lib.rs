@@ -42,6 +42,16 @@ pub struct Selection {
     pub method: Method,
 }
 
+/// The person moving or resizing a window with Windows' own dragging.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SizeMove {
+    Start,
+    /// The first resize step of this drag (none for a plain move).
+    Sizing,
+    /// Where the window ended up (physical pixels).
+    End(Rect),
+}
+
 /// Memory, for picking a model that fits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub struct Memory {
@@ -53,7 +63,8 @@ pub struct Memory {
 pub use imp::{
     ClickOutsideWatcher, DoubleCopyWatcher, capture_selection, cursor_position,
     foreground_process_name, hide_window, kill_with_app, memory, prepare_popup_window,
-    process_memory, set_clipboard_text, set_popup_focus, show_window_at, speak, work_area_at,
+    process_memory, set_clipboard_text, set_popup_focus, show_window_at, speak, watch_size_move,
+    work_area_at,
 };
 
 #[cfg(not(windows))]
@@ -79,6 +90,13 @@ mod stub {
         Err(Error::Unsupported)
     }
     pub fn hide_window(_hwnd: isize) {}
+    pub fn watch_size_move(
+        _hwnd: isize,
+        _min_css: (i32, i32),
+        _on_change: impl Fn(SizeMove) + Send + Sync + 'static,
+    ) -> Result<(), Error> {
+        Err(Error::Unsupported)
+    }
     pub fn place_window_async(
         _hwnd: isize,
         _x: i32,
@@ -131,18 +149,17 @@ mod stub {
         }
     }
 
-    /// Calls back when the mouse is pressed outside a rectangle, or inside a focus area
-    /// (Windows only).
+    /// Calls back when the mouse is pressed outside a rectangle, and before a press
+    /// inside it reaches the window (Windows only).
     pub struct ClickOutsideWatcher;
     impl ClickOutsideWatcher {
         pub fn start(
             _on_click_outside: impl Fn() + Send + Sync + 'static,
-            _on_focus_area: impl Fn() + Send + Sync + 'static,
+            _on_click_inside: impl Fn() + Send + Sync + 'static,
         ) -> Self {
             ClickOutsideWatcher
         }
         pub fn set_rect(&self, _rect: Option<Rect>) {}
-        pub fn set_focus_rect(&self, _rect: Option<Rect>) {}
     }
 }
 
