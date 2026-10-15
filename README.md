@@ -11,7 +11,7 @@ For contracts, papers, letters and any word you don't know, in every app, not on
 
 ### [Download for Windows](https://github.com/omikhan4901/text_explainer/releases/download/latest-build/Plainly-x64-setup.exe)
 
-<sub>Free preview · Windows 10 and 11, 64-bit · [all builds](https://github.com/omikhan4901/text_explainer/releases)</sub>
+<sub>Free preview · Windows 10 and 11, 64-bit · [all builds](https://github.com/omikhan4901/text_explainer/releases) · [plainly.omikhan.com](https://plainly.omikhan.com)</sub>
 
 <br>
 

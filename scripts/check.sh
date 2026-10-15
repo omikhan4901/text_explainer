@@ -25,6 +25,11 @@ if [ "${E2E:-0}" = "1" ]; then
   npx playwright test
 fi
 
+if [ -d site/node_modules ]; then
+  step "website: types and static build (site/)"
+  (cd site && npx tsc --noEmit && npx next build > /dev/null)
+fi
+
 if [ ! -f src-tauri/resources/dictionary.sqlite ]; then
   step "dictionary: build (bundled with the app)"
   python3 scripts/build-dictionary.py
