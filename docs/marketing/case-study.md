@@ -1,4 +1,4 @@
-# Case study: making any text readable, offline
+# Case study: Plainly, making any text readable, offline
 
 **Mehboob Ehsan Khan** · 2026 · [github.com/omikhan4901/text_explainer](https://github.com/omikhan4901/text_explainer)
 

@@ -5,7 +5,7 @@ name: Installer (latest build)
 # always holds the newest one:
 # https://github.com/omikhan4901/text_explainer/releases/tag/latest-build
 # Stable download link (the file name never changes):
-# https://github.com/omikhan4901/text_explainer/releases/download/latest-build/TextExplainer-x64-setup.exe
+# https://github.com/omikhan4901/text_explainer/releases/download/latest-build/Plainly-x64-setup.exe
 # Numbered releases still come from "Release (draft)".
 #
 # Updates: each build is version 0.1.<run number>. When the repository has the update key
@@ -79,7 +79,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $built = Get-ChildItem target/release/bundle/nsis/*.exe | Select-Object -First 1
-          $exe = Join-Path $env:RUNNER_TEMP "TextExplainer-x64-setup.exe"
+          $exe = Join-Path $env:RUNNER_TEMP "Plainly-x64-setup.exe"
           Copy-Item $built.FullName $exe
           $assets = @($exe)
           # The update manifest installed apps read: the signature covers the file's bytes,
@@ -92,7 +92,7 @@ jobs:
               pub_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
               platforms = @{ "windows-x86_64" = @{
                 signature = (Get-Content $sig -Raw).Trim()
-                url = "https://github.com/${{ github.repository }}/releases/download/latest-build/TextExplainer-x64-setup.exe"
+                url = "https://github.com/${{ github.repository }}/releases/download/latest-build/Plainly-x64-setup.exe"
               } }
             }
             $json = Join-Path $env:RUNNER_TEMP "latest.json"
@@ -103,11 +103,11 @@ jobs:
           $short = $env:GITHUB_SHA.Substring(0, 7)
           $date = (Get-Date).ToUniversalTime().ToString("d MMMM yyyy, HH:mm 'UTC'")
           $notes = @"
-          Text Explainer $env:VERSION for Windows 10 and 11 (64-bit), the newest build, made from
+          Plainly $env:VERSION for Windows 10 and 11 (64-bit), the newest build, made from
           commit $short on $date. It is replaced on every change, so it may have rough edges;
           numbered releases are the stable ones.
 
-          Download **TextExplainer-x64-setup.exe** below and run it. The installer isn't
+          Download **Plainly-x64-setup.exe** below and run it. The installer isn't
           code-signed yet, so Windows SmartScreen will warn: choose "More info", then
           "Run anyway".
 
@@ -117,4 +117,4 @@ jobs:
           # (The first time there is none, and that's fine.)
           try { gh release delete latest-build --cleanup-tag --yes } catch { }
           $global:LASTEXITCODE = 0
-          gh release create latest-build @assets --latest --title "Text Explainer (preview build)" --notes $notes --target $env:GITHUB_SHA
+          gh release create latest-build @assets --latest --title "Plainly (preview build)" --notes $notes --target $env:GITHUB_SHA

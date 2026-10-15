@@ -137,6 +137,12 @@ Decisions that belong to the owner (not built until decided):
 
 ## Decisions made while building
 
+- Renamed to **Plainly** on 15 October 2026 (owner). The app identifier stays
+  `dev.omikhan.textexplainer` so settings, models and the word book carry over; the
+  repository, crate names and paths keep the old name. The installer is now
+  `Plainly-x64-setup.exe`; an install made under the old name sits in its own folder and
+  can be uninstalled once Plainly is installed.
+
 - Tauri 2 (stable), not Tauri 3 (alpha in Oct 2026).
 - This build container can't reach Hugging Face or GitHub release downloads, so models are
   only run in CI (the eval workflow) and on the owner's machine.

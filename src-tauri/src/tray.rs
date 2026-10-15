@@ -19,7 +19,7 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         true,
         None::<&str>,
     )?;
-    let quit = MenuItem::with_id(app, "quit", "Quit Text Explainer", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quit Plainly", true, None::<&str>)?;
     Menu::with_items(
         app,
         &[
@@ -35,12 +35,9 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
 fn tooltip(app: &AppHandle) -> String {
     let state = app.state::<AppState>();
     if state.paused.load(Ordering::SeqCst) {
-        "Text Explainer (paused)".into()
+        "Plainly (paused)".into()
     } else {
-        format!(
-            "Text Explainer: select text, press {}",
-            state.settings().hotkey
-        )
+        format!("Plainly: select text, press {}", state.settings().hotkey)
     }
 }
 

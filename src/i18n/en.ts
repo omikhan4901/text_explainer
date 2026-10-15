@@ -1,7 +1,7 @@
 // Every UI string. Keys are grouped by screen.
 export const en = {
   app: {
-    name: "Text Explainer",
+    name: "Plainly",
     tagline: "Select text anywhere, get a readable version. Fully offline.",
   },
   level: {
@@ -42,7 +42,7 @@ export const en = {
     noSelectionTitle: "Nothing selected",
     noSelection: (hotkey: string) => `Select some text, then press ${hotkey}. Or copy it twice with Ctrl+C, C.`,
     noModelTitle: "Choose a model first",
-    noModel: "Text Explainer needs a model to read with. It takes a minute to set up.",
+    noModel: "Plainly needs a model to read with. It takes a minute to set up.",
     setUp: "Set up",
     errorTitle: "Couldn't explain this",
     details: "Details",
@@ -161,7 +161,7 @@ export const en = {
     promptCustom: "Custom",
     promptDefault: "Built-in",
     unload: "Free memory now",
-    engineMissing: "The model engine is missing. Reinstall Text Explainer.",
+    engineMissing: "The model engine is missing. Reinstall Plainly.",
   },
   reading: {
     title: "Reading",

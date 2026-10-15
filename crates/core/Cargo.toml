@@ -1,6 +1,6 @@
 [package]
 name = "te-core"
-description = "Text Explainer core: text cleanup, readability, guards, prompts, local model engine"
+description = "Plainly core: text cleanup, readability, guards, prompts, local model engine"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

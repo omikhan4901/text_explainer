@@ -1,7 +1,8 @@
-# Working on Text Explainer
+# Working on Plainly
 
 Offline desktop app: select text anywhere, press a hotkey, get a readable version next to
-the cursor. Runs a small local model (llama.cpp) on an 8 GB CPU-only laptop.
+the cursor. Renamed from Text Explainer on 15 October 2026; keep the identifier
+`dev.omikhan.textexplainer` (it holds people's settings and data). Runs a small local model (llama.cpp) on an 8 GB CPU-only laptop.
 The plan is `docs/IMPLEMENTATION_PLAN.md` (sources, translation and Definer parity: `docs/SOURCES_PLAN.md`); progress and the next step are in
 `docs/PROGRESS.md`. Read both before starting work, and update `PROGRESS.md` as you go.
 `docs/GUIDE.md` explains how everything works (keep it true when you change how things work).

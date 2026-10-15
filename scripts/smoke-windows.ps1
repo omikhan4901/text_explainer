@@ -10,8 +10,8 @@ Write-Host "Installing $($installer.Name)"
 $p = Start-Process $installer.FullName -ArgumentList "/S" -Wait -PassThru
 if ($p.ExitCode -ne 0) { throw "The installer exited with $($p.ExitCode)" }
 
-# Per-user install: usually %LOCALAPPDATA%\Text Explainer; otherwise find it by the engine.
-$server = Get-Item (Join-Path $env:LOCALAPPDATA "Text Explainer\resources\llama\llama-server.exe") -ErrorAction SilentlyContinue
+# Per-user install: usually %LOCALAPPDATA%\Plainly; otherwise find it by the engine.
+$server = Get-Item (Join-Path $env:LOCALAPPDATA "Plainly\resources\llama\llama-server.exe") -ErrorAction SilentlyContinue
 if (-not $server) {
   $server = Get-ChildItem $env:LOCALAPPDATA -Recurse -Depth 4 -Filter "llama-server.exe" -ErrorAction SilentlyContinue |
     Where-Object { $_.FullName -like "*\resources\llama\*" } | Select-Object -First 1
@@ -65,7 +65,7 @@ function Test-AppStart($arguments, $label) {
     while ((Get-Date) -lt $deadline -and -not $line) {
       if ($proc.HasExited) { throw "The app exited during startup with $($proc.ExitCode)" }
       if (Test-Path $log) {
-        $line = Select-String -Path $log -Pattern "Text Explainer started" | Select-Object -First 1
+        $line = Select-String -Path $log -Pattern "Plainly started" | Select-Object -First 1
       }
       if (-not $line) { Start-Sleep -Milliseconds 500 }
     }

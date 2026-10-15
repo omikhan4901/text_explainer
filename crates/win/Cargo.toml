@@ -1,6 +1,6 @@
 [package]
 name = "te-win"
-description = "Text Explainer Windows integration: selection capture, clipboard, popup window styles"
+description = "Plainly Windows integration: selection capture, clipboard, popup window styles"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

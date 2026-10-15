@@ -1,4 +1,4 @@
-# How Text Explainer works
+# How Plainly works
 
 A guide to the code for anyone changing it. Keep it true when you change how things work.
 
@@ -84,7 +84,7 @@ each once, at most 50 (`settings.excluded_apps`, default: KeePass, KeePassXC, 1P
 Bitwarden). Before the shortcut or a double Ctrl+C does anything, `trigger.rs` asks
 `te_win::foreground_process_name` (the foreground window's process, opened with
 `PROCESS_QUERY_LIMITED_INFORMATION`) and does nothing at all for an app on the list: no
-capture, no clipboard, no card. It also remembers that app (not Text Explainer itself) so
+capture, no clipboard, no card. It also remembers that app (not Plainly itself) so
 Settings can offer "Add <app>" (`last_app`); names typed in Settings are checked by
 `validate_app`. The Look up box doesn't read from any app, so it isn't affected.
 

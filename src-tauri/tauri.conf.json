@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Text Explainer",
+  "productName": "Plainly",
   "version": "0.1.0",
   "identifier": "dev.omikhan.textexplainer",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Text Explainer",
+        "title": "Plainly",
         "url": "index.html",
         "width": 920,
         "height": 640,
@@ -24,7 +24,7 @@
       },
       {
         "label": "popup",
-        "title": "Text Explainer",
+        "title": "Plainly",
         "url": "popup.html",
         "width": 460,
         "height": 360,

@@ -1,6 +1,6 @@
 [package]
 name = "te-eval"
-description = "Measures models for Text Explainer: speed, memory, readability gain, meaning and language faithfulness"
+description = "Measures models for Plainly: speed, memory, readability gain, meaning and language faithfulness"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

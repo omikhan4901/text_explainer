@@ -2,14 +2,14 @@
 
 <img src="docs/logo.png" alt="" width="88">
 
-# Text Explainer
+# Plainly
 
 **Select hard text anywhere on Windows. Read it in plain words, right next to it.**
 
 Web searches, a dictionary and a private AI in one small card.<br>
 For contracts, papers, letters and any word you don't know, in every app, not only the browser.
 
-### [Download for Windows](https://github.com/omikhan4901/text_explainer/releases/download/latest-build/TextExplainer-x64-setup.exe)
+### [Download for Windows](https://github.com/omikhan4901/text_explainer/releases/download/latest-build/Plainly-x64-setup.exe)
 
 <sub>Free preview · Windows 10 and 11, 64-bit · [all builds](https://github.com/omikhan4901/text_explainer/releases)</sub>
 
@@ -90,7 +90,7 @@ Save a word from the card, hear it read aloud, and export your list to Excel or 
 
 ## Install
 
-1. [Download the installer](https://github.com/omikhan4901/text_explainer/releases/download/latest-build/TextExplainer-x64-setup.exe)
+1. [Download the installer](https://github.com/omikhan4901/text_explainer/releases/download/latest-build/Plainly-x64-setup.exe)
    and run it. It isn't code-signed yet, so Windows shows a warning: choose
    **More info**, then **Run anyway**.
 2. First run asks one question (search the web first, or offline only) and helps you pick

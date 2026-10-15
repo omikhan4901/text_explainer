@@ -1,4 +1,4 @@
-//! The Text Explainer desktop app: tray, global hotkey and double Ctrl+C, the reading
+//! The Plainly desktop app: tray, global hotkey and double Ctrl+C, the reading
 //! card, settings and model management.
 
 mod commands;
@@ -125,7 +125,7 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         engine_found = state.paths.llama_server.is_file(),
         dictionary = state.dictionary.lock().is_ok_and(|d| d.is_some()),
         hotkey_registered = state.hotkey.lock().is_ok_and(|h| h.is_some()),
-        "Text Explainer started"
+        "Plainly started"
     );
     updater::init(&handle);
     Ok(())
@@ -230,5 +230,5 @@ pub fn run() {
             _ => {}
         })
         .run(tauri::generate_context!())
-        .expect("error while running Text Explainer");
+        .expect("error while running Plainly");
 }

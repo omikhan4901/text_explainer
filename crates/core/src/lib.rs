@@ -1,4 +1,4 @@
-//! Text Explainer core.
+//! Plainly core.
 //!
 //! Everything that isn't Windows UI lives here so it can be tested on any platform:
 //! text cleanup and classification, readability scores, the meaning and language guards,

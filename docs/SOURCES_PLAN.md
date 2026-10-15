@@ -1,6 +1,6 @@
 # Sources, translation and Definer parity: plan
 
-Decided by the owner on 15 October 2026: Text Explainer does everything
+Decided by the owner on 15 October 2026: Plainly does everything
 [Definer](https://chromewebstore.google.com/detail/mkhlnnpfjieohiohgbphcnfdkmniofac) does,
 plus the local AI that Definer can't do. **It stays desktop software, never a browser
 extension.** Everything here is built into the app and works in browsers the same way it
@@ -18,7 +18,7 @@ tabbed card, page sources in a child web view, the Sources settings page, the Lo
 
 ### What Definer does (parity)
 
-| Definer | In Text Explainer |
+| Definer | In Plainly |
 |---|---|
 | Bubble next to the selection | The reading card, already placed by the selection's rectangle in any app, browsers included |
 | Several sources in one bubble | The card gets tabs: Explain, Translate, Dictionary, then web sources |

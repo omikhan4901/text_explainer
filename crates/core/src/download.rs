@@ -101,7 +101,7 @@ pub async fn download(
     let client = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(20))
         .read_timeout(Duration::from_secs(60))
-        .user_agent(concat!("TextExplainer/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("Plainly/", env!("CARGO_PKG_VERSION")))
         .build()
         .map_err(|e| DownloadError::Network(e.to_string()))?;
 

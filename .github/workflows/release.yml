@@ -45,7 +45,7 @@ jobs:
           $exe = Get-ChildItem target/release/bundle/nsis/*.exe | Select-Object -First 1
           $hash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLower()
           $notes = @"
-          Text Explainer ${{ inputs.version }} for Windows 10 and 11 (64-bit).
+          Plainly ${{ inputs.version }} for Windows 10 and 11 (64-bit).
 
           Select text anywhere, press Ctrl+Shift+Space (or copy it twice), and a readable
           version appears next to it. Runs fully offline after a one-time model download.
@@ -55,4 +55,4 @@ jobs:
 
           SHA-256 of $($exe.Name): $hash
           "@
-          gh release create "v${{ inputs.version }}" $exe.FullName --draft --title "Text Explainer ${{ inputs.version }}" --notes $notes --target $env:GITHUB_SHA
+          gh release create "v${{ inputs.version }}" $exe.FullName --draft --title "Plainly ${{ inputs.version }}" --notes $notes --target $env:GITHUB_SHA

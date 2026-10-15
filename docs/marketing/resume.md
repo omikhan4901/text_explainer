@@ -3,7 +3,7 @@
 Pick 3–4. Every number is measured (see `docs/PROGRESS.md`). Don't claim users or
 downloads until they exist.
 
-**Text Explainer**: offline "make this readable" desktop app (Rust, Tauri, React/TypeScript, llama.cpp) · 2026
+**Plainly**: offline "make this readable" desktop app (Rust, Tauri, React/TypeScript, llama.cpp) · 2026
 
 - Built a Windows desktop app that rewrites any selected text at a chosen reading level
   using a small language model running locally through llama.cpp, with no data leaving

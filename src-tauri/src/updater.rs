@@ -95,7 +95,7 @@ async fn check_once(app: &AppHandle) -> Result<Status, String> {
         asker
             .dialog()
             .message(format!(
-                "Text Explainer {question} is ready. Install it now? The app closes, updates \
+                "Plainly {question} is ready. Install it now? The app closes, updates \
                  and opens again."
             ))
             .title("Update available")

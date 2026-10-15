@@ -14,7 +14,7 @@ use crate::prompt::Message;
 
 #[derive(Debug, thiserror::Error)]
 pub enum EngineError {
-    #[error("the bundled model engine is missing ({0}); reinstall Text Explainer")]
+    #[error("the bundled model engine is missing ({0}); reinstall Plainly")]
     MissingEngine(PathBuf),
     #[error("the model file is missing ({0}); choose or download a model in Settings")]
     MissingModel(PathBuf),

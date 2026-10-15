@@ -1,6 +1,6 @@
 # LinkedIn post (draft; post when the first release is out)
 
-I've been building Text Explainer: select hard text in any app, press one key, and a
+I've been building Plainly: select hard text in any app, press one key, and a
 clear version appears next to it. Contracts, papers, forms, medical letters.
 
 It runs entirely on your laptop. No account, no cloud, nothing you read leaves the

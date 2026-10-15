@@ -6,7 +6,7 @@ not code-signed), so the posts call it a preview and invite feedback. Change tha
 once the first numbered release is out.
 
 Download link used below:
-https://github.com/omikhan4901/text_explainer/releases/download/latest-build/TextExplainer-x64-setup.exe
+https://github.com/omikhan4901/text_explainer/releases/download/latest-build/Plainly-x64-setup.exe
 
 Screenshots are in `docs/screenshots/`. They show the real interface running against the
 app's built-in demo data (the sample text and its translation are demo content, not a
@@ -23,7 +23,7 @@ Suggested order: post 1 (launch), then one feature post every two or three days.
 > I've been building something for everyone who has ever read a sentence three times and
 > still not understood it.
 >
-> **Text Explainer** is a small Windows app. Select any hard text, in any app (a PDF, a
+> **Plainly** is a small Windows app. Select any hard text, in any app (a PDF, a
 > Word file, an email, a website), press Ctrl+Shift+Space, and a card opens right next to
 > it: web searches, a dictionary, and "Explain with AI", which rewrites the text in plain
 > language.
@@ -32,7 +32,7 @@ Suggested order: post 1 (launch), then one feature post every two or three days.
 > graphics card, and what you send it never leaves your machine.
 >
 > It's an early preview, free to try:
-> https://github.com/omikhan4901/text_explainer/releases/download/latest-build/TextExplainer-x64-setup.exe
+> https://github.com/omikhan4901/text_explainer/releases/download/latest-build/Plainly-x64-setup.exe
 >
 > Windows will warn you because the installer isn't signed yet: click "More info", then
 > "Run anyway". I'd love to hear what you think, especially what breaks.
@@ -43,7 +43,7 @@ Suggested order: post 1 (launch), then one feature post every two or three days.
 
 **Image:** `feature-translate.png` (your text above its Bangla translation)
 
-> New in Text Explainer: translate without sending your text to anyone.
+> New in Plainly: translate without sending your text to anyone.
 >
 > The AI tab now has two buttons: Explain and Translate. Translation runs on your
 > computer, so contracts, medical letters and private messages stay private.
@@ -65,7 +65,7 @@ Suggested order: post 1 (launch), then one feature post every two or three days.
 
 **Image:** `feature-words.png` (the Words page with saved words)
 
-> Students: Text Explainer now keeps the words you look up.
+> Students: Plainly now keeps the words you look up.
 >
 > Press the bookmark on the card to save a word with its meaning. Find it again on the
 > Words page, hear it read aloud, and export your list to Excel or straight into Anki for
@@ -83,7 +83,7 @@ Suggested order: post 1 (launch), then one feature post every two or three days.
 
 > Sometimes the word isn't on your screen: you heard it in a lecture or a meeting.
 >
-> Press the Text Explainer shortcut with nothing selected (or pick "Look up" in the tray)
+> Press the Plainly shortcut with nothing selected (or pick "Look up" in the tray)
 > and type it. The same card opens with searches, the dictionary and the AI.
 >
 > Free preview for Windows: (link)
@@ -96,7 +96,7 @@ Suggested order: post 1 (launch), then one feature post every two or three days.
 
 > A question I get: "Does it read everything I select?"
 >
-> No. Text Explainer only reads a selection when you press its shortcut or copy the same
+> No. Plainly only reads a selection when you press its shortcut or copy the same
 > text twice. And there's a list of apps it never reads from at all: password managers are
 > on it from the start, and you can add any app.
 >
@@ -113,7 +113,7 @@ Suggested order: post 1 (launch), then one feature post every two or three days.
 
 > কোনো বাক্য তিনবার পড়েও বুঝতে পারেননি? এমন সবার জন্য একটা ছোট অ্যাপ বানাচ্ছি।
 >
-> **Text Explainer** একটি Windows অ্যাপ। যেকোনো অ্যাপে (PDF, Word, ইমেইল, ওয়েবসাইট)
+> **Plainly** একটি Windows অ্যাপ। যেকোনো অ্যাপে (PDF, Word, ইমেইল, ওয়েবসাইট)
 > কঠিন লেখা সিলেক্ট করে Ctrl+Shift+Space চাপুন: পাশেই একটা কার্ড খুলবে। সেখানে ওয়েব
 > সার্চ, ডিকশনারি, আর AI, যা লেখাটা সহজ ভাষায় বুঝিয়ে দেয় বা বাংলায় অনুবাদ করে দেয়।
 >

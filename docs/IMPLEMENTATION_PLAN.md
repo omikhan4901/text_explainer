@@ -1,4 +1,4 @@
-# Text Explainer: implementation plan
+# Plainly: implementation plan
 
 Approved by the owner on 2026-10-01. Decisions: Atlas design, Windows first (MVP before
 other platforms), "select to show" off by default, a balanced model (between the fastest
