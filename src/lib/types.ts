@@ -112,6 +112,8 @@ export interface AppInfo {
   recommended: string;
   total_ram_bytes: number | null;
   languages: LanguageInfo[];
+  /** The "Translate into" choices; `ai` is false for those only the web Translate tab can do. */
+  translate_languages: TranslateLanguage[];
   engine_found: boolean;
   model_loaded: boolean;
   downloading: string | null;
@@ -181,9 +183,9 @@ export interface DictionaryEntry {
 export type AiMode = "running" | "deferred" | "off";
 
 export type PopupEvent =
-  | { type: "open"; id: number; ai: AiMode; kind: SelectionKind; query: string; web: WebTab[] }
+  | { type: "open"; id: number; ai: AiMode; kind: SelectionKind; query: string; web: WebTab[]; translate: TranslateAvailability }
   | { type: "dictionary"; id: number; entry: DictionaryEntry }
-  | { type: "explain"; id: number; event: ExplainEvent }
+  | { type: "explain"; id: number; task: AiTask; event: ExplainEvent }
   | { type: "no_selection"; hotkey: string }
   | { type: "no_model" }
   | { type: "capture_failed"; message: string }
@@ -194,3 +196,19 @@ export type DownloadEvent =
   | { state: "done"; id: string }
   | { state: "failed"; id: string; message: string }
   | { state: "cancelled"; id: string };
+
+/** What the card's AI tab does: explain at the reading level, or translate (`translate.rs`). */
+export type AiTask = "explain" | "translate";
+
+/** Whether the AI can translate this selection into the language chosen in Settings. */
+export type TranslateAvailability =
+  | { state: "available"; code: string; name: string }
+  | { state: "same_language"; name: string }
+  | { state: "unsupported"; name: string };
+
+export interface TranslateLanguage {
+  code: string;
+  name: string;
+  native: string;
+  ai: boolean;
+}

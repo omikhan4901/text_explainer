@@ -1,7 +1,7 @@
 // A stand-in for the Rust app when the pages run in a plain browser. It keeps settings in
 // memory, simulates downloads, and can play scripted reading-card scenarios
 // (`popup.html?demo=passage`) for development, tests and screenshots.
-import type { AppInfo, ExplainEvent, ModelInfo, PopupEvent, Settings, WebSource, WebTab } from "./types";
+import type { AiTask, AppInfo, ExplainEvent, ModelInfo, PopupEvent, Settings, TranslateAvailability, WebSource, WebTab } from "./types";
 
 type Handler = (payload: unknown) => void;
 
@@ -131,6 +131,9 @@ const installed = new Set<string>();
 if (typeof location !== "undefined" && new URLSearchParams(location.search).get("offline") === "1") {
   settings = { ...settings, offline_only: true };
 }
+// `?lang=bn` sets "Translate into" (the AI tab's Translate and the web Translate tab).
+const langParam = typeof location !== "undefined" ? new URLSearchParams(location.search).get("lang") : null;
+if (langParam) settings = { ...settings, translate_to: langParam };
 // `?state=ready` starts as if set up already (for screenshots of the settings pages).
 if (typeof location !== "undefined" && new URLSearchParams(location.search).get("state") === "ready") {
   installed.add("gemma-4-e2b");
@@ -157,6 +160,7 @@ function info(): AppInfo {
       { code: "es", name: "Spanish", native: "Español" },
       { code: "fr", name: "French", native: "Français" },
     ],
+    translate_languages: TRANSLATE_LANGUAGES,
     engine_found: true,
     model_loaded: false,
     downloading,
@@ -220,6 +224,12 @@ async function call<T>(command: string, args: Record<string, unknown> = {}): Pro
     case "set_level":
       settings = { ...settings, level: args.level as Settings["level"] };
       if (pendingAi) void pendingAi(demoId);
+      return undefined as T;
+    case "set_ai_task":
+      if (args.id === demoId) {
+        aiTask = args.task as AiTask;
+        if (pendingAi) void pendingAi(demoId);
+      }
       return undefined as T;
     case "explain_now":
       if (args.id === demoId && pendingAi) void pendingAi(demoId);
@@ -322,6 +332,7 @@ async function playDemo(name: string) {
   currentDemo = name;
   clearTimeout(demoTimer);
   const id = ++demoId;
+  aiTask = "explain";
   if (name === "no_model") return emit("te://popup", { type: "no_model" });
   if (name === "no_selection") return emit("te://popup", { type: "no_selection", hotkey: settings.hotkey });
   const word = name === "word" || name === "word_offline";
@@ -336,6 +347,7 @@ async function playDemo(name: string) {
     kind: word ? "word" : "passage",
     query: word ? "ubiquitous" : SOURCE,
     web,
+    translate: translateAvailability(),
   } satisfies PopupEvent);
   if (word) emit("te://popup", { type: "dictionary", id, entry: UBIQUITOUS } satisfies PopupEvent);
   pendingAi = word ? explainWord : (requestId) => explainPassage(requestId, name);
@@ -343,7 +355,8 @@ async function playDemo(name: string) {
 }
 
 async function explainPassage(id: number, name: string) {
-  const send = (event: ExplainEvent) => emit("te://popup", { type: "explain", id, event } satisfies PopupEvent);
+  if (aiTask === "translate") return translateDemo(id, "passage");
+  const send = (event: ExplainEvent) => emit("te://popup", { type: "explain", id, task: "explain", event } satisfies PopupEvent);
   send({ type: "started", kind: "passage", source: SOURCE, truncated: false, grade_before: 17.4, parts: 1, language: "English" });
   if (name === "loading") {
     send({ type: "loading" });
@@ -376,13 +389,56 @@ async function explainPassage(id: number, name: string) {
 
 /** A word's meaning in its text, once the card's AI tab asks for it. */
 async function explainWord(id: number) {
-  const send = (event: ExplainEvent) => emit("te://popup", { type: "explain", id, event } satisfies PopupEvent);
+  if (aiTask === "translate") return translateDemo(id, "word");
+  const send = (event: ExplainEvent) => emit("te://popup", { type: "explain", id, task: "explain", event } satisfies PopupEvent);
   send({ type: "started", kind: "word", source: "ubiquitous", truncated: false, grade_before: null, parts: 1, language: "English" });
   await sleep(500);
   if (id !== demoId) return;
   const text = "Here it means found almost everywhere: smartphones are part of nearly every moment of daily life.";
   send({ type: "part_done", part: 0, text });
   send({ type: "done", text, grade_after: null, report: { missing: [], added: [] }, timings: null, elapsed_ms: 480 });
+}
+
+/** The AI's translation in the demos (canned; the app runs the local model). */
+const TRANSLATIONS: Record<string, { word: string; passage: string }> = {
+  bn: {
+    word: "সর্বব্যাপী: এখানে অর্থ প্রায় সব জায়গায় পাওয়া যায়।",
+    passage:
+      "এই চুক্তিতে যা-ই থাকুক না কেন, ভাড়াটিয়াকে প্রতি মাসের ৫ তারিখের মধ্যে মাসিক ভাড়া $1,200 পরিশোধ করতে হবে; না হলে বকেয়া অর্থের 5% বিলম্ব ফি যোগ হবে।",
+  },
+  es: {
+    word: "ubicuo: aquí significa que está en casi todas partes.",
+    passage:
+      "Sin perjuicio de cualquier disposición en contrario de este Contrato, el Arrendatario pagará el alquiler mensual de $1,200 a más tardar el día 5 de cada mes; de lo contrario, se aplicará un recargo del 5% sobre el importe pendiente.",
+  },
+};
+
+const TRANSLATE_LANGUAGES = [
+  { code: "en", name: "English", native: "English", ai: true },
+  { code: "bn", name: "Bangla", native: "বাংলা", ai: true },
+  { code: "es", name: "Spanish", native: "Español", ai: true },
+  { code: "th", name: "Thai", native: "ไทย", ai: false },
+];
+
+let aiTask: AiTask = "explain";
+
+/** The demo texts are English: Translate is offered for the other AI languages. */
+function translateAvailability(): TranslateAvailability {
+  const lang = TRANSLATE_LANGUAGES.find((l) => l.code === settings.translate_to) ?? TRANSLATE_LANGUAGES[0]!;
+  if (!lang.ai) return { state: "unsupported", name: lang.name };
+  if (lang.code === "en") return { state: "same_language", name: lang.name };
+  return { state: "available", code: lang.code, name: lang.name };
+}
+
+async function translateDemo(id: number, kind: "word" | "passage") {
+  const send = (event: ExplainEvent) => emit("te://popup", { type: "explain", id, task: "translate", event } satisfies PopupEvent);
+  const lang = settings.translate_to;
+  send({ type: "started", kind, source: kind === "word" ? "ubiquitous" : SOURCE, truncated: false, grade_before: null, parts: 1, language: lang });
+  await sleep(400);
+  if (id !== demoId || aiTask !== "translate") return;
+  const text = (TRANSLATIONS[lang] ?? TRANSLATIONS.es!)[kind];
+  send({ type: "part_done", part: 0, text });
+  send({ type: "done", text, grade_after: null, report: { missing: [], added: [] }, timings: null, elapsed_ms: 900 });
 }
 
 /** A source's page address, as the app builds it (sources.rs). */

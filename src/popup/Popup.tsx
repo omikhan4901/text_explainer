@@ -8,7 +8,7 @@ import { strings } from "../i18n";
 import { api, inApp, on } from "../lib/ipc";
 import { mock } from "../lib/mock";
 import { applyAppearance, followSystemTheme } from "../lib/theme";
-import type { DictionaryEntry, Level, PopupEvent, Sense, Settings } from "../lib/types";
+import type { AiTask, DictionaryEntry, Level, PopupEvent, Sense, Settings } from "../lib/types";
 import {
   answerText,
   copyable,
@@ -35,6 +35,10 @@ const ICON = 15;
 
 export function Popup() {
   const [state, dispatch] = useReducer(reduce, initialState);
+  const setTask = useCallback((id: number, task: AiTask) => {
+    dispatch({ type: "set_task", task });
+    void api.setAiTask(id, task);
+  }, []);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [pinned, setPinned] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -124,6 +128,7 @@ export function Popup() {
             pinned={pinned}
             onPin={togglePin}
             onTab={(tab) => dispatch({ type: "select_tab", tab })}
+            onTask={(task) => setTask(state.id, task)}
           />
         ) : (
           <MessageCard state={state} pinned={pinned} onPin={togglePin} />
@@ -152,12 +157,14 @@ function ExplainCard({
   pinned,
   onPin,
   onTab,
+  onTask,
 }: {
   state: Explaining;
   level: Level;
   pinned: boolean;
   onPin: () => void;
   onTab: (tab: TabId) => void;
+  onTask: (task: AiTask) => void;
 }) {
   const word = isWord(state);
   // With web tabs every tab keeps the page's height, so switching never resizes the card.
@@ -186,7 +193,7 @@ function ExplainCard({
         {state.dictionary && <DictionaryPane entry={state.dictionary} copyText={copyable(state)} />}
       </Tabs.Content>
       <Tabs.Content value="explain" className="flex min-h-0 flex-col focus-visible:outline-none" style={steady}>
-        <ExplainPane state={state} level={level} />
+        <ExplainPane state={state} level={level} onTask={onTask} />
       </Tabs.Content>
     </Tabs.Root>
   );
@@ -346,7 +353,28 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function ExplainPane({ state, level }: { state: Explaining; level: Level }) {
+/** Explain or Translate: what the AI tab does for this selection. */
+function TaskSwitch({ state, onTask }: { state: Explaining; onTask: (task: AiTask) => void }) {
+  const tr = state.translate;
+  const why = tr.state === "same_language" ? strings.translate.already(tr.name) : tr.state === "unsupported" ? strings.translate.webOnly(tr.name) : undefined;
+  return (
+    <div className="flex items-center gap-2.5 px-4 pt-3">
+      <Segmented<AiTask>
+        size="sm"
+        label={strings.translate.label}
+        value={state.task}
+        onChange={onTask}
+        options={[
+          { value: "explain", label: strings.translate.explain },
+          { value: "translate", label: strings.translate.to(tr.name), title: why, disabled: tr.state !== "available" },
+        ]}
+      />
+      {why && <span className="min-w-0 truncate text-[12px] text-muted">{why}</span>}
+    </div>
+  );
+}
+
+function ExplainPane({ state, level, onTask }: { state: Explaining; level: Level; onTask: (task: AiTask) => void }) {
   const text = answerText(state);
   const streaming = isStreaming(state);
   const badge = gradeBadge(state);
@@ -372,7 +400,8 @@ function ExplainPane({ state, level }: { state: Explaining; level: Level }) {
 
   return (
     <>
-      <div key={state.id} className="card-in min-h-0 overflow-y-auto px-4 pt-3.5 pb-4" aria-live="polite" aria-busy={!state.done}>
+      <TaskSwitch state={state} onTask={onTask} />
+      <div key={`${state.id}-${state.task}`} className="card-in min-h-0 overflow-y-auto px-4 pt-3 pb-4" aria-live="polite" aria-busy={!state.done}>
         {state.error ? (
           <ErrorBlock message={state.error.message} detail={state.error.detail} />
         ) : text ? (
@@ -405,7 +434,7 @@ function ExplainPane({ state, level }: { state: Explaining; level: Level }) {
       )}
 
       <Footer>
-        {passage ? (
+        {passage && state.task === "explain" ? (
           <Segmented<Level>
             size="sm"
             label={strings.level.label}

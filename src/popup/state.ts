@@ -1,5 +1,5 @@
 // What the reading card shows, driven by events from the app. Pure so it's easy to test.
-import type { AiMode, DictionaryEntry, PopupEvent, Report, SelectionKind, WebTab } from "../lib/types";
+import type { AiMode, AiTask, DictionaryEntry, PopupEvent, Report, SelectionKind, TranslateAvailability, WebTab } from "../lib/types";
 
 /** The card's tabs: web searches (`web:<source id>`), the bundled dictionary, and the
  * model's explanation ("Explain with AI"). */
@@ -14,6 +14,9 @@ export interface Explaining {
   /** The selection, one line, for the header. */
   query: string;
   web: WebTab[];
+  /** What the AI tab does: explain, or translate into the language from Settings. */
+  task: AiTask;
+  translate: TranslateAvailability;
   started: boolean;
   kind: SelectionKind;
   source: string;
@@ -40,8 +43,8 @@ export type CardState =
   | { view: "capture_failed"; message: string }
   | Explaining;
 
-/** What the card itself does (the person picks a tab). */
-export type CardAction = { type: "select_tab"; tab: TabId };
+/** What the card itself does (the person picks a tab, or Explain / Translate in the AI tab). */
+export type CardAction = { type: "select_tab"; tab: TabId } | { type: "set_task"; task: AiTask };
 
 export const initialState: CardState = { view: "empty" };
 
@@ -58,6 +61,8 @@ function fresh(event: Extract<PopupEvent, { type: "open" }>): Explaining {
     tab: event.web[0] ? webTab(event.web[0].id) : "explain",
     query: event.query,
     web: event.web,
+    task: "explain",
+    translate: event.translate,
     started: false,
     kind: event.kind,
     source: "",
@@ -84,6 +89,23 @@ export function reduce(state: CardState, event: PopupEvent | CardAction): CardSt
       if (state.view !== "explain" || !tabs(state).includes(event.tab)) return state;
       // Opening the AI tab starts the model (the card then asks the app for it).
       return { ...state, tab: event.tab, ai: event.tab === "explain" && state.ai === "deferred" ? "requested" : state.ai };
+    case "set_task": {
+      if (state.view !== "explain" || state.task === event.task || !canRun(state, event.task)) return state;
+      // The app runs the request again with the other task; the old answer goes now.
+      return {
+        ...state,
+        task: event.task,
+        started: false,
+        parts: [],
+        loadingModel: false,
+        done: false,
+        gradeAfter: null,
+        report: null,
+        error: null,
+        elapsedMs: null,
+        tokensPerSecond: null,
+      };
+    }
     case "no_selection":
       return { view: "no_selection", hotkey: event.hotkey };
     case "no_model":
@@ -104,8 +126,8 @@ export function reduce(state: CardState, event: PopupEvent | CardAction): CardSt
       };
     }
     case "explain": {
-      // Events from an earlier request (still finishing) are ignored.
-      if (state.view !== "explain" || state.id !== event.id) return state;
+      // Events from an earlier request, or for the task the person just left, are ignored.
+      if (state.view !== "explain" || state.id !== event.id || event.task !== state.task) return state;
       const e = event.event;
       switch (e.type) {
         case "started":
@@ -199,8 +221,14 @@ export function isWorking(state: Explaining): boolean {
   return (state.ai === "requested" || state.ai === "running") && !state.done;
 }
 
-/** Only show the grade when it means something (passages, both grades known). */
+/** Whether the AI tab can do `task` for this selection (Translate needs a supported language
+ * that the text isn't already in). */
+export function canRun(state: Explaining, task: AiTask): boolean {
+  return task === "explain" || state.translate.state === "available";
+}
+
+/** Only show the grade when it means something (explained passages, both grades known). */
 export function gradeBadge(state: Explaining): { before: number; after: number } | null {
-  if (state.kind !== "passage" || state.gradeBefore == null || state.gradeAfter == null) return null;
+  if (state.task !== "explain" || state.kind !== "passage" || state.gradeBefore == null || state.gradeAfter == null) return null;
   return { before: state.gradeBefore, after: state.gradeAfter };
 }

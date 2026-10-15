@@ -74,6 +74,33 @@ console window, and logs to `%LOCALAPPDATA%\dev.omikhan.textexplainer\logs`. A W
 object (`te_win::kill_with_app`) ensures it dies with the app. It's started on the first
 request, restarted if it crashes, and stopped after the idle time in Settings.
 
+## Private translation
+
+The AI tab has two tasks: **Explain** (the plain-language rewrite at the reading level) and
+**Translate to <language>**, where the language is "Translate into" on the Sources page
+(the same setting the web Translate tab uses for `{lang}`). Translation runs on the local
+model like an explanation, so the text never leaves the computer.
+
+- The card opens on Explain; switching runs the same request again with the other task
+  (`set_ai_task`), and events for the task just left are dropped by the card.
+- Translate is offered only when it can be guarded: the target needs a script the language
+  guard knows (`translate::target`; Thai, for example, is web only), and a selection
+  already in that language says "Already in English" instead. A word's language is told
+  from its sentence when the word alone can't tell (`translate::availability`).
+- Prompts (`prompt::translate`, `prompt::translate_word`): translate everything, in order,
+  keep every number, date and name, add nothing, write only the target language. A word
+  gets its translation plus a short note on the sense it has in its sentence.
+- The language guard constrains the answer to the target's script (plus digits,
+  punctuation, and Latin for names), and the script check retries a drifted answer, as
+  for explanations.
+- The meaning guard compares numbers after turning native digits (Bangla, Devanagari,
+  Arabic-Indic, full-width) into ASCII ones, and dates likewise. Names are only compared
+  when both languages share a script, since translation rightly changes their script.
+- Token budgets are per target script (`prompt::max_tokens_for_translation`): Bangla,
+  Hindi, Arabic and CJK take many more tokens per word than English.
+- Quality per model and language is measured with the eval harness's translate task
+  (`docs/models.md`).
+
 ## Models already on the computer
 
 `crates/core/src/discover.rs` looks for GGUF files the person already has: LM Studio

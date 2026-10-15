@@ -262,6 +262,15 @@ export const en = {
     downloadingNote: "You can try it once the download finishes.",
     done: "Done",
   },
+  translate: {
+    label: "What the AI does",
+    explain: "Explain",
+    to: (language: string) => `Translate to ${language}`,
+    already: (language: string) => `Already in ${language}`,
+    webOnly: (language: string) => `${language}: the web Translate tab only`,
+    aiLanguages: "Explain with AI can translate into the languages without a mark; the others use the web Translate tab.",
+    webOnlyMark: "web only",
+  },
 } as const;
 
 export type Strings = typeof en;

@@ -20,6 +20,8 @@ for (const demo of [
   "no_selection",
   "loading&tab=explain",
   "error&tab=explain",
+  "passage&tab=explain&lang=bn",
+  "passage&tab=explain&lang=th",
 ]) {
   test(`reading card (${demo}) is accessible`, async ({ page }) => {
     await page.goto(`/popup.html?demo=${demo}`);
