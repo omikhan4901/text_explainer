@@ -14,27 +14,8 @@ import { useData } from "../data";
 
 const t = strings.sources;
 
-/** Languages Google Translate takes, for the Translate tab's target. */
-const TRANSLATE_TO: [string, string][] = [
-  ["en", "English"],
-  ["bn", "বাংলা (Bangla)"],
-  ["hi", "हिन्दी (Hindi)"],
-  ["ur", "اردو (Urdu)"],
-  ["ar", "العربية (Arabic)"],
-  ["es", "Español (Spanish)"],
-  ["fr", "Français (French)"],
-  ["de", "Deutsch (German)"],
-  ["pt", "Português (Portuguese)"],
-  ["ru", "Русский (Russian)"],
-  ["tr", "Türkçe (Turkish)"],
-  ["id", "Bahasa Indonesia"],
-  ["zh-CN", "中文 (Chinese)"],
-  ["ja", "日本語 (Japanese)"],
-  ["ko", "한국어 (Korean)"],
-];
-
 export function SourcesPage() {
-  const { settings, update } = useData();
+  const { settings, update, info } = useData();
   const list = settings.sources;
   const setList = (sources: WebSource[]) => void update({ sources });
   const patch = (id: string, p: Partial<WebSource>) => setList(list.map((s) => (s.id === id ? { ...s, ...p } : s)));
@@ -104,14 +85,16 @@ export function SourcesPage() {
         <Group>
           <Field label={t.translateTo} hint={t.translateHint} htmlFor="translate-to">
             <select id="translate-to" className={inputClass} value={settings.translate_to} onChange={(e) => void update({ translate_to: e.target.value })}>
-              {TRANSLATE_TO.map(([code, name]) => (
-                <option key={code} value={code}>
-                  {name}
+              {info.translate_languages.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.native === l.name ? l.name : `${l.native} (${l.name})`}
+                  {l.ai ? "" : ` · ${strings.translate.webOnlyMark}`}
                 </option>
               ))}
             </select>
           </Field>
         </Group>
+        <p className="mt-2 text-[12px] text-muted">{strings.translate.aiLanguages}</p>
       </Section>
     </>
   );

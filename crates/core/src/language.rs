@@ -353,6 +353,17 @@ const STOPWORDS: &[(&str, &[&str])] = &[
 
 /// Best guess at the language of `text`, or `None` if it can't tell.
 pub fn detect(text: &str) -> Option<&'static Language> {
+    detect_with(text, true)
+}
+
+/// Like `detect`, but returns `None` instead of assuming English for Latin text with no
+/// common words (single words, names): for decisions that a wrong guess would block,
+/// such as "this is already in the language you translate into".
+pub fn detect_known(text: &str) -> Option<&'static Language> {
+    detect_with(text, false)
+}
+
+fn detect_with(text: &str, assume_english: bool) -> Option<&'static Language> {
     let script = dominant_script(text)?;
     let by_script = |s: Script| LANGUAGES.iter().find(|l| l.scripts.first() == Some(&s));
     match script {
@@ -376,7 +387,8 @@ pub fn detect(text: &str) -> Option<&'static Language> {
             match best {
                 // Single words and short phrases have no stopwords: assume English, the
                 // language most people select terms from. Callers can override.
-                None => language("en"),
+                None if assume_english => language("en"),
+                None => None,
                 Some((code, _)) => language(code),
             }
         }
@@ -427,6 +439,13 @@ impl AllowedScripts {
         AllowedScripts(set)
     }
 
+    /// For a translation: Latin (names, brands, units) and the target's scripts only. The
+    /// source's own script is not allowed, so a model can't hand the text back untranslated
+    /// in it.
+    pub fn for_translation(target: &Language) -> Self {
+        Self::for_request("", Some(target))
+    }
+
     pub fn allows(&self, s: Script) -> bool {
         self.0.contains(&s)
     }
@@ -466,6 +485,33 @@ impl AllowedScripts {
             count,
             sample,
         })
+    }
+}
+
+/// True when a translation into `target` still reads as the source's language: small
+/// models sometimes hand the text back instead of translating it, and the script check
+/// alone can't see that when Latin is allowed (names, brands) or both languages are
+/// written in Latin.
+///
+/// - Target with its own script (Bangla, Hindi, Arabic, Chinese...): fewer than half of
+///   the answer's letters are in that script (a few names in Latin are fine).
+/// - Otherwise: the answer is confidently detected as the source's language, and that
+///   isn't the target (English handed back for Spanish). Unknown stays allowed.
+pub fn untranslated(source: &str, output: &str, target: &Language) -> bool {
+    if target.scripts.iter().any(|&s| s != Script::Latin) {
+        let counts = script_counts(output);
+        let total: usize = counts.iter().map(|&(_, n)| n).sum();
+        let in_target: usize = counts
+            .iter()
+            .filter(|(s, _)| target.scripts.contains(s))
+            .map(|&(_, n)| n)
+            .sum();
+        // A very short answer (an acronym, a brand) can't be judged by its letters.
+        return total >= 4 && in_target * 2 < total;
+    }
+    match (detect_known(source), detect_known(output)) {
+        (Some(from), Some(got)) => got == from && got.code != target.code,
+        _ => false,
     }
 }
 
@@ -629,6 +675,90 @@ mod tests {
     fn grammar_with_everything_allowed_still_parses() {
         let all = AllowedScripts(RANGES.iter().map(|r| r.0).collect());
         assert_eq!(all.grammar(), "root ::= [^\\x00]*\n");
+    }
+
+    #[test]
+    fn known_detection_does_not_guess_english_for_bare_words() {
+        assert_eq!(detect("Schadenfreude").map(|l| l.code), Some("en"));
+        assert_eq!(detect_known("Schadenfreude"), None);
+        assert_eq!(detect_known("12345"), None);
+        assert_eq!(
+            detect_known("The rent is due on the first day.").map(|l| l.code),
+            Some("en")
+        );
+        assert_eq!(detect_known("ভাড়া").map(|l| l.code), Some("bn"));
+    }
+
+    #[test]
+    fn translation_allows_only_latin_and_the_target_script() {
+        let bn = AllowedScripts::for_translation(language("bn").unwrap());
+        assert_eq!(bn.0, BTreeSet::from([Script::Latin, Script::Bengali]));
+        let zh = AllowedScripts::for_translation(language("zh").unwrap());
+        assert!(zh.allows(Script::Cjk));
+        assert!(!zh.allows(Script::Kana));
+        assert!(zh.violations("租金是 1,200 美元 (USD)。").is_none());
+        assert!(zh.violations("租金是 ভাড়া").is_some());
+        // Translating Bangla into English: Bengali isn't allowed back in.
+        let en = AllowedScripts::for_translation(language("en").unwrap());
+        assert!(en.violations("The rent is due ভাড়া").is_some());
+        let ar = AllowedScripts::for_translation(language("ar").unwrap());
+        assert!(ar.violations("يجب دفع الإيجار 1,200 دولار").is_none());
+        assert!(ar.violations("يجب دفع 租金").is_some());
+        let g = bn.grammar();
+        assert!(g.contains("\\u4E00-\\u9FFF"), "Han excluded");
+        assert!(g.contains("\\u0900-\\u0963"), "Devanagari excluded");
+        assert!(!g.contains("\\u0980-\\u09FF"), "Bengali allowed");
+        assert!(!g.contains("\\u0041-\\u005A"), "Latin allowed");
+    }
+
+    #[test]
+    fn native_digits_follow_their_script() {
+        // Digits are letters of their script to the guard: a Bangla answer may use Bangla
+        // digits, but Arabic-Indic digits in it would be another script.
+        assert_eq!(script_of('৫'), Some(Script::Bengali));
+        assert_eq!(script_of('५'), Some(Script::Devanagari));
+        assert_eq!(script_of('٥'), Some(Script::Arabic));
+        let bn = AllowedScripts::for_translation(language("bn").unwrap());
+        assert!(bn.violations("৫ তারিখ").is_none());
+        assert!(bn.violations("٥ তারিখ").is_some());
+    }
+
+    #[test]
+    fn an_answer_handed_back_untranslated_is_caught() {
+        let src = "The tenant must pay the rent of $1,200 by the 5th day of each month.";
+        let bn = language("bn").unwrap();
+        assert!(untranslated(src, src, bn));
+        assert!(!untranslated(
+            src,
+            "ভাড়াটেকে প্রতি মাসের ৫ তারিখের মধ্যে $1,200 ভাড়া দিতে হবে।",
+            bn
+        ));
+        // Names in Latin inside a translation are fine.
+        assert!(!untranslated(
+            "Microsoft and Google signed it.",
+            "Microsoft এবং Google এতে সই করেছে বলে জানা গেছে।",
+            bn
+        ));
+        // Too short to judge (a brand kept as is).
+        assert!(!untranslated("iOS", "iOS", bn));
+        let es = language("es").unwrap();
+        assert!(untranslated(src, src, es));
+        assert!(!untranslated(
+            src,
+            "El inquilino debe pagar el alquiler de 1.200 $ antes del día 5 de cada mes.",
+            es
+        ));
+        // A bare word can't be judged: allowed.
+        assert!(!untranslated("bank", "bank", es));
+        // Spanish into English handed back as Spanish.
+        let en = language("en").unwrap();
+        let es_src = "El inquilino debe pagar el alquiler antes del día 5 de cada mes.";
+        assert!(untranslated(es_src, es_src, en));
+        assert!(!untranslated(
+            es_src,
+            "The tenant must pay the rent before the 5th of each month.",
+            en
+        ));
     }
 
     #[test]

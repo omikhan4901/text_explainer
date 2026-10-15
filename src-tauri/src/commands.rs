@@ -11,8 +11,9 @@ use te_core::language::LANGUAGES;
 use te_core::models::{self, CATALOG, Fit, Tier};
 use te_core::prompt::{self, Level, OutputLanguage};
 use te_core::settings::{ModelChoice, Settings};
+use te_core::translate;
 
-use crate::popup::{self, PopupEvent};
+use crate::popup::{self, AiTask, PopupEvent};
 use crate::state::AppState;
 use crate::{hotkey, lookup, trigger};
 
@@ -84,12 +85,21 @@ pub struct LanguageInfo {
 }
 
 #[derive(Serialize)]
+pub struct TranslateLanguage {
+    #[serde(flatten)]
+    choice: translate::Choice,
+    ai: bool,
+}
+
+#[derive(Serialize)]
 pub struct AppInfo {
     version: &'static str,
     models: Vec<ModelInfo>,
     recommended: &'static str,
     total_ram_bytes: Option<u64>,
     languages: Vec<LanguageInfo>,
+    /// The "Translate into" choices; `ai` is false for those only the web tab can do.
+    translate_languages: Vec<TranslateLanguage>,
     engine_found: bool,
     model_loaded: bool,
     downloading: Option<String>,
@@ -142,6 +152,13 @@ pub async fn app_info(state: State<'_, AppState>) -> CmdResult<AppInfo> {
                 code: l.code,
                 name: l.name,
                 native: l.native,
+            })
+            .collect(),
+        translate_languages: translate::CHOICES
+            .iter()
+            .map(|&choice| TranslateLanguage {
+                choice,
+                ai: translate::target(choice.code).is_some(),
             })
             .collect(),
         engine_found: state.paths.llama_server.is_file(),
@@ -314,6 +331,13 @@ pub async fn set_level(app: AppHandle, level: Level) -> CmdResult<()> {
 #[tauri::command]
 pub fn explain_now(app: AppHandle, id: u64) {
     trigger::explain_now(&app, id);
+}
+
+/// The card's AI tab switched between Explain and Translate: run request `id` again with
+/// that task (the card stays on its tab).
+#[tauri::command]
+pub fn set_ai_task(app: AppHandle, id: u64, task: AiTask) {
+    trigger::set_ai_task(&app, id, task);
 }
 
 /// Shows a web source's page in the card's content area. Async: creating a web view from

@@ -99,6 +99,20 @@ test("offline, a passage is explained at once", async ({ page }) => {
   await expect(page.getByText(/Whatever else this agreement says/)).toBeVisible({ timeout: 5000 });
 });
 
+test("the AI tab translates on the computer, and says when it can't", async ({ page }) => {
+  await page.goto("/popup.html?demo=passage&tab=explain&lang=bn");
+  await expect(page.getByText(/Whatever else this agreement says/)).toBeVisible({ timeout: 5000 });
+  await page.getByRole("radio", { name: "Translate to Bangla" }).click();
+  await expect(page.getByText(/ভাড়াটিয়াকে/)).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole("radio", { name: "Simpler" })).toHaveCount(0);
+  await page.getByRole("radio", { name: "Explain" }).click();
+  await expect(page.getByText(/Whatever else this agreement says/)).toBeVisible({ timeout: 5000 });
+
+  await page.goto("/popup.html?demo=passage&tab=explain");
+  await expect(page.getByRole("radio", { name: "Translate to English" })).toBeDisabled();
+  await expect(page.getByText("Already in English")).toBeVisible();
+});
+
 test("the reading level switch redoes the text", async ({ page }) => {
   await page.goto("/popup.html?demo=passage&tab=explain");
   await expect(page.getByText(/Whatever else this agreement says/)).toBeVisible({ timeout: 5000 });

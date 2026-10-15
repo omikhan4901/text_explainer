@@ -15,6 +15,8 @@ use te_core::models;
 use te_core::settings::{ModelChoice, Settings};
 use te_win::{ClickOutsideWatcher, Rect, Side};
 
+use crate::popup::AiTask;
+
 pub struct Paths {
     pub settings: PathBuf,
     pub models: PathBuf,
@@ -72,6 +74,8 @@ pub struct AppState {
     pub task: Mutex<Option<JoinHandle<()>>>,
     pub request_id: AtomicU64,
     pub last: Mutex<Option<LastRequest>>,
+    /// The AI tab's task and the request it was chosen on; any other request explains.
+    pub ai_task: Mutex<(u64, AiTask)>,
     pub popup: Mutex<Option<PopupPlacement>>,
     pub pinned: AtomicBool,
     pub paused: AtomicBool,
@@ -94,6 +98,14 @@ pub struct AppState {
 impl AppState {
     pub fn settings(&self) -> Settings {
         self.settings.lock().expect("settings lock").clone()
+    }
+
+    /// The AI tab's task for request `id` (Explain unless the card chose otherwise on it).
+    pub fn ai_task(&self, id: u64) -> AiTask {
+        match *self.ai_task.lock().expect("ai task lock") {
+            (chosen_on, task) if chosen_on == id => task,
+            _ => AiTask::Explain,
+        }
     }
 
     pub fn backend(&self, settings: &Settings) -> Backend {

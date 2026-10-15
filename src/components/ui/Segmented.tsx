@@ -4,6 +4,7 @@ export interface SegmentedOption<T extends string> {
   value: T;
   label: string;
   title?: string;
+  disabled?: boolean;
 }
 
 /** A compact one-of-several control. */
@@ -34,7 +35,8 @@ export function Segmented<T extends string>({
           key={o.value}
           value={o.value}
           title={o.title}
-          className={`${pad} rounded-[5px] font-medium text-muted transition-colors hover:text-text data-[state=on]:bg-surface data-[state=on]:text-text data-[state=on]:shadow-[0_0_0_1px_var(--border),0_1px_2px_rgb(0_0_0/0.06)]`}
+          disabled={o.disabled}
+          className={`${pad} rounded-[5px] font-medium text-muted transition-colors hover:text-text disabled:cursor-default disabled:opacity-50 disabled:hover:text-muted data-[state=on]:bg-surface data-[state=on]:text-text data-[state=on]:shadow-[0_0_0_1px_var(--border),0_1px_2px_rgb(0_0_0/0.06)]`}
         >
           {o.label}
         </ToggleGroup.Item>

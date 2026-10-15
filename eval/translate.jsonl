@@ -1,0 +1,12 @@
+{"id": "rent", "domain": "legal", "text": "The tenant must pay the monthly rent of $1,200 by the 5th day of each month, or a late fee of 5% will be added."}
+{"id": "notice", "domain": "legal", "text": "Either party may end this agreement with 30 days' written notice, starting on 1 March 2026."}
+{"id": "dose", "domain": "medical", "text": "Take 500 mg of paracetamol every 6 hours, and no more than 4 doses in 24 hours."}
+{"id": "visa", "domain": "government", "text": "Applicants who have lived in the United Kingdom for 12 months may apply online before 31/12/2025."}
+{"id": "loan", "domain": "finance", "text": "The bank approved a loan of 1.2 million taka at an interest rate of 9.5% a year for 15 years."}
+{"id": "who", "domain": "news", "text": "The World Health Organization (WHO) reported 3,450 new cases in Geneva on Tuesday, up 18% from last week."}
+{"id": "meeting", "domain": "work", "text": "Dr. Amina Rahman from Dhaka University will speak at 10:30 on 14 November in Room 204."}
+{"id": "battery", "domain": "technical", "text": "The battery lasts about 8 hours and charges to 80% in 45 minutes with the 65 W adapter."}
+{"id": "refund", "domain": "consumer", "text": "Refunds are paid within 14 business days. Orders over $250 also get free shipping.\n\nKeep your receipt: you will need the order number to return an item."}
+{"id": "word-bank", "domain": "word", "text": "bank", "context": "We sat on the bank of the river and watched the boats."}
+{"id": "word-deadline", "domain": "word", "text": "deadline", "context": "The deadline for the application is next Friday."}
+{"id": "word-fine", "domain": "word", "text": "fine", "context": "He had to pay a fine for parking in the wrong place."}

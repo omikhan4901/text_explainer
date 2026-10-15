@@ -94,3 +94,13 @@ runs on its own free runner in parallel; results appear in the run summary and a
 artifacts (every answer, for reading them yourself). "Extra llama-server arguments" are
 appended to the app's own, to compare engine settings on the same passages. Choose the
 Windows runner to run the models with the exact engine build the app ships.
+
+## Translation (to be measured)
+
+AI Translate has its own corpus (`eval/translate.jsonl`: English sentences with numbers,
+dates and names, and words in context) and task in the harness:
+`cargo run -p te-eval --release -- --task translate --targets bn,es,hi,ar,zh ...` (or the
+**Model evaluation** workflow's translate option). It reports speed, tokens used, numbers
+kept (the meaning guard), answers handed back untranslated, and the wrong-script rate with
+the grammar (should be 0) and without it. No translation numbers have been measured yet;
+languages that score badly will get a "may be rough" label before the card promises them.

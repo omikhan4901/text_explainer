@@ -7,7 +7,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use te_core::engine::{Backend, Engine, EngineError, ServerConfig};
-use te_core::explain::{self, Event, ExplainError, OutputChoice, Request};
+use te_core::explain::{self, Event, ExplainError, OutputChoice, Request, Task};
+use te_core::language::language;
+use te_core::prompt::Level;
 use te_core::text::SelectionKind;
 
 fn fake_exe() -> PathBuf {
@@ -207,11 +209,179 @@ async fn fixed_output_language_is_named_in_the_prompt() {
     let mut engine = Engine::new(Backend::Local(cfg));
     let mut req =
         Request::new("The rent is due on the first day of every month, without exception.");
-    req.output = OutputChoice::Fixed("bn".into());
+    req.task = Task::Explain {
+        level: Level::Plain,
+        output: OutputChoice::Fixed("bn".into()),
+        custom_prompt: None,
+    };
     let (result, _) = collect(&mut engine, &req).await;
     result.unwrap();
     let body = std::fs::read_to_string(&record).unwrap();
     assert!(body.contains("Write only in Bangla (Bengali)."), "{body}");
+    engine.unload().await;
+}
+
+fn recording(dir: &tempfile::TempDir) -> (ServerConfig, PathBuf) {
+    let record = dir.path().join("requests.jsonl");
+    let mut cfg = config(dir);
+    cfg.extra_args = vec![
+        "--fake-record".into(),
+        record.to_string_lossy().into_owned(),
+    ];
+    (cfg, record)
+}
+
+fn recorded(path: &PathBuf) -> Vec<serde_json::Value> {
+    std::fs::read_to_string(path)
+        .unwrap()
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect()
+}
+
+fn translate_to(code: &str, text: &str) -> Request {
+    let mut req = Request::new(text);
+    req.task = Task::Translate {
+        to: language(code).unwrap(),
+    };
+    req
+}
+
+#[tokio::test]
+async fn translation_sends_the_translate_prompt_and_the_target_grammar() {
+    let dir = tempfile::tempdir().unwrap();
+    let (cfg, record) = recording(&dir);
+    let mut engine = Engine::new(Backend::Local(cfg));
+    let req = translate_to(
+        "bn",
+        "The rent of $1,200 is due on 05/03/2026, with a 5% late fee.",
+    );
+    let (result, events) = collect(&mut engine, &req).await;
+    result.unwrap();
+
+    match &events[0] {
+        Event::Started {
+            language,
+            grade_before,
+            ..
+        } => {
+            assert_eq!(language.as_deref(), Some("Bangla (Bengali)"));
+            assert_eq!(*grade_before, None, "a translation has no reading grade");
+        }
+        e => panic!("{e:?}"),
+    }
+    let text = done_text(&events);
+    assert!(!text.contains("Here is the translation"), "{text}");
+    assert!(text.contains("$১,২০০"), "{text}");
+    match events.last().unwrap() {
+        Event::Done {
+            report,
+            grade_after,
+            ..
+        } => {
+            // Bangla digits count as the same numbers.
+            assert!(report.is_clean(), "{report:?}");
+            assert_eq!(*grade_after, None);
+        }
+        e => panic!("{e:?}"),
+    }
+
+    let body = &recorded(&record)[0];
+    let system = body["messages"][0]["content"].as_str().unwrap();
+    assert!(
+        system.starts_with("You are a careful translator. You translate the text the user gives you into Bangla (Bengali)."),
+        "{system}"
+    );
+    let user = body["messages"][1]["content"].as_str().unwrap();
+    assert!(user.starts_with("Translate this text into Bangla (Bengali)."));
+    let grammar = body["grammar"].as_str().unwrap();
+    assert!(grammar.contains("\\u4E00-\\u9FFF"), "Chinese excluded");
+    assert!(grammar.contains("\\u0900-\\u0963"), "Devanagari excluded");
+    assert!(!grammar.contains("\\u0980-\\u09FF"), "Bangla allowed");
+    // 13 words at the Bangla budget (6 tokens a word, plus 64).
+    assert_eq!(body["max_tokens"], 142);
+    engine.unload().await;
+}
+
+#[tokio::test]
+async fn a_translation_that_drifts_is_retried_on_an_endpoint() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut local = Engine::new(Backend::Local(config(&dir)));
+    let target = local.ensure_ready().await.unwrap();
+    let mut engine = Engine::new(Backend::Endpoint {
+        base_url: target.base_url.clone(),
+        api_key: target.api_key.clone(),
+        model: "fake".into(),
+    });
+    let req = translate_to(
+        "bn",
+        "[drift] The fee is due monthly and must be paid on time.",
+    );
+    let (result, events) = collect(&mut engine, &req).await;
+    result.unwrap();
+    assert!(events.contains(&Event::RestartPart { part: 0 }));
+    let text = done_text(&events);
+    assert!(!text.contains('这'), "{text}");
+    assert!(text.contains("অনু"), "{text}");
+    local.unload().await;
+}
+
+#[tokio::test]
+async fn a_translation_handed_back_untranslated_is_retried() {
+    let dir = tempfile::tempdir().unwrap();
+    let (cfg, record) = recording(&dir);
+    let mut engine = Engine::new(Backend::Local(cfg));
+    // The grammar allows Latin (names), so only the untranslated check can catch this.
+    let req = translate_to(
+        "bn",
+        "[echo] The fee is due monthly and must be paid on time.",
+    );
+    let (result, events) = collect(&mut engine, &req).await;
+    result.unwrap();
+    assert!(events.contains(&Event::RestartPart { part: 0 }));
+    assert!(done_text(&events).contains("অনু"));
+    let bodies = recorded(&record);
+    assert_eq!(bodies.len(), 2);
+    assert_eq!(
+        bodies[1]["messages"][1]["content"],
+        "Important: write the whole answer in Bangla (Bengali) only. Do not use any other language or script."
+    );
+    // Into Spanish (both Latin): the echo is caught by language detection.
+    let req = translate_to(
+        "es",
+        "[echo] The fee is due monthly and must be paid on time.",
+    );
+    let (result, events) = collect(&mut engine, &req).await;
+    result.unwrap();
+    assert!(events.contains(&Event::RestartPart { part: 0 }));
+    assert!(done_text(&events).contains("texto"));
+    engine.unload().await;
+}
+
+#[tokio::test]
+async fn a_word_is_translated_in_its_sentence() {
+    let dir = tempfile::tempdir().unwrap();
+    let (cfg, record) = recording(&dir);
+    let mut engine = Engine::new(Backend::Local(cfg));
+    let mut req = translate_to("es", "“bank,”");
+    req.context = Some("We sat on the bank of the river.".into());
+    let (result, events) = collect(&mut engine, &req).await;
+    result.unwrap();
+    assert!(matches!(
+        &events[0],
+        Event::Started {
+            kind: SelectionKind::Word,
+            ..
+        }
+    ));
+    let body = &recorded(&record)[0];
+    let system = body["messages"][0]["content"].as_str().unwrap();
+    assert!(system.starts_with("You translate words and short phrases into Spanish."));
+    assert_eq!(
+        body["messages"][1]["content"],
+        "Word: bank\nSentence: We sat on the bank of the river."
+    );
+    assert_eq!(body["max_tokens"], 98);
     engine.unload().await;
 }
 

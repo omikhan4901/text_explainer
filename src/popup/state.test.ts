@@ -1,16 +1,18 @@
 import { bareTerm } from "./Popup";
 import { answerText, copyable, gradeBadge, initialState, isStreaming, isWorking, reduce, tabs, type CardState, type Explaining } from "./state";
-import type { AiMode, ExplainEvent, PopupEvent, SelectionKind, WebTab } from "../lib/types";
+import type { AiTask, TranslateAvailability, AiMode, ExplainEvent, PopupEvent, SelectionKind, WebTab } from "../lib/types";
 
 const SEARCHES: WebTab[] = [
   { id: "google", name: "Google" },
   { id: "bing", name: "Bing" },
 ];
-function open(id: number, ai: AiMode, kind: SelectionKind = "passage", web: WebTab[] = []): PopupEvent {
-  return { type: "open", id, ai, kind, query: "Hard text.", web };
+const SPANISH: TranslateAvailability = { state: "available", code: "es", name: "Spanish" };
+
+function open(id: number, ai: AiMode, kind: SelectionKind = "passage", web: WebTab[] = [], translate = SPANISH): PopupEvent {
+  return { type: "open", id, ai, kind, query: "Hard text.", web, translate };
 }
 
-const ex = (id: number, event: ExplainEvent): PopupEvent => ({ type: "explain", id, event });
+const ex = (id: number, event: ExplainEvent, task: AiTask = "explain"): PopupEvent => ({ type: "explain", id, task, event });
 const started: ExplainEvent = {
   type: "started",
   kind: "passage",
@@ -194,4 +196,48 @@ test("a dictionary entry arriving after the model started keeps the open tab", (
 
 test("picking a tab outside a request does nothing", () => {
   expect(reduce(initialState, { type: "select_tab", tab: "explain" })).toBe(initialState);
+});
+
+describe("Explain and Translate in the AI tab", () => {
+  const done: ExplainEvent = { type: "done", text: "x", grade_after: 8, report: { missing: [], added: [] }, timings: null, elapsed_ms: 1 };
+
+  it("switching to Translate drops the explanation and ignores its late events", () => {
+    let s = reduce(initialState, open(1, "running"));
+    s = reduce(s, ex(1, started));
+    s = reduce(s, ex(1, { type: "delta", part: 0, text: "Plain words" }));
+    s = reduce(s, { type: "set_task", task: "translate" });
+    expect(s.view === "explain" && s.task).toBe("translate");
+    expect(s.view === "explain" && s.parts).toEqual([]);
+    s = reduce(s, ex(1, { type: "delta", part: 0, text: " more" }));
+    expect(s.view === "explain" && s.parts).toEqual([]);
+    s = reduce(s, ex(1, { ...started, grade_before: null }, "translate"));
+    s = reduce(s, ex(1, { type: "part_done", part: 0, text: "Texto difícil." }, "translate"));
+    s = reduce(s, ex(1, done, "translate"));
+    expect(s.view === "explain" && copyable(s)).toBe("Texto difícil.");
+  });
+
+  it("translations show no reading grade", () => {
+    let s = reduce(initialState, open(1, "running"));
+    s = reduce(s, { type: "set_task", task: "translate" });
+    s = reduce(s, ex(1, started, "translate"));
+    s = reduce(s, ex(1, done, "translate"));
+    expect(s.view === "explain" && gradeBadge(s)).toBeNull();
+  });
+
+  it("Translate is refused when the text is already in that language or it isn't supported", () => {
+    for (const translate of [
+      { state: "same_language", name: "English" },
+      { state: "unsupported", name: "Thai" },
+    ] as TranslateAvailability[]) {
+      const s = reduce(reduce(initialState, open(1, "running", "passage", [], translate)), { type: "set_task", task: "translate" });
+      expect(s.view === "explain" && s.task).toBe("explain");
+    }
+  });
+
+  it("a new selection starts on Explain", () => {
+    let s = reduce(initialState, open(1, "running"));
+    s = reduce(s, { type: "set_task", task: "translate" });
+    s = reduce(s, open(2, "running"));
+    expect(s.view === "explain" && s.task).toBe("explain");
+  });
 });

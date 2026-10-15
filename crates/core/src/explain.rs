@@ -1,7 +1,8 @@
-//! One "explain this" request from start to finish: clean the selection, decide what it
-//! is, pick the output language and allowed scripts, stream the rewrite part by part
-//! through the output filter, enforce the language guard (with one stricter retry), and
-//! finish with the reading grade and the meaning check.
+//! One "explain this" or "translate this" request from start to finish: clean the
+//! selection, decide what it is, pick the output language and allowed scripts, stream the
+//! rewrite or translation part by part through the output filter, enforce the language
+//! guard (with one stricter retry), and finish with the reading grade and the meaning
+//! check.
 //!
 //! The UI receives a stream of `Event`s. Text arrives per part: `Delta`s while streaming,
 //! then `PartDone` with the cleaned final text of that part (which replaces the streamed
@@ -11,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
 use crate::engine::{Engine, EngineError, Sampling, Timings};
-use crate::language::{self, AllowedScripts};
+use crate::language::{self, AllowedScripts, Language};
 use crate::meaning;
 use crate::output::StreamFilter;
 use crate::prompt::{self, Level, Message, OutputLanguage};
@@ -29,15 +30,38 @@ pub enum OutputChoice {
     Fixed(String),
 }
 
+/// What the model does with the selection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Task {
+    /// Rewrite it in plain language at a reading level (a word: what it means here).
+    Explain {
+        level: Level,
+        output: OutputChoice,
+        /// Custom system prompt for this level (Settings → Model → Prompts).
+        custom_prompt: Option<String>,
+    },
+    /// Translate it into this language (`translate::target`). The language guard allows
+    /// only the target's script (and Latin, for names), an answer handed back untranslated
+    /// is retried like drift, and the meaning guard checks numbers and dates.
+    Translate { to: &'static Language },
+}
+
+impl Default for Task {
+    fn default() -> Self {
+        Task::Explain {
+            level: Level::Plain,
+            output: OutputChoice::SameAsText,
+            custom_prompt: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Request {
     pub text: String,
     /// The sentence or paragraph around a selected word, when the app could read it.
     pub context: Option<String>,
-    pub level: Level,
-    pub output: OutputChoice,
-    /// Custom system prompt for this level (Settings → Model → Prompts).
-    pub custom_prompt: Option<String>,
+    pub task: Task,
     pub sampling: Sampling,
     /// Long text is rewritten in parts of about this many words.
     pub part_words: usize,
@@ -52,9 +76,7 @@ impl Request {
         Request {
             text: text.into(),
             context: None,
-            level: Level::Plain,
-            output: OutputChoice::SameAsText,
-            custom_prompt: None,
+            task: Task::default(),
             sampling: Sampling::default(),
             part_words: 180,
             common_words: Vec::new(),
@@ -148,27 +170,39 @@ async fn run_inner(
         return Err(ExplainError::Empty);
     }
 
-    let out_lang = match &req.output {
-        OutputChoice::Fixed(code) => language::language(code),
-        OutputChoice::SameAsText => {
-            let probe = req
-                .context
-                .as_deref()
-                .filter(|_| kind != SelectionKind::Passage)
-                .unwrap_or(&source);
-            language::detect(probe)
+    let (out_lang, allowed) = match &req.task {
+        Task::Explain { output, .. } => {
+            let out_lang = match output {
+                OutputChoice::Fixed(code) => language::language(code),
+                OutputChoice::SameAsText => {
+                    let probe = req
+                        .context
+                        .as_deref()
+                        .filter(|_| kind != SelectionKind::Passage)
+                        .unwrap_or(&source);
+                    language::detect(probe)
+                }
+            };
+            let allowed = AllowedScripts::for_request(
+                &format!("{source}\n{}", req.context.as_deref().unwrap_or("")),
+                out_lang,
+            );
+            (out_lang, allowed)
         }
+        Task::Translate { to } => (Some(*to), AllowedScripts::for_translation(to)),
+    };
+    let translate_to: Option<&Language> = match &req.task {
+        Task::Translate { to } => Some(to),
+        Task::Explain { .. } => None,
     };
     let out = out_lang.map_or(OutputLanguage::SameAsText, OutputLanguage::Named);
-    let allowed = AllowedScripts::for_request(
-        &format!("{source}\n{}", req.context.as_deref().unwrap_or("")),
-        out_lang,
-    );
     let grammar = engine.supports_grammar().then(|| allowed.grammar());
 
-    // The reading-grade formula is calibrated for English only.
-    let english =
-        kind == SelectionKind::Passage && language::detect(&source).is_some_and(|l| l.code == "en");
+    // The reading-grade formula is calibrated for English only, and a translation has no
+    // grade to compare.
+    let english = translate_to.is_none()
+        && kind == SelectionKind::Passage
+        && language::detect(&source).is_some_and(|l| l.code == "en");
     let parts: Vec<String> = match kind {
         SelectionKind::Passage => text::chunk(&source, req.part_words),
         _ => vec![source.clone()],
@@ -191,22 +225,41 @@ async fn run_inner(
     let mut finished_parts = Vec::with_capacity(parts.len());
     let mut timings = None;
     for (i, part) in parts.iter().enumerate() {
-        let messages = match kind {
-            SelectionKind::Passage => prompt::rewrite(
-                part,
-                req.level,
-                out,
-                req.custom_prompt.as_deref(),
-                Some((i + 1, parts.len())),
-            ),
-            _ => prompt::word_meaning(text::bare_word(part), req.context.as_deref(), out),
-        };
+        let passage = kind == SelectionKind::Passage;
+        let word = text::bare_word(part);
+        let context = req.context.as_deref();
         let mut sampling = req.sampling.clone();
-        sampling.max_tokens = match kind {
-            SelectionKind::Passage => {
-                prompt::max_tokens_for_rewrite(text::word_count(part), req.level)
+        let messages = match (&req.task, passage) {
+            (
+                Task::Explain {
+                    level,
+                    custom_prompt,
+                    ..
+                },
+                true,
+            ) => {
+                sampling.max_tokens =
+                    prompt::max_tokens_for_rewrite(text::word_count(part), *level);
+                prompt::rewrite(
+                    part,
+                    *level,
+                    out,
+                    custom_prompt.as_deref(),
+                    Some((i + 1, parts.len())),
+                )
             }
-            _ => 160,
+            (Task::Explain { .. }, false) => {
+                sampling.max_tokens = 160;
+                prompt::word_meaning(word, context, out)
+            }
+            (Task::Translate { to }, true) => {
+                sampling.max_tokens = prompt::max_tokens_for_translation(part, to);
+                prompt::translate(part, to, Some((i + 1, parts.len())))
+            }
+            (Task::Translate { to }, false) => {
+                sampling.max_tokens = prompt::max_tokens_for_word_translation(to);
+                prompt::translate_word(word, context, to)
+            }
         };
 
         let mut final_text = None;
@@ -233,11 +286,21 @@ async fn run_inner(
                 .await?;
             timings = completion.timings.or(timings);
             let cleaned = filter.finish();
-            if allowed.violations(&cleaned).is_none() {
+            let drifted = allowed.violations(&cleaned).is_some();
+            // A translation handed back in the source language is retried the same way.
+            let untranslated =
+                translate_to.is_some_and(|to| language::untranslated(part, &cleaned, to));
+            if !drifted && !untranslated {
                 final_text = Some(cleaned);
                 break;
             }
-            tracing::warn!(part = i, attempt, "answer drifted into another script");
+            tracing::warn!(
+                part = i,
+                attempt,
+                drifted,
+                untranslated,
+                "answer is not in the language asked for"
+            );
         }
         let Some(text) = final_text else {
             return Err(ExplainError::LanguageDrift);
@@ -250,12 +313,17 @@ async fn run_inner(
     }
 
     let text = finished_parts.join("\n\n");
-    let (grade_after, report) = match kind {
-        SelectionKind::Passage => (
+    let common = |w: &str| req.common_words.iter().any(|c| c == w);
+    let (grade_after, report) = match (kind, translate_to) {
+        (SelectionKind::Passage, None) => (
             english
                 .then(|| readability::grade(&text).map(|r| r.grade))
                 .flatten(),
-            meaning::check_with(&source, &text, &|w| req.common_words.iter().any(|c| c == w)),
+            meaning::check_with(&source, &text, &common),
+        ),
+        (SelectionKind::Passage, Some(to)) => (
+            None,
+            meaning::check_translation(&source, &text, to, &common),
         ),
         _ => (None, meaning::Report::default()),
     };

@@ -7,14 +7,15 @@ use std::sync::atomic::Ordering;
 
 use tauri::{AppHandle, Manager};
 use te_core::engine::{Backend, Sampling};
-use te_core::explain::{self, Event, Request};
+use te_core::explain::{self, Event, Request, Task};
 use te_core::rules;
 use te_core::sources;
 use te_core::text::{self, SelectionKind};
+use te_core::translate;
 use te_win::Rect;
 
 use crate::lookup;
-use crate::popup::{self, AiMode, PopupEvent};
+use crate::popup::{self, AiMode, AiTask, PopupEvent};
 use crate::state::{AppState, LastRequest};
 
 /// Notes the app in front (for "Add <app>" in Settings) and says whether the card may
@@ -143,6 +144,11 @@ pub fn run(app: &AppHandle) {
             kind,
             query: header_text(&cleaned),
             web,
+            translate: translate::availability(
+                &cleaned,
+                last.context.as_deref(),
+                &settings.translate_to,
+            ),
         },
     );
     if let Some(entry) = entry {
@@ -182,6 +188,17 @@ pub fn explain_again(app: &AppHandle) {
     explain_now(app, id);
 }
 
+/// The card's AI tab switched between Explain and Translate on request `id`: run that
+/// request again with the new task (if it's still the current one).
+pub fn set_ai_task(app: &AppHandle, id: u64, task: AiTask) {
+    let state = app.state::<AppState>();
+    if state.request_id.load(Ordering::SeqCst) != id {
+        return;
+    }
+    *state.ai_task.lock().expect("ai task lock") = (id, task);
+    explain_now(app, id);
+}
+
 /// Streams the model's answer for the last selection into the card as request `id`.
 fn explain(app: &AppHandle, id: u64) {
     let state = app.state::<AppState>();
@@ -209,17 +226,49 @@ fn explain(app: &AppHandle, id: u64) {
         })
         .unwrap_or_default();
 
+    let ai_task = state.ai_task(id);
+    let emitter = app.clone();
+    let mut emit = move |event: Event| {
+        popup::emit(
+            &emitter,
+            PopupEvent::Explain {
+                id,
+                task: ai_task,
+                event,
+            },
+        )
+    };
+    let what = match ai_task {
+        AiTask::Explain => Task::Explain {
+            level: settings.level,
+            output: settings.output.clone(),
+            custom_prompt: settings.prompts.for_level(settings.level).map(String::from),
+        },
+        AiTask::Translate => match translate::target(&settings.translate_to) {
+            Some(to) => Task::Translate { to },
+            // The card offers Translate only for guarded languages; Settings may have
+            // changed since the card opened.
+            None => {
+                emit(Event::Error {
+                    message: format!(
+                        "the AI can't translate into {} yet; the Translate tab can",
+                        settings.translate_to
+                    ),
+                    detail: None,
+                });
+                return;
+            }
+        },
+    };
+
     let engine = state.engine.clone();
-    let app2 = app.clone();
     let task = tauri::async_runtime::spawn(async move {
         let mut engine = engine.lock().await;
         engine.set_backend(backend).await;
         let request = Request {
             text: last.text,
             context: last.context,
-            level: settings.level,
-            output: settings.output.clone(),
-            custom_prompt: settings.prompts.for_level(settings.level).map(String::from),
+            task: what,
             sampling: Sampling {
                 temperature: settings.temperature,
                 top_p: settings.top_p,
@@ -228,8 +277,6 @@ fn explain(app: &AppHandle, id: u64) {
             part_words: 180,
             common_words,
         };
-        let emitter = app2.clone();
-        let mut emit = move |event: Event| popup::emit(&emitter, PopupEvent::Explain { id, event });
         if let Err(e) = explain::run(&mut engine, &request, &mut emit).await {
             tracing::info!("explain request {id} ended: {e}");
         }
