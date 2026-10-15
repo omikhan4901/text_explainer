@@ -1,7 +1,5 @@
 # Text Explainer
 
-[![CI](https://github.com/omikhan4901/text_explainer/actions/workflows/ci.yml/badge.svg)](https://github.com/omikhan4901/text_explainer/actions/workflows/ci.yml)
-
 Select hard text anywhere, press one key, and a clearer version appears right next to it.
 Fully offline, on an ordinary 8 GB laptop with no graphics card.
 

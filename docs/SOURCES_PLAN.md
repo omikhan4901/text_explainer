@@ -88,7 +88,7 @@ double Ctrl+C cover it.
 
 ## 4. Milestones
 
-Each milestone ships on its own, passes `scripts/check.sh` and the Windows CI job, and is
+Each milestone ships on its own, passes `scripts/check.sh` (and builds on Windows), and is
 pushed to `main`. The Windows MVP release (M6 in `IMPLEMENTATION_PLAN.md`) comes first.
 
 | # | Milestone | Done when |

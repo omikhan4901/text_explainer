@@ -83,7 +83,7 @@ Tauri 2 app (tray only, no taskbar button)
 
 ## 4. Milestones (Windows MVP)
 
-Each milestone ships on its own, passes `scripts/check.sh` and the Windows CI job, and is
+Each milestone ships on its own, passes `scripts/check.sh` (and builds on Windows), and is
 pushed to `main`.
 
 | # | Milestone | Done when |

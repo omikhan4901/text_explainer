@@ -76,14 +76,15 @@ AI Translate and the offline dictionary. Desktop software only, never a browser 
   worth the risk before the first real-machine test.
 - First words (budget 2 s, default model, 4-core runner): 2.2 s median on Linux, 2.5 s
   on Windows, so just over budget; a paragraph's instructions dominate on a CPU.
-- The Windows CI job builds and uploads the NSIS installer on every push to main, then
-  smoke-tests it: silent install, the bundled llama-server runs, the app starts and finds
-  its engine and dictionary.
+- Until 15 October 2026 the Windows CI job built and uploaded the NSIS installer on every
+  push to main, then smoke-tested it: silent install, the bundled llama-server runs, the
+  app starts and finds its engine and dictionary. The push CI is paused for the redesign
+  (owner's call); "Release (draft)" still builds the installer on demand.
 
 ## Blocked on the owner
 
-- Testing on a real Windows machine: the installer is in the latest CI run's artifacts;
-  the checklist is `docs/testing/windows.md`.
+- Testing on a real Windows machine: run "Release (draft)" for an installer (CI on push is
+  paused); the checklist is `docs/testing/windows.md`.
 - Publishing the first release: run "Release (draft)" and press Publish when happy.
 
 ## Decisions made while building

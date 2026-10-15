@@ -13,10 +13,12 @@ The plan is `docs/IMPLEMENTATION_PLAN.md` (sources, translation and Definer pari
 - Work on and push to `main` only. Small conventional commits (`feat:`, `fix:`, `test:`,
   `docs:`, `chore:`, `refactor:`).
 - **Run `scripts/check.sh` before every push** and gate the push on its exit code
-  (`E2E=1` adds the Playwright journeys and accessibility checks; CI always runs them;
-  locally use `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium` if Playwright can't find Chromium). It runs
-  what the Linux CI job runs. The Windows app (`src-tauri`) only builds on the Windows CI
-  job: after pushing, check that job and fix it before moving on. Never leave `main` red.
+  (`E2E=1` adds the Playwright journeys and accessibility checks; locally use
+  `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium` if Playwright can't find Chromium). It also
+  lints the Windows app (`src-tauri`) for the Windows target. The push-triggered CI
+  workflow was removed on 15 October 2026 at the owner's request while the redesign is in
+  progress (it is in git history as `.github/workflows/ci.yml`); a real Windows build
+  comes from the manual "Release (draft)" workflow. Never leave `main` broken.
 - Never spend the owner's money: standard GitHub runners only (the repo is public, so they
   are free), no paid services, no code signing purchases. Ask first if something costs.
 - Never commit secrets, model files (`*.gguf`) or generated binaries.
