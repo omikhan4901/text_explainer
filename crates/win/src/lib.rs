@@ -53,7 +53,7 @@ pub struct Memory {
 pub use imp::{
     ClickOutsideWatcher, DoubleCopyWatcher, capture_selection, cursor_position, hide_window,
     kill_with_app, memory, prepare_popup_window, process_memory, set_clipboard_text,
-    show_window_at, work_area_at,
+    show_window_at, speak, work_area_at,
 };
 
 #[cfg(not(windows))]
@@ -95,6 +95,10 @@ mod stub {
         Some(kb * 1024)
     }
     pub fn set_clipboard_text(_text: &str) -> Result<(), Error> {
+        Err(Error::Unsupported)
+    }
+    /// Reads text aloud with the system voice (Windows only).
+    pub fn speak(_text: &str) -> Result<(), Error> {
         Err(Error::Unsupported)
     }
 
