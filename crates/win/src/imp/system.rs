@@ -11,8 +11,11 @@ use windows::Win32::System::JobObjects::{
 use windows::Win32::System::ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
 use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
 use windows::Win32::System::Threading::{
-    OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_QUOTA, PROCESS_TERMINATE,
+    OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_QUOTA,
+    PROCESS_TERMINATE, QueryFullProcessImageNameW,
 };
+use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
+use windows::core::PWSTR;
 
 use crate::{Error, Memory};
 
@@ -82,5 +85,37 @@ pub fn kill_with_app(pid: u32) -> Result<(), Error> {
         let result = AssignProcessToJobObject(job.0, process).map_err(|e| Error::Os(e.message()));
         let _ = CloseHandle(process);
         result
+    }
+}
+
+/// The program file name (`notepad.exe`) of the app that owns the foreground window, or
+/// None when there is none or Windows won't say (a protected process).
+pub fn foreground_process_name() -> Option<String> {
+    // SAFETY: plain queries; the process handle is closed on every path below.
+    unsafe {
+        let window = GetForegroundWindow();
+        if window.is_invalid() {
+            return None;
+        }
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(window, Some(&mut pid));
+        if pid == 0 {
+            return None;
+        }
+        let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+        let mut buffer = [0u16; 1024];
+        let mut len = buffer.len() as u32;
+        let result = QueryFullProcessImageNameW(
+            process,
+            PROCESS_NAME_WIN32,
+            PWSTR(buffer.as_mut_ptr()),
+            &mut len,
+        );
+        let _ = CloseHandle(process);
+        result.ok()?;
+        let path = String::from_utf16_lossy(&buffer[..(len as usize).min(buffer.len())]);
+        std::path::Path::new(&path)
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
     }
 }
