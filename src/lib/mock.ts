@@ -40,6 +40,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ],
   offline_only: false,
   translate_to: "en",
+  web_language: { mode: "fixed", code: "en" },
   lookup_hotkey: "",
   excluded_apps: ["keepass.exe", "keepassxc.exe", "1password.exe", "bitwarden.exe"],
   keep_history: true,

@@ -214,6 +214,10 @@ export const en = {
     translate: "Translation",
     translateTo: "Main translation language",
     translateHint: "Everything is translated into this first. In the card you can switch to another language for that text.",
+    webLanguage: "Web pages in",
+    webLanguageHint: "Google and Bing show their menus and answers in this language. Results stay in the language they were written in.",
+    webAutomatic: "Automatic (the site decides)",
+    webSameAsTranslation: (name: string) => `Same as the translation language (${name})`,
   },
   shortcuts: {
     title: "Shortcuts",

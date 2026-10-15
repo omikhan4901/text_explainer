@@ -56,7 +56,11 @@ A guide to the code for anyone changing it. Keep it true when you change how thi
    percent-encoded and can't change the host) and shows one child web view (`popup-web`,
    Tauri's `unstable` multi-webview) over that area: incognito, never focused on its own,
    http(s) navigation only, new windows sent to the default browser. It asks for phone
-   pages (a mobile user agent), which fit a card; desktop pages scrolled sideways. The
+   pages (a mobile user agent), which fit a card; desktop pages scrolled sideways. Google
+   and Bing are asked for their page in the "Web pages in" language (Sources page,
+   `settings.web_language`: English unless changed, the owner's choice; Automatic lets
+   the site guess from where the person is). `sources::with_page_language` adds Google's
+   `hl` or Bing's `setlang`, never over a language the address already names. The
    card sends the area again when it changes size. Clicking into the page activates the
    card like any other click in it (step 2), so the person can type there. It gets no app
    permissions (it's remote content). Other tabs call `web_hide`; closing the card closes

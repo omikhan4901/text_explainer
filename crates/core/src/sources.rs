@@ -27,6 +27,79 @@ pub struct WebSource {
     pub passages: bool,
 }
 
+/// Which language search sites show their pages in (their menus and AI answers; results
+/// stay in the language they were written in).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "mode", content = "code", rename_all = "snake_case")]
+pub enum WebLanguage {
+    /// The site decides (it guesses from where the person is).
+    Automatic,
+    /// The main translation language (`translate_to`).
+    SameAsTranslation,
+    /// A language code ("en", "bn").
+    Fixed(String),
+}
+
+impl Default for WebLanguage {
+    /// English (the owner's choice, 15 October 2026).
+    fn default() -> Self {
+        WebLanguage::Fixed("en".into())
+    }
+}
+
+impl WebLanguage {
+    /// The language code to ask for, if any.
+    pub fn code<'a>(&'a self, translate_to: &'a str) -> Option<&'a str> {
+        match self {
+            WebLanguage::Automatic => None,
+            WebLanguage::SameAsTranslation => Some(translate_to),
+            WebLanguage::Fixed(code) => Some(code),
+        }
+    }
+
+    /// A fixed code that isn't a plain language code ("en", "zh-CN") becomes English.
+    pub fn sanitized(self) -> Self {
+        match self {
+            WebLanguage::Fixed(code) => {
+                let code = code.trim();
+                if is_language_code(code) {
+                    WebLanguage::Fixed(code.to_string())
+                } else {
+                    WebLanguage::default()
+                }
+            }
+            other => other,
+        }
+    }
+}
+
+/// "en", "bn", "zh-CN": letters, digits and hyphens, at most 12 characters.
+pub fn is_language_code(code: &str) -> bool {
+    !code.is_empty()
+        && code.len() <= 12
+        && code.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+}
+
+/// Asks a search site for its page in `lang`: Google's `hl`, Bing's `setlang`. Other sites
+/// (and the translators, which have their own target language) are left as they are, and
+/// so is an address that already names a language.
+pub fn with_page_language(mut url: Url, lang: &str) -> Url {
+    let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
+    let google = host == "google.com" || host.starts_with("www.google.");
+    let bing =
+        (host == "www.bing.com" || host == "bing.com") && !url.path().starts_with("/translator");
+    let (param, code) = match (google, bing) {
+        (true, _) => ("hl", lang),
+        (_, true) => ("setlang", bing_lang(lang)),
+        _ => return url,
+    };
+    if !is_language_code(code) || url.query_pairs().any(|(k, _)| k == param) {
+        return url;
+    }
+    url.query_pairs_mut().append_pair(param, code);
+    url
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum SourceError {
     #[error("the address must start with https:// or http://")]
@@ -211,10 +284,17 @@ pub fn build_url(template: &str, selection: &str, lang: &str) -> Result<Url, Sou
 /// The language code a site expects: Bing names Chinese by script ("zh-Hans"), where the
 /// setting uses Google's region codes ("zh-CN").
 fn lang_for<'a>(template: &str, lang: &'a str) -> &'a str {
-    let bing = Url::parse(template).is_ok_and(|u| u.host_str() == Some("www.bing.com"));
-    match (bing, lang) {
-        (true, "zh-CN") => "zh-Hans",
-        (true, "zh-TW") => "zh-Hant",
+    if Url::parse(template).is_ok_and(|u| u.host_str() == Some("www.bing.com")) {
+        bing_lang(lang)
+    } else {
+        lang
+    }
+}
+
+fn bing_lang(lang: &str) -> &str {
+    match lang {
+        "zh-CN" => "zh-Hans",
+        "zh-TW" => "zh-Hant",
         _ => lang,
     }
 }
@@ -259,6 +339,77 @@ pub fn sanitize(sources: &mut Vec<WebSource>) {
 
 #[cfg(test)]
 mod tests {
+    fn page(template: &str, lang: &str) -> String {
+        with_page_language(build_url(template, "a swing", "bn").unwrap(), lang).to_string()
+    }
+
+    #[test]
+    fn search_pages_are_asked_for_the_chosen_language() {
+        assert_eq!(
+            page("https://www.google.com/search?q={query}", "en"),
+            "https://www.google.com/search?q=a%20swing&hl=en"
+        );
+        assert_eq!(
+            page("https://www.bing.com/search?q={query}", "bn"),
+            "https://www.bing.com/search?q=a%20swing&setlang=bn"
+        );
+        assert_eq!(
+            page("https://www.bing.com/images/search?q={query}", "zh-CN"),
+            "https://www.bing.com/images/search?q=a%20swing&setlang=zh-Hans"
+        );
+        assert_eq!(
+            page("https://www.google.co.uk/search?q={query}", "en"),
+            "https://www.google.co.uk/search?q=a%20swing&hl=en"
+        );
+    }
+
+    #[test]
+    fn other_pages_and_named_languages_are_left_alone() {
+        // A language the address already names wins (a site the person added).
+        assert_eq!(
+            page("https://www.google.com/search?q={query}&hl=bn", "en"),
+            "https://www.google.com/search?q=a%20swing&hl=bn"
+        );
+        // Translators have their own target; other sites have no such switch.
+        for t in [
+            "https://translate.google.com/?sl=auto&tl={lang}&text={query}&op=translate",
+            "https://www.bing.com/translator?from=auto&to={lang}&text={query}",
+            "https://duckduckgo.com/?q={query}",
+            "https://en.wikipedia.org/w/index.php?search={query}",
+            "https://notgoogle.com/?q={query}",
+        ] {
+            let plain = build_url(t, "a swing", "bn").unwrap().to_string();
+            assert_eq!(page(t, "en"), plain, "{t}");
+        }
+        // A code that isn't one is never added.
+        assert_eq!(
+            page("https://www.google.com/search?q={query}", "en&x=1"),
+            "https://www.google.com/search?q=a%20swing"
+        );
+    }
+
+    #[test]
+    fn the_web_language_setting() {
+        assert_eq!(WebLanguage::default(), WebLanguage::Fixed("en".into()));
+        assert_eq!(WebLanguage::Automatic.code("bn"), None);
+        assert_eq!(WebLanguage::SameAsTranslation.code("bn"), Some("bn"));
+        assert_eq!(WebLanguage::Fixed("fr".into()).code("bn"), Some("fr"));
+        assert_eq!(
+            WebLanguage::Fixed(" bn ".into()).sanitized(),
+            WebLanguage::Fixed("bn".into())
+        );
+        assert_eq!(
+            WebLanguage::Fixed("<b>".into()).sanitized(),
+            WebLanguage::default()
+        );
+        let json = serde_json::to_string(&WebLanguage::Fixed("bn".into())).unwrap();
+        assert_eq!(json, r#"{"mode":"fixed","code":"bn"}"#);
+        assert_eq!(
+            serde_json::from_str::<WebLanguage>(r#"{"mode":"automatic"}"#).unwrap(),
+            WebLanguage::Automatic
+        );
+    }
+
     use super::*;
 
     #[test]

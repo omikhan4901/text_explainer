@@ -400,7 +400,13 @@ pub fn web_url(app: &AppHandle, source_id: &str) -> Result<tauri::Url, String> {
         .as_ref()
         .map(|l| text::clean(&l.text))
         .ok_or("Nothing is selected.")?;
-    sources::build_url(&source.url, &selection, &settings.translate_to).map_err(|e| e.to_string())
+    let url = sources::build_url(&source.url, &selection, &settings.translate_to)
+        .map_err(|e| e.to_string())?;
+    // Search sites show their page in the chosen language (English unless changed).
+    Ok(match settings.web_language.code(&settings.translate_to) {
+        Some(lang) => sources::with_page_language(url, lang),
+        None => url,
+    })
 }
 
 /// Shows `source_id`'s page in the card's content area, creating the web view the first

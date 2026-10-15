@@ -383,3 +383,17 @@ test("an accepted update shows its download, and a failed one can be dismissed",
   await page.getByRole("button", { name: "Close" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
+
+test("sources: web pages are in English unless another language is picked", async ({ page }) => {
+  await page.goto("/index.html?state=ready&page=sources");
+  const lang = page.getByRole("combobox", { name: "Web pages in" });
+  await expect(lang).toHaveValue("en");
+  const saved = async () => (await mockCalls(page)).filter((c) => c.command === "save_settings").at(-1)?.args.settings as { web_language: unknown } | undefined;
+
+  await lang.selectOption({ label: "বাংলা (Bangla)" });
+  await expect.poll(async () => (await saved())?.web_language).toEqual({ mode: "fixed", code: "bn" });
+  await lang.selectOption({ label: "Automatic (the site decides)" });
+  await expect.poll(async () => (await saved())?.web_language).toEqual({ mode: "automatic" });
+  await lang.selectOption({ label: "Same as the translation language (English)" });
+  await expect.poll(async () => (await saved())?.web_language).toEqual({ mode: "same_as_translation" });
+});

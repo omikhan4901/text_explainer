@@ -119,6 +119,9 @@ by security, database and AI engineers before it reaches `main`:
       (the card kept its own copy of the settings and wasn't told to reload it after a
       change; the answer itself was redone at the new level). The shortcut warning stays:
       something else holds Ctrl+Shift+Space on the owner's PC (being checked).
+- [x] "Web pages in" (owner, 15 October 2026): Google and Bing pages in a chosen language,
+      English by default (the private web view has no cookies, so Google guessed Bengali
+      from the location). Automatic, the translation language, or any language.
 - [ ] Not verified on Windows yet: the Look up box's focus and placement, app rules on
       real apps, the Windows voice, export through the save dialog
 

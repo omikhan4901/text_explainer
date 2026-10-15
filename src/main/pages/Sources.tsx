@@ -93,6 +93,27 @@ export function SourcesPage() {
               ))}
             </select>
           </Field>
+          <Field label={t.webLanguage} hint={t.webLanguageHint} htmlFor="web-language">
+            <select
+              id="web-language"
+              className={inputClass}
+              value={settings.web_language.mode === "fixed" ? settings.web_language.code : settings.web_language.mode}
+              onChange={(e) => {
+                const v = e.target.value;
+                void update({ web_language: v === "automatic" || v === "same_as_translation" ? { mode: v } : { mode: "fixed", code: v } });
+              }}
+            >
+              <option value="automatic">{t.webAutomatic}</option>
+              <option value="same_as_translation">
+                {t.webSameAsTranslation(info.translate_languages.find((l) => l.code === settings.translate_to)?.name ?? settings.translate_to)}
+              </option>
+              {info.translate_languages.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.native === l.name ? l.name : `${l.native} (${l.name})`}
+                </option>
+              ))}
+            </select>
+          </Field>
         </Group>
         <p className="mt-2 text-[12px] text-muted">{strings.translate.aiLanguages}</p>
       </Section>

@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use crate::explain::OutputChoice;
 use crate::prompt::Level;
 use crate::rules;
-use crate::sources::{self, WebSource};
+use crate::sources::{self, WebLanguage, WebSource};
 
 pub const CURRENT_VERSION: u32 = 1;
 
@@ -51,6 +51,8 @@ pub struct Settings {
     pub offline_only: bool,
     /// Language code for `{lang}` in source addresses (the Translate tab's target).
     pub translate_to: String,
+    /// Which language search sites show their pages in (English unless changed).
+    pub web_language: WebLanguage,
     /// Shortcut that opens the Look up box, in the same format as `hotkey`; empty for none.
     pub lookup_hotkey: String,
     /// Program files (`keepass.exe`) where the card never reads a selection (`rules.rs`).
@@ -88,6 +90,7 @@ impl Default for Settings {
             sources: sources::defaults(),
             offline_only: false,
             translate_to: "en".into(),
+            web_language: WebLanguage::default(),
             lookup_hotkey: String::new(),
             excluded_apps: rules::defaults(),
             keep_history: true,
@@ -233,6 +236,7 @@ impl Settings {
         }
         self.extra_server_args.retain(|a| !a.trim().is_empty());
         sources::sanitize(&mut self.sources);
+        self.web_language = self.web_language.sanitized();
         let lang = self.translate_to.trim();
         self.translate_to = if !lang.is_empty()
             && lang.len() <= 12
@@ -371,6 +375,7 @@ mod tests {
         let s = Settings::load(&path);
         assert!(s.unload_on_close);
         assert_eq!(s.idle_unload_minutes, 30);
+        assert_eq!(s.web_language, sources::WebLanguage::Fixed("en".into()));
         assert_eq!(s.card_size, None);
     }
 

@@ -44,6 +44,8 @@ export interface WebTab {
   name: string;
 }
 
+export type WebLanguage = { mode: "automatic" } | { mode: "same_as_translation" } | { mode: "fixed"; code: string };
+
 export interface CardSize {
   width: number;
   height: number;
@@ -74,6 +76,8 @@ export interface Settings {
   sources: WebSource[];
   offline_only: boolean;
   translate_to: string;
+  /** Which language search sites show their pages in. */
+  web_language: WebLanguage;
   /** Shortcut for the Look up box; "" for none. */
   lookup_hotkey: string;
   /** Program files (`keepass.exe`) where the card never reads a selection. */
