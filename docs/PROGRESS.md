@@ -125,6 +125,9 @@ by security, database and AI engineers before it reaches `main`:
 - [x] Model page (owner): a paused download has Discard beside Resume (deletes what was
       saved so far), and Delete is a labelled button, not a small icon. The list now
       updates at once after a delete (before, only when the deleted model was in use).
+- [x] Reading fonts never changed (owner): the font stacks sat in Tailwind's @theme, which
+      leaves out variables no class uses, so every choice fell back to Geist. Moved to
+      plain variables; a journey now checks the preview's font and that it loads.
 - [ ] Not verified on Windows yet: the Look up box's focus and placement, app rules on
       real apps, the Windows voice, export through the save dialog
 

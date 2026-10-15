@@ -417,3 +417,20 @@ test("model: a paused download can be resumed or discarded, and a model deleted"
   await expect(row.getByRole("button", { name: "Delete Qwen3.5 2B" })).toBeVisible({ timeout: 10_000 });
   await expect(row.getByRole("button", { name: "Delete Qwen3.5 2B" })).toHaveText("Delete");
 });
+
+test("reading: the chosen font is the one the preview uses, and it is loaded", async ({ page }) => {
+  await page.goto("/index.html?state=ready&page=reading");
+  const preview = page.getByText(/Whatever else this agreement says/).first();
+  const font = () => preview.evaluate((el) => getComputedStyle(el).fontFamily);
+  for (const [label, family] of [
+    ["Atkinson Hyperlegible", "Atkinson Hyperlegible"],
+    ["Source Serif", "Source Serif 4"],
+    ["Geist", "Geist Variable"],
+  ] as const) {
+    await page.getByRole("radio", { name: label, exact: true }).click();
+    await expect.poll(font).toContain(family);
+    await expect
+      .poll(() => page.evaluate(async (f) => (await document.fonts.load(`16px "${f}"`)).length > 0, family))
+      .toBe(true);
+  }
+});
