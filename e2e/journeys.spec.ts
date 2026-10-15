@@ -397,3 +397,23 @@ test("sources: web pages are in English unless another language is picked", asyn
   await lang.selectOption({ label: "Same as the translation language (English)" });
   await expect.poll(async () => (await saved())?.web_language).toEqual({ mode: "same_as_translation" });
 });
+
+test("model: a paused download can be resumed or discarded, and a model deleted", async ({ page }) => {
+  await page.goto("/index.html?state=ready&page=model");
+  const row = page.locator("div.px-4", { hasText: "Qwen3.5 2B" }).first();
+  await row.getByRole("button", { name: /^Download/ }).click();
+  await expect.poll(async () => Number(await row.getByRole("progressbar").getAttribute("aria-valuenow"))).toBeGreaterThan(5);
+  await row.getByRole("button", { name: "Cancel" }).click();
+  await expect(row.getByRole("button", { name: /^Resume \(/ })).toBeVisible();
+
+  // Discard deletes what was downloaded so far: the full download is offered again.
+  await row.getByRole("button", { name: "Discard the unfinished download of Qwen3.5 2B" }).click();
+  await expect(row.getByRole("button", { name: /^Download \(/ })).toBeVisible();
+  await expect(row.getByRole("button", { name: /Discard/ })).toHaveCount(0);
+  expect((await mockCalls(page)).filter((c) => c.command === "delete_model").at(-1)?.args).toEqual({ id: "qwen3.5-2b" });
+
+  // An installed model has a labelled Delete button, and its row updates at once.
+  await row.getByRole("button", { name: /^Download \(/ }).click();
+  await expect(row.getByRole("button", { name: "Delete Qwen3.5 2B" })).toBeVisible({ timeout: 10_000 });
+  await expect(row.getByRole("button", { name: "Delete Qwen3.5 2B" })).toHaveText("Delete");
+});

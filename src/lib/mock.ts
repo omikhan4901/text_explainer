@@ -182,6 +182,9 @@ const book = new WordBook(() => Date.now() - ago);
   ago = 0;
 }
 let downloadTimer: ReturnType<typeof setInterval> | undefined;
+// What a cancelled download left on disk, so it can be resumed or discarded.
+const partial = new Map<string, number>();
+let downloadDone = 0;
 let downloading: string | null = null;
 
 function emit(event: string, payload: unknown) {
@@ -191,7 +194,7 @@ function emit(event: string, payload: unknown) {
 function info(): AppInfo {
   return {
     version: "0.1.0",
-    models: MODELS.map((m) => ({ ...m, installed: installed.has(m.id) })),
+    models: MODELS.map((m) => ({ ...m, installed: installed.has(m.id), partial_bytes: partial.get(m.id) ?? 0 })),
     recommended: "gemma-4-e2b",
     total_ram_bytes: 8 * GB,
     languages: [
@@ -255,11 +258,13 @@ async function call<T>(command: string, args: Record<string, unknown> = {}): Pro
       const id = args.id as string;
       const m = MODELS.find((x) => x.id === id)!;
       downloading = id;
-      let done = 0;
+      let done = partial.get(id) ?? 0;
+      partial.delete(id);
       clearInterval(downloadTimer);
       return new Promise<T>((resolve) => {
         downloadTimer = setInterval(() => {
           done = Math.min(m.size_bytes, done + m.size_bytes / 40);
+          downloadDone = done;
           emit("te://download", { state: "progress", id, downloaded: done, total: m.size_bytes, bytes_per_sec: 9.5e6 });
           if (done >= m.size_bytes) {
             clearInterval(downloadTimer);
@@ -275,11 +280,16 @@ async function call<T>(command: string, args: Record<string, unknown> = {}): Pro
     }
     case "cancel_download":
       clearInterval(downloadTimer);
-      if (downloading) emit("te://download", { state: "cancelled", id: downloading });
-      downloading = null;
+      if (downloading) {
+        const id = downloading;
+        partial.set(id, downloadDone);
+        downloading = null;
+        emit("te://download", { state: "cancelled", id });
+      }
       return undefined as T;
     case "delete_model":
       installed.delete(args.id as string);
+      partial.delete(args.id as string);
       return undefined as T;
     case "validate_hotkey": {
       const h = String(args.hotkey);

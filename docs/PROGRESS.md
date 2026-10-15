@@ -122,6 +122,9 @@ by security, database and AI engineers before it reaches `main`:
 - [x] "Web pages in" (owner, 15 October 2026): Google and Bing pages in a chosen language,
       English by default (the private web view has no cookies, so Google guessed Bengali
       from the location). Automatic, the translation language, or any language.
+- [x] Model page (owner): a paused download has Discard beside Resume (deletes what was
+      saved so far), and Delete is a labelled button, not a small icon. The list now
+      updates at once after a delete (before, only when the deleted model was in use).
 - [ ] Not verified on Windows yet: the Look up box's focus and placement, app rules on
       real apps, the Windows voice, export through the save dialog
 

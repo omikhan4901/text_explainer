@@ -19,7 +19,7 @@ const FIT_COLOR = { comfortable: "text-success", tight: "text-warn", too_big: "t
 
 /** One model: what it is, whether it fits, and the one action that makes sense now. */
 export function ModelRow({ model, recommended = false, compact = false }: { model: ModelInfo; recommended?: boolean; compact?: boolean }) {
-  const { settings, info, update } = useData();
+  const { settings, info, update, refresh } = useData();
   const progress = useDownloadOf(model.id);
   const inUse = settings.model.kind === "catalog" && settings.model.id === model.id;
   const otherDownloading = info.downloading !== null && info.downloading !== model.id;
@@ -48,6 +48,8 @@ export function ModelRow({ model, recommended = false, compact = false }: { mode
       {model.partial_bytes > 0 ? t.resume(c.gb(model.partial_bytes)) : t.download(c.gb(model.size_bytes))}
     </Button>
   );
+  // Deletes the model, or what a paused download has saved so far.
+  const remove = () => void api.deleteModel(model.id).then(refresh, () => {});
 
   return (
     <div className={compact ? "px-4 py-4" : "px-4 py-3.5"}>
@@ -74,16 +76,15 @@ export function ModelRow({ model, recommended = false, compact = false }: { mode
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
           {action}
-          {model.installed && !progress && (
+          {!progress && (model.installed || model.partial_bytes > 0) && (
             <Button
               size="sm"
               variant="ghost"
-              className="w-7 px-0"
-              aria-label={`${t.delete} ${model.name}`}
-              title={t.delete}
-              onClick={() => void api.deleteModel(model.id).then(() => {})}
+              aria-label={model.installed ? t.deleteModel(model.name) : t.discardDownload(model.name)}
+              title={model.installed ? undefined : t.discardHint(c.gb(model.partial_bytes))}
+              onClick={remove}
             >
-              <Trash size={14} />
+              <Trash size={14} /> {model.installed ? t.delete : t.discard}
             </Button>
           )}
         </div>
