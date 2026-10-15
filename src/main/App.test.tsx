@@ -8,7 +8,8 @@ test("first run walks through welcome, model and try-it", async () => {
   await userEvent.click(screen.getByRole("button", { name: "Get started" }));
   expect(screen.getByRole("heading", { name: "Download a model" })).toBeInTheDocument();
   expect(screen.getByText("Gemma 4 E2B")).toBeInTheDocument();
-  expect(screen.getByText("Fits easily")).toBeInTheDocument();
+  // The catalog shows the fit hint (models found on the computer may show it too, once found).
+  expect(screen.getAllByText("Fits easily").length).toBeGreaterThan(0);
   // Next is disabled until a model is chosen or downloading.
   expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
 });
