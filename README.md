@@ -37,6 +37,16 @@ It isn't code-signed yet, so SmartScreen warns: choose "More info", then "Run an
   from the app you're in. Esc or a click elsewhere closes it.
 - **Two ways in.** Select text and press the shortcut (Ctrl+Shift+Space by default), or
   press Ctrl+C twice.
+- **Look up anything.** Press the shortcut with nothing selected (or use the tray menu)
+  and type a word or phrase; the card opens with the same tabs.
+- **Translate privately.** The AI tab can translate instead of explain, on your computer,
+  with the same checks for numbers and the wrong language. The web Translate tab is there
+  too.
+- **Keep your words.** Save a word from the card, find it again on the Words page, hear it
+  read aloud by the Windows voice, and export your list to Excel (CSV) or Anki. A history
+  of what you looked up stays on your computer and can be turned off.
+- **Private where it matters.** The card never reads selections in apps you choose;
+  password managers are on the list from the start.
 - **It checks itself.** If a rewrite drops or invents a number, date or name, the card
   says so. Answers can't drift into another language: a grammar constrains the model
   token by token.

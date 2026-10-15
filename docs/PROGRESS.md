@@ -52,11 +52,11 @@ AI Translate and the offline dictionary. Desktop software only, never a browser 
 - [x] Models already on the computer (15 October 2026, owner): found in LM Studio,
       Ollama, Jan, GPT4All, Hugging Face and Downloads, each with its memory fit, usable
       in one click from the Model page and first run.
-- [ ] S1 Tabs and Look up (tabs done; Look up box next)
+- [x] S1 Tabs and Look up
 - [ ] S2 Web sources
 - [x] S3 Page sources (see "Search first")
-- [ ] S4 AI Translate
-- [ ] S5 Triggers and rules
+- [ ] S4 AI Translate (built; measuring per model and language is next)
+- [ ] S5 Triggers and rules (app rules done; select-to-show, double-click and site rules next)
 - [ ] S6 Polish
 
 ## Release 1.0 plan (15 October 2026)
@@ -70,10 +70,17 @@ you looked up.
 Built in parallel (each engineer in their own worktree, merged by the PM), then reviewed
 by security, database and AI engineers before it reaches `main`:
 
-- [ ] Look up box: tray, the hotkey with nothing selected, an optional own shortcut (S1)
-- [ ] App rules: never read selections in chosen apps, password managers by default (S5)
-- [ ] Word book: save words from the card, history, export to CSV and Anki, Listen
-- [ ] Private AI Translate in the AI tab, with the language and meaning guards (S4)
+- [x] Look up box: tray, the hotkey with nothing selected, an optional own shortcut (S1)
+- [x] App rules: never read selections in chosen apps, password managers by default (S5)
+- [x] Word book: save words from the card, history, export to CSV and Anki, Listen
+- [x] Private AI Translate in the AI tab, with the language and meaning guards (S4);
+      translation quality per model and language is not measured yet (eval translate task)
+- [x] Review (security, database, AI): 9 findings, all fixed (Chinese and Japanese
+      paragraphs were treated as one word, same-script text handed back went unnoticed,
+      false alarms on names, a translation could overwrite a saved explanation, a history
+      file could be deleted when it couldn't be moved aside, and smaller ones)
+- [ ] Not verified on Windows yet: the Look up box's focus and placement, app rules on
+      real apps, the Windows voice, export through the save dialog
 
 Decisions that belong to the owner (not built until decided):
 
