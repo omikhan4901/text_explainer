@@ -2,7 +2,7 @@
 // screenshots) a mock answers instead, so every screen can be built and checked anywhere.
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { AppInfo, FoundModel, Level, Settings } from "./types";
+import type { AppInfo, ExportFormat, FoundModel, Level, Lookup, NewWord, Page, SavedWord, Settings } from "./types";
 
 /** Where the card's content area is, in CSS pixels from the window's top left. */
 export interface WebBounds {
@@ -50,4 +50,12 @@ export const api = {
   openUrl: (url: string) => call<void>("open_url", { url }),
   validateHotkey: (hotkey: string) => call<void>("validate_hotkey", { hotkey }),
   setPaused: (paused: boolean) => call<void>("set_paused", { paused }),
+  saveWord: (word: NewWord) => call<SavedWord>("save_word", { word }),
+  removeWord: (term: string) => call<boolean>("remove_word", { term }),
+  isSaved: (term: string) => call<boolean>("is_saved", { term }),
+  listWords: (search: string, limit: number, offset: number) => call<Page<SavedWord>>("list_words", { search, limit, offset }),
+  listHistory: (limit: number, offset: number) => call<Page<Lookup>>("list_history", { limit, offset }),
+  clearHistory: () => call<number>("clear_history"),
+  exportWords: (format: ExportFormat, path: string) => call<number>("export_words", { format, path }),
+  speak: (text: string) => call<void>("speak", { text }),
 };

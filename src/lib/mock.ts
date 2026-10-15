@@ -1,7 +1,8 @@
 // A stand-in for the Rust app when the pages run in a plain browser. It keeps settings in
 // memory, simulates downloads, and can play scripted reading-card scenarios
 // (`popup.html?demo=passage`) for development, tests and screenshots.
-import type { AppInfo, ExplainEvent, ModelInfo, PopupEvent, Settings, WebSource, WebTab } from "./types";
+import type { AppInfo, ExplainEvent, ModelInfo, NewWord, PopupEvent, Settings, WebSource, WebTab } from "./types";
+import { WordBook } from "./words";
 
 type Handler = (payload: unknown) => void;
 
@@ -36,6 +37,8 @@ export const DEFAULT_SETTINGS: Settings = {
   ],
   offline_only: false,
   translate_to: "en",
+  keep_history: true,
+  history_days: 30,
 };
 
 function source(id: string, name: string, url: string, enabled: boolean, words: boolean, passages: boolean): WebSource {
@@ -137,6 +140,35 @@ if (typeof location !== "undefined" && new URLSearchParams(location.search).get(
   settings = { ...settings, first_run_done: true, model: { kind: "catalog", id: "gemma-4-e2b" } };
 }
 const handlers = new Map<string, Set<Handler>>();
+
+// The Word book, with a few saved words and lookups so the Words page has something to show.
+let ago = 0;
+const book = new WordBook(() => Date.now() - ago);
+{
+  const minute = 60_000;
+  ago = 4 * 24 * 60 * minute;
+  const seed = book;
+  const words: [string, NewWord["kind"], string | null, string | null][] = [
+    ["notwithstanding", "word", "despite anything to the contrary", "Here it means: whatever else the agreement says."],
+    ["accrue", "word", "grow by addition", "The late fee is added to what is owed."],
+    ["অভিধান", "word", null, "শব্দের অর্থ লেখা বই।"],
+    ["carte blanche", "phrase", "complete freedom to act as you wish", null],
+  ];
+  for (const [term, kind, definition, explanation] of words) {
+    seed.save({ term, kind, definition, explanation });
+    ago -= 24 * 60 * minute;
+  }
+  ago = 3 * 60 * minute;
+  for (const [query, kind] of [
+    ["lessee", "word"],
+    ["carte blanche", "phrase"],
+    ["Notwithstanding any provision of this Agreement to the contrary, the Lessee shall remit payment.", "passage"],
+  ] as const) {
+    seed.record(query, kind, true, 30);
+    ago -= 50 * minute;
+  }
+  ago = 0;
+}
 let downloadTimer: ReturnType<typeof setInterval> | undefined;
 let downloading: string | null = null;
 
@@ -258,6 +290,24 @@ async function call<T>(command: string, args: Record<string, unknown> = {}): Pro
           fit: "too_big",
         },
       ] as T;
+    case "save_word":
+      return book.save(args.word as NewWord) as T;
+    case "remove_word":
+      return book.remove(String(args.term)) as T;
+    case "is_saved":
+      return book.isSaved(String(args.term)) as T;
+    case "list_words":
+      return book.list(String(args.search ?? ""), Number(args.limit), Number(args.offset)) as T;
+    case "list_history":
+      return book.history(Number(args.limit), Number(args.offset)) as T;
+    case "clear_history":
+      return book.clearHistory() as T;
+    case "export_words": {
+      const page = book.list("", 200, 0);
+      return page.total as T;
+    }
+    case "speak":
+      return undefined as T;
     case "validate_source": {
       const url = String(args.url).trim();
       if (!/^https?:\/\//i.test(url)) throw "the address must start with https:// or http://";
@@ -329,6 +379,7 @@ async function playDemo(name: string) {
   const web = webTabs(word);
   const hasModel = name !== "word_offline";
   const ai = !hasModel ? "off" : web.length > 0 || word ? "deferred" : "running";
+  book.record(word ? "ubiquitous" : SOURCE, word ? "word" : "passage", settings.keep_history, settings.history_days);
   emit("te://popup", {
     type: "open",
     id,

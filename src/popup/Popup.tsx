@@ -1,4 +1,4 @@
-import { ArrowSquareOut, Check, Copy, Globe, PushPin, PushPinSlash, Sparkle, Warning, X } from "@phosphor-icons/react";
+import { ArrowSquareOut, BookmarkSimple, Check, Copy, Globe, PushPin, PushPinSlash, SpeakerHigh, Sparkle, Warning, X } from "@phosphor-icons/react";
 import { Tabs } from "radix-ui";
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState, type ReactNode } from "react";
 import { LinkButton } from "../components/ui/Button";
@@ -8,6 +8,7 @@ import { strings } from "../i18n";
 import { api, inApp, on } from "../lib/ipc";
 import { mock } from "../lib/mock";
 import { applyAppearance, followSystemTheme } from "../lib/theme";
+import { bareTerm, savableTerm } from "../lib/words";
 import type { DictionaryEntry, Level, PopupEvent, Sense, Settings } from "../lib/types";
 import {
   answerText,
@@ -172,7 +173,10 @@ function ExplainCard({
             <span className="text-[13px] text-muted">“{state.query}”</span>
           )}
         </p>
-        <PinClose pinned={pinned} onPin={onPin} />
+        <div className="flex shrink-0 items-center gap-0.5">
+          <WordActions state={state} />
+          <PinClose pinned={pinned} onPin={onPin} />
+        </div>
       </div>
       {/* Only the AI tab (offline, no dictionary entry): no row of tabs to choose from. */}
       {tabs(state).length > 1 ? <TabRail state={state} /> : <div className="border-b border-border" />}
@@ -433,9 +437,68 @@ function ExplainPane({ state, level }: { state: Explaining; level: Level }) {
   );
 }
 
-/** “Ubiquitous,” → Ubiquitous */
-export function bareTerm(s: string): string {
-  return s.trim().replace(/^[^\p{L}\p{M}\p{N}]+|[^\p{L}\p{M}\p{N}]+$/gu, "");
+export { bareTerm };
+
+/** Listen (words and short terms) and Save to Words, for selections short enough to keep.
+ * A saved word takes the AI's answer when it finishes. */
+function WordActions({ state }: { state: Explaining }) {
+  const target = savableTerm(state.query, state.kind);
+  const term = target?.term ?? "";
+  const kind = target?.kind ?? null;
+  const [saved, setSaved] = useState<{ id: number; on: boolean } | null>(null);
+  const isSaved = saved?.id === state.id && saved.on;
+  const answer = state.done && !state.error ? answerText(state) : "";
+  /** The last answer stored, so each one is saved once. */
+  const stored = useRef("");
+
+  // Whether it's in the book already, once per request.
+  useEffect(() => {
+    if (!term) return;
+    let live = true;
+    api
+      .isSaved(term)
+      .then((on) => live && setSaved({ id: state.id, on }))
+      .catch(() => live && setSaved(null));
+    return () => {
+      live = false;
+    };
+  }, [state.id, term]);
+
+  useEffect(() => {
+    const key = `${state.id}:${answer}`;
+    if (!isSaved || !answer || !kind || stored.current === key) return;
+    stored.current = key;
+    void api.saveWord({ term, kind, definition: null, explanation: answer }).catch(() => undefined);
+  }, [isSaved, answer, kind, term, state.id]);
+
+  if (!kind) return null;
+  const toggle = async () => {
+    try {
+      if (isSaved) {
+        await api.removeWord(term);
+        setSaved({ id: state.id, on: false });
+      } else {
+        const definition = state.dictionary?.senses[0]?.definition ?? null;
+        await api.saveWord({ term, kind, definition, explanation: answer || null });
+        stored.current = `${state.id}:${answer}`;
+        setSaved({ id: state.id, on: true });
+      }
+    } catch {
+      // The book couldn't be written; the button keeps showing what is stored.
+    }
+  };
+  return (
+    <>
+      {kind !== "passage" && (
+        <IconButton label={t.listen} onClick={() => void api.speak(term).catch(() => undefined)}>
+          <SpeakerHigh size={ICON} />
+        </IconButton>
+      )}
+      <IconButton label={t.save} active={isSaved} aria-pressed={isSaved} onClick={() => void toggle()}>
+        <BookmarkSimple size={ICON} weight={isSaved ? "fill" : "regular"} />
+      </IconButton>
+    </>
+  );
 }
 
 /** A word's senses from the bundled dictionary, grouped by part of speech. */

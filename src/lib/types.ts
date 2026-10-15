@@ -65,6 +65,8 @@ export interface Settings {
   sources: WebSource[];
   offline_only: boolean;
   translate_to: string;
+  keep_history: boolean;
+  history_days: number;
 }
 
 export type Tier = "fastest" | "fast" | "balanced" | "best";
@@ -194,3 +196,42 @@ export type DownloadEvent =
   | { state: "done"; id: string }
   | { state: "failed"; id: string; message: string }
   | { state: "cancelled"; id: string };
+
+/** What a lookup or saved word was (the card's classification; never "empty"). */
+export type WordKind = "word" | "phrase" | "passage";
+
+/** A word in the Word book (`history.rs`). Times are unix milliseconds. */
+export interface SavedWord {
+  id: number;
+  term: string;
+  kind: WordKind;
+  definition: string | null;
+  explanation: string | null;
+  context: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+/** A word to save; missing texts keep what is saved already. */
+export interface NewWord {
+  term: string;
+  kind: WordKind;
+  definition: string | null;
+  explanation: string | null;
+}
+
+/** Something the card was opened on. */
+export interface Lookup {
+  id: number;
+  query: string;
+  kind: WordKind;
+  created_at: number;
+}
+
+/** One page of a list, and how many there are in all. */
+export interface Page<T> {
+  items: T[];
+  total: number;
+}
+
+export type ExportFormat = "csv" | "anki";
