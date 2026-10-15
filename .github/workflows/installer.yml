@@ -1,0 +1,69 @@
+name: Installer (latest build)
+
+# Builds the Windows installer from every push to main, smoke-tests it on the runner, and
+# puts it on the "latest-build" pre-release, which always holds the newest one:
+# https://github.com/omikhan4901/text_explainer/releases/tag/latest-build
+# Stable download link (the file name never changes):
+# https://github.com/omikhan4901/text_explainer/releases/download/latest-build/TextExplainer-x64-setup.exe
+# Numbered releases still come from "Release (draft)".
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# A newer push replaces a build still running for an older one.
+concurrency:
+  group: installer
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: npm ci
+      - run: python scripts/fetch-llama.py
+      - run: python scripts/build-dictionary.py
+      - run: cargo test --workspace
+      - run: npx tauri build --ci
+      - name: Smoke test (install, run the engine, start the app)
+        run: ./scripts/smoke-windows.ps1
+        timeout-minutes: 5
+      - name: Publish to the latest-build pre-release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $built = Get-ChildItem target/release/bundle/nsis/*.exe | Select-Object -First 1
+          $exe = Join-Path $env:RUNNER_TEMP "TextExplainer-x64-setup.exe"
+          Copy-Item $built.FullName $exe
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          $short = $env:GITHUB_SHA.Substring(0, 7)
+          $date = (Get-Date).ToUniversalTime().ToString("d MMMM yyyy, HH:mm 'UTC'")
+          $notes = @"
+          The newest build of Text Explainer for Windows 10 and 11 (64-bit), made from
+          commit $short on $date. It is replaced on every change, so it may have rough edges;
+          numbered releases are the stable ones.
+
+          Download **TextExplainer-x64-setup.exe** below and run it. The installer isn't
+          code-signed yet, so Windows SmartScreen will warn: choose "More info", then
+          "Run anyway".
+
+          SHA-256: $hash
+          "@
+          # Move the pre-release to this commit: remove the old one (and its tag), make it again.
+          # (The first time there is none, and that's fine.)
+          try { gh release delete latest-build --cleanup-tag --yes } catch { }
+          $global:LASTEXITCODE = 0
+          gh release create latest-build $exe --prerelease --title "Latest build (preview)" --notes $notes --target $env:GITHUB_SHA

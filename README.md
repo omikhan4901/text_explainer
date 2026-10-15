@@ -6,10 +6,14 @@ and **Explain with AI**, a local model that rewrites it in plain language on an 
 8 GB laptop with no graphics card. Like the Definer extension, but for every app on
 Windows, and with an AI that never leaves your computer.
 
-> **Status: ongoing work.** The Windows MVP is built and tested in CI on every push
-> (including installing it on a Windows runner and running real models through it); the
-> first test on a real Windows desktop and the first release are next. macOS and Linux
-> come after. Progress: [`docs/PROGRESS.md`](docs/PROGRESS.md).
+**[Download for Windows](https://github.com/omikhan4901/text_explainer/releases/download/latest-build/TextExplainer-x64-setup.exe)**
+(64-bit, Windows 10 and 11). This is the newest build, rebuilt and smoke-tested on a
+Windows runner on every change ([all builds](https://github.com/omikhan4901/text_explainer/releases)).
+It isn't code-signed yet, so SmartScreen warns: choose "More info", then "Run anyway".
+
+> **Status: ongoing work.** The Windows MVP is built; the first test on a real Windows
+> desktop and the first numbered release are next. macOS and Linux come after.
+> Progress: [`docs/PROGRESS.md`](docs/PROGRESS.md).
 
 **This, from a lease:**
 

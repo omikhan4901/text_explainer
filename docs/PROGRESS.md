@@ -116,8 +116,8 @@ Decisions that belong to the owner (not built until decided):
 
 ## Blocked on the owner
 
-- Testing on a real Windows machine: run "Release (draft)" for an installer (CI on push is
-  paused); the checklist is `docs/testing/windows.md`.
+- Testing on a real Windows machine: download the latest build (README's Download link,
+  rebuilt on every push); the checklist is `docs/testing/windows.md`.
 - Publishing the first release: run "Release (draft)" and press Publish when happy.
 
 ## Decisions made while building

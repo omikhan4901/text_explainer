@@ -17,8 +17,11 @@ The plan is `docs/IMPLEMENTATION_PLAN.md` (sources, translation and Definer pari
   `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium` if Playwright can't find Chromium). It also
   lints the Windows app (`src-tauri`) for the Windows target. The push-triggered CI
   workflow was removed on 15 October 2026 at the owner's request while the redesign is in
-  progress (it is in git history as `.github/workflows/ci.yml`); a real Windows build
-  comes from the manual "Release (draft)" workflow. Never leave `main` broken.
+  progress (it is in git history as `.github/workflows/ci.yml`). Every push to `main` builds the
+  Windows installer, smoke-tests it and publishes it to the public `latest-build`
+  pre-release (`installer.yml`, the owner's decision, 15 October 2026: the README's
+  Download link points there), so a broken `main` breaks the download. Numbered releases
+  come from the manual "Release (draft)" workflow. Never leave `main` broken.
 - Never spend the owner's money: standard GitHub runners only (the repo is public, so they
   are free), no paid services, no code signing purchases. Ask first if something costs.
 - Never commit secrets, model files (`*.gguf`) or generated binaries.
