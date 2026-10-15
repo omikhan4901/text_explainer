@@ -55,3 +55,13 @@ test("first run is accessible", async ({ page }) => {
   await page.getByRole("button", { name: "Get started" }).click();
   await expectAccessible(page);
 });
+
+test("reading card translating, with the language search open, is accessible", async ({ page }) => {
+  await page.goto("/popup.html?demo=passage&tab=explain&lang=bn");
+  await page.getByRole("radio", { name: "Translate" }).click({ timeout: 5000 });
+  await page.getByText(/ভাড়াটিয়াকে/).waitFor({ timeout: 5000 });
+  await expectAccessible(page);
+  await page.getByRole("button", { name: /Translating into Bangla/ }).click();
+  await page.getByRole("combobox", { name: "Search languages" }).waitFor();
+  await expectAccessible(page);
+});

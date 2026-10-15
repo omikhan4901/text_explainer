@@ -53,7 +53,7 @@ pub struct Memory {
 pub use imp::{
     ClickOutsideWatcher, DoubleCopyWatcher, capture_selection, cursor_position,
     foreground_process_name, hide_window, kill_with_app, memory, prepare_popup_window,
-    process_memory, set_clipboard_text, show_window_at, speak, work_area_at,
+    process_memory, set_clipboard_text, set_popup_focus, show_window_at, speak, work_area_at,
 };
 
 #[cfg(not(windows))]
@@ -70,6 +70,9 @@ mod stub {
         None
     }
     pub fn prepare_popup_window(_hwnd: isize) -> Result<(), Error> {
+        Err(Error::Unsupported)
+    }
+    pub fn set_popup_focus(_hwnd: isize, _focus: bool) -> Result<(), Error> {
         Err(Error::Unsupported)
     }
     pub fn show_window_at(_hwnd: isize, _x: i32, _y: i32, _w: i32, _h: i32) -> Result<(), Error> {

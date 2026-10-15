@@ -40,4 +40,11 @@ describe("pairUp", () => {
     // An earlier part is complete once a later one has text.
     expect(pairUp(["One. Two.", "Three."], ["Uno y dos.", "Tr"], false)[0]).toEqual({ source: "One. Two.", result: "Uno y dos." });
   });
+
+  it("keeps whole parts together for explanations", () => {
+    expect(pairUp([src, "Next part."], ["Pay by the 5th; if not, 5% more.", "Next."], true, false)).toEqual([
+      { source: src, result: "Pay by the 5th; if not, 5% more." },
+      { source: "Next part.", result: "Next." },
+    ]);
+  });
 });

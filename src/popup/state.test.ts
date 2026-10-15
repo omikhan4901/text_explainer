@@ -6,7 +6,8 @@ const SEARCHES: WebTab[] = [
   { id: "google", name: "Google" },
   { id: "bing", name: "Bing" },
 ];
-const SPANISH: TranslateAvailability = { state: "available", code: "es", name: "Spanish" };
+const EN = { code: "en", name: "English" };
+const SPANISH: TranslateAvailability = { state: "available", code: "es", name: "Spanish", source: EN };
 
 function open(id: number, ai: AiMode, kind: SelectionKind = "passage", web: WebTab[] = [], translate = SPANISH): PopupEvent {
   return { type: "open", id, ai, kind, query: "Hard text.", web, translate };
@@ -227,12 +228,27 @@ describe("Explain and Translate in the AI tab", () => {
 
   it("Translate is refused when the text is already in that language or it isn't supported", () => {
     for (const translate of [
-      { state: "same_language", name: "English" },
-      { state: "unsupported", name: "Thai" },
+      { state: "same_language", name: "English", source: EN },
+      { state: "unsupported", name: "Thai", source: EN },
     ] as TranslateAvailability[]) {
       const s = reduce(reduce(initialState, open(1, "running", "passage", [], translate)), { type: "set_task", task: "translate" });
       expect(s.view === "explain" && s.task).toBe("explain");
+      // Picking a language makes it possible.
+      const picked = reduce(s, { type: "set_task", task: "translate", target: { code: "bn", name: "Bangla" } });
+      expect(picked.view === "explain" && picked.task).toBe("translate");
+      expect(picked.view === "explain" && picked.target?.code).toBe("bn");
     }
+  });
+
+  it("picking another language translates again, and the old one's late events are ignored", () => {
+    let s = reduce(initialState, open(1, "running"));
+    s = reduce(s, { type: "set_task", task: "translate" });
+    s = reduce(s, ex(1, started, "translate"));
+    s = reduce(s, ex(1, { type: "part_done", part: 0, text: "Texto." }, "translate"));
+    s = reduce(s, { type: "set_task", task: "translate", target: { code: "bn", name: "Bangla" } });
+    expect(s.view === "explain" && s.parts).toEqual([]);
+    // Choosing the same language again changes nothing.
+    expect(reduce(s, { type: "set_task", task: "translate", target: { code: "bn", name: "Bangla" } })).toBe(s);
   });
 
   it("a new selection starts on Explain", () => {

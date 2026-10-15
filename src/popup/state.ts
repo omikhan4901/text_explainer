@@ -1,5 +1,5 @@
 // What the reading card shows, driven by events from the app. Pure so it's easy to test.
-import type { AiMode, AiTask, DictionaryEntry, PopupEvent, Report, SelectionKind, TranslateAvailability, WebTab } from "../lib/types";
+import type { AiMode, AiTask, DictionaryEntry, LanguageName, PopupEvent, Report, SelectionKind, TranslateAvailability, WebTab } from "../lib/types";
 
 /** The card's tabs: web searches (`web:<source id>`), the bundled dictionary, and the
  * model's explanation ("Explain with AI"). */
@@ -17,6 +17,8 @@ export interface Explaining {
   /** What the AI tab does: explain, or translate into the language from Settings. */
   task: AiTask;
   translate: TranslateAvailability;
+  /** The language Translate goes into: the person's pick, or the default for this text. */
+  target: LanguageName | null;
   started: boolean;
   kind: SelectionKind;
   source: string;
@@ -46,7 +48,7 @@ export type CardState =
   | Explaining;
 
 /** What the card itself does (the person picks a tab, or Explain / Translate in the AI tab). */
-export type CardAction = { type: "select_tab"; tab: TabId } | { type: "set_task"; task: AiTask };
+export type CardAction = { type: "select_tab"; tab: TabId } | { type: "set_task"; task: AiTask; target?: LanguageName };
 
 export const initialState: CardState = { view: "empty" };
 
@@ -65,6 +67,7 @@ function fresh(event: Extract<PopupEvent, { type: "open" }>): Explaining {
     web: event.web,
     task: "explain",
     translate: event.translate,
+    target: event.translate.state === "available" ? { code: event.translate.code, name: event.translate.name } : null,
     started: false,
     kind: event.kind,
     source: "",
@@ -93,11 +96,15 @@ export function reduce(state: CardState, event: PopupEvent | CardAction): CardSt
       // Opening the AI tab starts the model (the card then asks the app for it).
       return { ...state, tab: event.tab, ai: event.tab === "explain" && state.ai === "deferred" ? "requested" : state.ai };
     case "set_task": {
-      if (state.view !== "explain" || state.task === event.task || !canRun(state, event.task)) return state;
+      if (state.view !== "explain") return state;
+      const target = event.target ?? state.target;
+      if (!canRun({ ...state, target }, event.task)) return state;
+      if (state.task === event.task && (event.task === "explain" || target?.code === state.target?.code)) return state;
       // The app runs the request again with the other task; the old answer goes now.
       return {
         ...state,
         task: event.task,
+        target,
         started: false,
         parts: [],
         sourceParts: [],
@@ -226,10 +233,10 @@ export function isWorking(state: Explaining): boolean {
   return (state.ai === "requested" || state.ai === "running") && !state.done;
 }
 
-/** Whether the AI tab can do `task` for this selection (Translate needs a supported language
- * that the text isn't already in). */
+/** Whether the AI tab can do `task` for this selection (Translate needs a language to go
+ * into: the default for this text, or one the person picked). */
 export function canRun(state: Explaining, task: AiTask): boolean {
-  return task === "explain" || state.translate.state === "available";
+  return task === "explain" || state.target !== null;
 }
 
 /** Only show the grade when it means something (explained passages, both grades known). */

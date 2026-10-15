@@ -144,11 +144,7 @@ pub fn run(app: &AppHandle) {
             kind,
             query: header_text(&cleaned),
             web,
-            translate: translate::availability(
-                &cleaned,
-                last.context.as_deref(),
-                &settings.translate_to,
-            ),
+            translate: translate::offer(&cleaned, last.context.as_deref(), &settings.translate_to),
         },
     );
     if let Some(entry) = entry {
@@ -190,12 +186,14 @@ pub fn explain_again(app: &AppHandle) {
 
 /// The card's AI tab switched between Explain and Translate on request `id`: run that
 /// request again with the new task (if it's still the current one).
-pub fn set_ai_task(app: &AppHandle, id: u64, task: AiTask) {
+pub fn set_ai_task(app: &AppHandle, id: u64, task: AiTask, to: Option<String>) {
     let state = app.state::<AppState>();
     if state.request_id.load(Ordering::SeqCst) != id {
         return;
     }
-    *state.ai_task.lock().expect("ai task lock") = (id, task);
+    // A language code, never a long string: the guard looks it up and refuses the rest.
+    let to = to.filter(|c| c.len() <= 12);
+    *state.ai_task.lock().expect("ai task lock") = (id, task, to);
     explain_now(app, id);
 }
 
@@ -226,7 +224,7 @@ fn explain(app: &AppHandle, id: u64) {
         })
         .unwrap_or_default();
 
-    let ai_task = state.ai_task(id);
+    let (ai_task, picked) = state.ai_task(id);
     let emitter = app.clone();
     let mut emit = move |event: Event| {
         popup::emit(
@@ -244,21 +242,23 @@ fn explain(app: &AppHandle, id: u64) {
             output: settings.output.clone(),
             custom_prompt: settings.prompts.for_level(settings.level).map(String::from),
         },
-        AiTask::Translate => match translate::target(&settings.translate_to) {
-            Some(to) => Task::Translate { to },
-            // The card offers Translate only for guarded languages; Settings may have
-            // changed since the card opened.
-            None => {
-                emit(Event::Error {
-                    message: format!(
-                        "the AI can't translate into {} yet; the Translate tab can",
-                        settings.translate_to
-                    ),
-                    detail: None,
-                });
-                return;
+        AiTask::Translate => {
+            match translate::target(picked.as_deref().unwrap_or(&settings.translate_to)) {
+                Some(to) => Task::Translate { to },
+                // The card offers Translate only for guarded languages; Settings may have
+                // changed since the card opened.
+                None => {
+                    emit(Event::Error {
+                        message: format!(
+                            "the AI can't translate into {} yet; the Translate tab can",
+                            settings.translate_to
+                        ),
+                        detail: None,
+                    });
+                    return;
+                }
             }
-        },
+        }
     };
 
     let engine = state.engine.clone();

@@ -288,8 +288,11 @@ async function call<T>(command: string, args: Record<string, unknown> = {}): Pro
     case "set_ai_task":
       if (args.id === demoId) {
         aiTask = args.task as AiTask;
+        aiTarget = (args.to as string | null) ?? settings.translate_to;
         if (pendingAi) void pendingAi(demoId);
       }
+      return undefined as T;
+    case "popup_focus":
       return undefined as T;
     case "explain_now":
       if (args.id === demoId && pendingAi) void pendingAi(demoId);
@@ -413,6 +416,7 @@ async function playDemo(name: string) {
   clearTimeout(demoTimer);
   const id = ++demoId;
   aiTask = "explain";
+  aiTarget = "";
   if (name === "no_model") return emit("te://popup", { type: "no_model" });
   if (name === "no_selection") return emit("te://popup", { type: "no_selection", hotkey: settings.hotkey });
   const word = name === "word" || name === "word_offline";
@@ -504,25 +508,35 @@ const TRANSLATIONS: Record<string, { word: string; passage: string }> = {
 };
 
 const TRANSLATE_LANGUAGES = [
-  { code: "en", name: "English", native: "English", ai: true },
-  { code: "bn", name: "Bangla", native: "বাংলা", ai: true },
-  { code: "es", name: "Spanish", native: "Español", ai: true },
-  { code: "th", name: "Thai", native: "ไทย", ai: false },
+  { code: "en", name: "English", native: "English", ai: true, lang: "en" },
+  { code: "bn", name: "Bangla", native: "বাংলা", ai: true, lang: "bn" },
+  { code: "hi", name: "Hindi", native: "हिन्दी", ai: true, lang: "hi" },
+  { code: "ur", name: "Urdu", native: "اردو", ai: true, lang: "ur" },
+  { code: "ar", name: "Arabic", native: "العربية", ai: true, lang: "ar" },
+  { code: "es", name: "Spanish", native: "Español", ai: true, lang: "es" },
+  { code: "fr", name: "French", native: "Français", ai: true, lang: "fr" },
+  { code: "de", name: "German", native: "Deutsch", ai: true, lang: "de" },
+  { code: "zh-CN", name: "Chinese (Simplified)", native: "简体中文", ai: true, lang: "zh" },
+  { code: "ja", name: "Japanese", native: "日本語", ai: true, lang: "ja" },
+  { code: "th", name: "Thai", native: "ไทย", ai: false, lang: null },
 ];
 
 let aiTask: AiTask = "explain";
+let aiTarget = "";
 
-/** The demo texts are English: Translate is offered for the other AI languages. */
+/** The demo texts are English: Translate goes into the setting's language (as the app's
+ * `translate::offer`, which also sends text in that language into English). */
 function translateAvailability(): TranslateAvailability {
   const lang = TRANSLATE_LANGUAGES.find((l) => l.code === settings.translate_to) ?? TRANSLATE_LANGUAGES[0]!;
-  if (!lang.ai) return { state: "unsupported", name: lang.name };
-  if (lang.code === "en") return { state: "same_language", name: lang.name };
-  return { state: "available", code: lang.code, name: lang.name };
+  const source = { code: "en", name: "English" };
+  if (!lang.ai) return { state: "unsupported", name: lang.name, source };
+  if (lang.code === "en") return { state: "same_language", name: lang.name, source };
+  return { state: "available", code: lang.code, name: lang.name, source };
 }
 
 async function translateDemo(id: number, kind: "word" | "passage") {
   const send = (event: ExplainEvent) => emit("te://popup", { type: "explain", id, task: "translate", event } satisfies PopupEvent);
-  const lang = settings.translate_to;
+  const lang = aiTarget || settings.translate_to;
   send({
     type: "started",
     kind,
@@ -531,10 +545,10 @@ async function translateDemo(id: number, kind: "word" | "passage") {
     grade_before: null,
     parts: 1,
     source_parts: [kind === "word" ? "ubiquitous" : SOURCE],
-    language: lang,
+    language: TRANSLATE_LANGUAGES.find((l) => l.code === lang)?.name ?? lang,
   });
   await sleep(400);
-  if (id !== demoId || aiTask !== "translate") return;
+  if (id !== demoId || aiTask !== "translate" || (aiTarget || settings.translate_to) !== lang) return;
   const text = (TRANSLATIONS[lang] ?? TRANSLATIONS.es!)[kind];
   send({ type: "part_done", part: 0, text });
   send({ type: "done", text, grade_after: null, report: { missing: [], added: [] }, timings: null, elapsed_ms: 900 });

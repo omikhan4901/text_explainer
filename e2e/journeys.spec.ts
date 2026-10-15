@@ -99,30 +99,42 @@ test("offline, a passage is explained at once", async ({ page }) => {
   await expect(page.getByText(/Whatever else this agreement says/)).toBeVisible({ timeout: 5000 });
 });
 
-test("the AI tab translates on the computer, and says when it can't", async ({ page }) => {
+test("the AI tab shows what you selected and translates it, with the language a search away", async ({ page }) => {
   await page.goto("/popup.html?demo=passage&tab=explain&lang=bn");
+  // What you selected, in full, above the plain version.
+  const original = page.getByRole("region", { name: "What you selected" });
+  await expect(original).toContainText("failing which a late fee equivalent to 5%");
+  await expect(original).toContainText("English");
   await expect(page.getByText(/Whatever else this agreement says/)).toBeVisible({ timeout: 5000 });
-  await page.getByRole("radio", { name: "Translate to Bangla" }).click();
+
+  await page.getByRole("radio", { name: "Translate" }).click();
   await expect(page.getByText(/ভাড়াটিয়াকে/)).toBeVisible({ timeout: 5000 });
-  // Each sentence sits under its original.
-  const pairs = page.getByRole("list", { name: "Each sentence and its translation" });
-  await expect(pairs.getByRole("listitem").first()).toContainText("Notwithstanding any provision");
-  await expect(pairs.getByRole("listitem").first()).toContainText("ভাড়াটিয়াকে");
+  await expect(original).toContainText("Notwithstanding any provision");
   await expect(page.getByRole("radio", { name: "Simpler" })).toHaveCount(0);
+
   // One click compares it with the web translator.
   await page.getByRole("button", { name: "Compare in the Translate tab" }).click();
   await expect(page.getByRole("tab", { name: "Translate", exact: true, selected: true })).toBeVisible();
   await page.getByRole("tab", { name: "Explain with AI" }).click();
-  await page.getByRole("radio", { name: "Explain" }).click();
-  await expect(page.getByText(/Whatever else this agreement says/)).toBeVisible({ timeout: 5000 });
 
+  // The language is a searchable list: type, Enter.
+  await page.getByRole("button", { name: /Translating into Bangla/ }).click();
+  await page.getByRole("combobox", { name: "Search languages" }).fill("span");
+  await expect(page.getByRole("option")).toHaveCount(1);
+  await page.keyboard.press("Enter");
+  await expect(page.getByText(/Sin perjuicio/)).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole("button", { name: /Translating into Spanish/ })).toBeVisible();
+
+  // English text with English as the language: Translate asks where to, and English is off.
   await page.goto("/popup.html?demo=passage&tab=explain");
-  await expect(page.getByRole("radio", { name: "Translate to English" })).toBeDisabled();
-  await expect(page.getByText("Already in English")).toBeVisible();
+  await page.getByRole("radio", { name: "Translate" }).click();
+  await expect(page.getByRole("listbox", { name: "Languages to translate into" })).toBeVisible();
+  await expect(page.getByRole("option", { name: /English/ })).toHaveAttribute("aria-disabled", "true");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("listbox")).toHaveCount(0);
 
   // A language only the web can do points to the web translator.
   await page.goto("/popup.html?demo=passage&tab=explain&lang=th");
-  await expect(page.getByRole("radio", { name: "Translate to Thai" })).toBeDisabled();
   await page.getByRole("button", { name: "Use the Translate tab" }).click();
   await expect(page.getByRole("tab", { name: "Translate", exact: true, selected: true })).toBeVisible();
 });

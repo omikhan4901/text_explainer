@@ -1,6 +1,20 @@
-import { ArrowSquareOut, BookmarkSimple, Check, Copy, Globe, PushPin, PushPinSlash, SpeakerHigh, Sparkle, Warning, X } from "@phosphor-icons/react";
+import {
+  ArrowSquareOut,
+  BookmarkSimple,
+  CaretDown,
+  Check,
+  Copy,
+  Globe,
+  MagnifyingGlass,
+  PushPin,
+  PushPinSlash,
+  SpeakerHigh,
+  Sparkle,
+  Warning,
+  X,
+} from "@phosphor-icons/react";
 import { Tabs } from "radix-ui";
-import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState, type ReactNode } from "react";
 import { LinkButton } from "../components/ui/Button";
 import { IconButton } from "../components/ui/IconButton";
 import { Segmented } from "../components/ui/Segmented";
@@ -10,7 +24,7 @@ import { mock } from "../lib/mock";
 import { applyAppearance, followSystemTheme } from "../lib/theme";
 import { bareTerm, savableTerm } from "../lib/words";
 import { pairUp, type Pair } from "./pairs";
-import type { AiTask, DictionaryEntry, Level, PopupEvent, Sense, Settings } from "../lib/types";
+import type { AiTask, DictionaryEntry, LanguageName, Level, PopupEvent, Sense, Settings, TranslateLanguage } from "../lib/types";
 import {
   answerText,
   copyable,
@@ -28,6 +42,7 @@ import {
 } from "./state";
 
 const t = strings.card;
+const tr = strings.translate;
 /** Card width and the transparent space around it for its shadow (match popup.rs). */
 const WIDTH = 480;
 const MARGIN = 12;
@@ -38,9 +53,23 @@ const ICON = 15;
 
 export function Popup() {
   const [state, dispatch] = useReducer(reduce, initialState);
-  const setTask = useCallback((id: number, task: AiTask) => {
-    dispatch({ type: "set_task", task });
-    void api.setAiTask(id, task);
+  // `remember`: the person picked the language, so it becomes the default.
+  const setTask = useCallback((id: number, task: AiTask, target?: LanguageName, remember?: boolean) => {
+    dispatch({ type: "set_task", task, target });
+    void api.setAiTask(id, task, target?.code);
+    if (remember && target) {
+      void api
+        .getSettings()
+        .then((s) => api.saveSettings({ ...s, translate_to: target.code }))
+        .catch(() => undefined);
+    }
+  }, []);
+  const [languages, setLanguages] = useState<TranslateLanguage[]>([]);
+  useEffect(() => {
+    void api
+      .appInfo()
+      .then((info) => setLanguages(info.translate_languages))
+      .catch(() => undefined);
   }, []);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [pinned, setPinned] = useState(false);
@@ -131,7 +160,8 @@ export function Popup() {
             pinned={pinned}
             onPin={togglePin}
             onTab={(tab) => dispatch({ type: "select_tab", tab })}
-            onTask={(task) => setTask(state.id, task)}
+            languages={languages}
+            onTask={(task, target, remember) => setTask(state.id, task, target, remember)}
           />
         ) : (
           <MessageCard state={state} pinned={pinned} onPin={togglePin} />
@@ -161,13 +191,15 @@ function ExplainCard({
   onPin,
   onTab,
   onTask,
+  languages,
 }: {
   state: Explaining;
   level: Level;
   pinned: boolean;
   onPin: () => void;
   onTab: (tab: TabId) => void;
-  onTask: (task: AiTask) => void;
+  onTask: (task: AiTask, target?: LanguageName, remember?: boolean) => void;
+  languages: TranslateLanguage[];
 }) {
   const word = isWord(state);
   // With web tabs every tab keeps the page's height, so switching never resizes the card.
@@ -199,7 +231,7 @@ function ExplainCard({
         {state.dictionary && <DictionaryPane entry={state.dictionary} copyText={copyable(state)} />}
       </Tabs.Content>
       <Tabs.Content value="explain" className="flex min-h-0 flex-col focus-visible:outline-none" style={steady}>
-        <ExplainPane state={state} level={level} onTask={onTask} onTab={onTab} />
+        <ExplainPane state={state} level={level} languages={languages} onTask={onTask} onTab={onTab} />
       </Tabs.Content>
     </Tabs.Root>
   );
@@ -359,7 +391,6 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-/** Explain or Translate: what the AI tab does for this selection. */
 /** The card's web translator tab (Google Translate, or Bing Translator), when it's on. */
 function webTranslator(state: Explaining) {
   return state.web.find((w) => w.id === "translate" || w.id === "bing-translator") ?? null;
@@ -379,32 +410,245 @@ function TabLink({ onClick, children }: { onClick: () => void; children: ReactNo
   );
 }
 
-function TaskSwitch({ state, onTask, onTab }: { state: Explaining; onTask: (task: AiTask) => void; onTab: (tab: TabId) => void }) {
-  const tr = state.translate;
-  const why = tr.state === "same_language" ? strings.translate.already(tr.name) : tr.state === "unsupported" ? strings.translate.webOnly(tr.name) : undefined;
+/** Explain or Translate: what the AI tab does for this selection. Translate with no
+ * language to go into yet opens the language search first. */
+function TaskSwitch({
+  state,
+  onTask,
+  onPickLanguage,
+  onTab,
+}: {
+  state: Explaining;
+  onTask: (task: AiTask) => void;
+  onPickLanguage: () => void;
+  onTab: (tab: TabId) => void;
+}) {
   const web = webTranslator(state);
   return (
     <div className="flex items-center gap-2.5 px-4 pt-3">
       <Segmented<AiTask>
         size="sm"
-        label={strings.translate.label}
+        label={tr.label}
         value={state.task}
-        onChange={onTask}
+        onChange={(task) => (task === "translate" && !state.target ? onPickLanguage() : onTask(task))}
         options={[
-          { value: "explain", label: strings.translate.explain },
-          { value: "translate", label: strings.translate.to(tr.name), title: why, disabled: tr.state !== "available" },
+          { value: "explain", label: tr.explain },
+          { value: "translate", label: tr.translate },
         ]}
       />
-      {tr.state === "unsupported" && web ? (
-        <TabLink onClick={() => onTab(webTab(web.id))}>{strings.translate.onTheWeb(web.name)}</TabLink>
-      ) : (
-        why && <span className="min-w-0 truncate text-[12px] text-muted">{why}</span>
+      {state.task === "explain" && state.translate.state === "unsupported" && web && (
+        <TabLink onClick={() => onTab(webTab(web.id))}>{tr.onTheWeb(web.name)}</TabLink>
       )}
     </div>
   );
 }
 
-function ExplainPane({ state, level, onTask, onTab }: { state: Explaining; level: Level; onTask: (task: AiTask) => void; onTab: (tab: TabId) => void }) {
+/** A small label over a panel ("ENGLISH · detected", "PLAIN ENGLISH"). */
+function PanelLabel({ children }: { children: ReactNode }) {
+  return <div className="mb-1 flex min-h-6 items-center text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">{children}</div>;
+}
+
+const readingStyle = { fontFamily: "var(--reading-font)", fontSize: "var(--reading-size, 15px)", lineHeight: "var(--reading-leading, 1.6)" };
+const HOT = "rounded-[3px] bg-warn-soft [box-decoration-break:clone]";
+
+/** What the person selected, in full (long text folds to four lines with "Show all").
+ * Each sentence lights up with its partner in the answer. */
+function SourcePanel({ pairs, language, hot, onHot }: { pairs: Pair[]; language: string | null; hot: number | null; onHot: (i: number | null) => void }) {
+  const [all, setAll] = useState(false);
+  const [clipped, setClipped] = useState(false);
+  const ref = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(() => setClipped(el.scrollHeight > el.clientHeight + 1));
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, []);
+  return (
+    <section aria-label={tr.original} className="rounded-lg bg-surface-2 px-3 py-2.5">
+      <PanelLabel>
+        {language ? (
+          <>
+            {language}
+            <span className="ml-1.5 font-normal tracking-normal normal-case">{tr.detected}</span>
+          </>
+        ) : (
+          tr.original
+        )}
+      </PanelLabel>
+      <p
+        ref={ref}
+        className={`text-[13.5px] leading-relaxed [overflow-wrap:anywhere] ${all ? "" : "line-clamp-4"}`}
+        style={{ fontFamily: "var(--reading-font)" }}
+      >
+        {pairs.map((p, i) => (
+          <Fragment key={i}>
+            <span onMouseEnter={() => onHot(i)} onMouseLeave={() => onHot(null)} className={hot === i ? HOT : undefined}>
+              {p.source}
+            </span>{" "}
+          </Fragment>
+        ))}
+      </p>
+      {(clipped || all) && (
+        <button type="button" onClick={() => setAll(!all)} className="mt-1 text-[12px] font-medium text-muted transition-colors hover:text-text">
+          {all ? tr.showLess : tr.showAll}
+        </button>
+      )}
+    </section>
+  );
+}
+
+/** The answer, sentence by sentence, each lighting up with its original. */
+function LinkedResult({ pairs, hot, onHot, streaming }: { pairs: Pair[]; hot: number | null; onHot: (i: number | null) => void; streaming: boolean }) {
+  const last = pairs.findLastIndex((p) => p.result);
+  return (
+    <p className="[overflow-wrap:anywhere]" style={readingStyle}>
+      {pairs.map((p, i) =>
+        p.result ? (
+          <Fragment key={i}>
+            <span
+              onMouseEnter={() => onHot(i)}
+              onMouseLeave={() => onHot(null)}
+              className={[hot === i ? HOT : "", streaming && i === last ? "stream-caret" : ""].join(" ").trim() || undefined}
+            >
+              {p.result}
+            </span>{" "}
+          </Fragment>
+        ) : null,
+      )}
+    </p>
+  );
+}
+
+/** The language name over a translation: opens the language search. */
+function LanguageButton({ name, open, onClick }: { name: string; open: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-haspopup="listbox"
+      aria-expanded={open}
+      aria-label={tr.changeLanguage(name)}
+      onClick={onClick}
+      className="-ml-1.5 inline-flex h-6 items-center gap-1 rounded-md px-1.5 tracking-[0.06em] text-text uppercase transition-colors hover:bg-surface-2 aria-expanded:bg-surface-2"
+    >
+      {name}
+      <CaretDown size={11} weight="bold" aria-hidden className={`transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
+    </button>
+  );
+}
+
+/** A searchable list of the languages to translate into. The card takes keyboard focus
+ * only while this is open (the person chose to type), and gives it back after. */
+function LanguageSearch({
+  languages,
+  current,
+  source,
+  onPick,
+  onClose,
+}: {
+  languages: TranslateLanguage[];
+  current: string | null;
+  source: LanguageName | null;
+  onPick: (l: LanguageName) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    void api
+      .popupFocus(true)
+      .catch(() => undefined)
+      .finally(() => input.current?.focus());
+    return () => void api.popupFocus(false).catch(() => undefined);
+  }, []);
+  const q = query.trim().toLowerCase();
+  const list = languages
+    .filter((l) => !q || [l.name, l.native, l.code].some((s) => s.toLowerCase().includes(q)))
+    .sort((a, b) => Number(!starts(b, q)) - Number(!starts(a, q)));
+  const blocked = (l: TranslateLanguage) => !l.ai || (!!source && l.lang === source.code);
+  const pick = (l: TranslateLanguage | undefined) => l && !blocked(l) && onPick({ code: l.code, name: l.name });
+  const at = Math.min(active, Math.max(list.length - 1, 0));
+  return (
+    <div className="card-in rounded-lg border border-border bg-surface">
+      <div className="flex items-center gap-2 border-b border-border px-2.5">
+        <MagnifyingGlass size={14} aria-hidden className="shrink-0 text-muted" />
+        <input
+          ref={input}
+          role="combobox"
+          aria-expanded="true"
+          aria-controls="language-list"
+          aria-activedescendant={list[at] ? `language-${list[at].code}` : undefined}
+          aria-label={tr.search}
+          placeholder={tr.search}
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setActive(0);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              e.preventDefault();
+              setActive((i) => Math.max(0, Math.min(list.length - 1, i + (e.key === "ArrowDown" ? 1 : -1))));
+            } else if (e.key === "Enter") {
+              e.preventDefault();
+              pick(list[at]);
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }
+          }}
+          className="h-9 min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted"
+        />
+      </div>
+      <ul id="language-list" role="listbox" aria-label={tr.languages} className="max-h-52 overflow-y-auto p-1">
+        {list.length === 0 && <li className="px-2 py-2 text-[12px] text-muted">{tr.noMatch(query.trim())}</li>}
+        {list.map((l, i) => {
+          const off = blocked(l);
+          return (
+            <li
+              key={l.code}
+              id={`language-${l.code}`}
+              role="option"
+              aria-selected={l.code === current}
+              aria-disabled={off || undefined}
+              onMouseEnter={() => setActive(i)}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => pick(l)}
+              className={`flex h-8 cursor-default items-center gap-2 rounded-md px-2 text-[13px] ${i === at ? "bg-surface-2" : ""} ${off ? "text-muted" : ""}`}
+            >
+              <span className="truncate">{l.native}</span>
+              {l.native !== l.name && <span className="truncate text-[12px] text-muted">{l.name}</span>}
+              <span className="ml-auto shrink-0 text-[11px] text-muted">{!l.ai ? tr.webOnly : source && l.lang === source.code ? tr.textLanguage : ""}</span>
+              {l.code === current && <Check size={13} weight="bold" aria-hidden className="shrink-0" />}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function starts(l: TranslateLanguage, q: string): boolean {
+  return !q || l.name.toLowerCase().startsWith(q) || l.native.toLowerCase().startsWith(q) || l.code.toLowerCase().startsWith(q);
+}
+
+function ExplainPane({
+  state,
+  level,
+  languages,
+  onTask,
+  onTab,
+}: {
+  state: Explaining;
+  level: Level;
+  languages: TranslateLanguage[];
+  onTask: (task: AiTask, target?: LanguageName, remember?: boolean) => void;
+  onTab: (tab: TabId) => void;
+}) {
+  const [picking, setPicking] = useState(false);
+  const [hot, setHot] = useState<number | null>(null);
   const web = webTranslator(state);
   const text = answerText(state);
   const streaming = isStreaming(state);
@@ -412,6 +656,10 @@ function ExplainPane({ state, level, onTask, onTab }: { state: Explaining; level
   const report = state.report;
   const flagged = !state.error && report && (report.missing.length > 0 || report.added.length > 0);
   const passage = state.kind === "passage";
+  const translating = state.task === "translate";
+  const pairs = passage && state.sourceParts.length > 0 ? pairUp(state.sourceParts, state.parts, state.done, translating) : null;
+  const levelName = strings.level[level];
+  const explainedAs = !passage ? tr.meaning : state.language ? tr.plainIn(levelName, state.language) : tr.plainIn(levelName, tr.version);
 
   if (state.ai === "off") {
     return (
@@ -427,7 +675,7 @@ function ExplainPane({ state, level, onTask, onTab }: { state: Explaining; level
         </button>
         {web && (
           <p className="pt-1">
-            <TabLink onClick={() => onTab(webTab(web.id))}>{strings.translate.onTheWeb(web.name)}</TabLink>
+            <TabLink onClick={() => onTab(webTab(web.id))}>{tr.onTheWeb(web.name)}</TabLink>
           </p>
         )}
       </div>
@@ -436,26 +684,56 @@ function ExplainPane({ state, level, onTask, onTab }: { state: Explaining; level
 
   return (
     <>
-      <TaskSwitch state={state} onTask={onTask} onTab={onTab} />
-      <div key={`${state.id}-${state.task}`} className="card-in min-h-0 overflow-y-auto px-4 pt-3 pb-4" aria-live="polite" aria-busy={!state.done}>
-        {state.error ? (
-          <ErrorBlock message={state.error.message} detail={state.error.detail} />
-        ) : text && state.task === "translate" && state.kind === "passage" && state.sourceParts.length > 0 ? (
-          <Pairs pairs={pairUp(state.sourceParts, state.parts, state.done)} streaming={streaming} />
-        ) : text ? (
-          <Reading text={text} streaming={streaming} />
-        ) : (
-          <div role="status">
-            <Skeleton lines={passage ? 3 : 2} />
-            <p className="mt-3 text-[12px] text-muted">{state.loadingModel ? t.loadingModel : t.thinking}</p>
-          </div>
-        )}
-        {state.truncated && !state.error && <p className="mt-3 text-[12px] text-muted">{t.truncated}</p>}
-        {state.task === "translate" && state.done && !state.error && web && (
-          <p className="mt-3">
-            <TabLink onClick={() => onTab(webTab(web.id))}>{strings.translate.compare(web.name)}</TabLink>
-          </p>
-        )}
+      <TaskSwitch
+        state={state}
+        onTask={(task) => onTask(task, task === "translate" ? (state.target ?? undefined) : undefined)}
+        onPickLanguage={() => setPicking(true)}
+        onTab={onTab}
+      />
+      <div key={`${state.id}-${state.task}`} className="card-in min-h-0 overflow-y-auto px-4 pt-3 pb-4" aria-busy={!state.done}>
+        {pairs && <SourcePanel pairs={pairs} language={state.translate.source?.name ?? null} hot={hot} onHot={setHot} />}
+        <section aria-label={tr.result} className={pairs ? "mt-3.5" : ""}>
+          <PanelLabel>
+            {translating || picking ? (
+              <LanguageButton name={state.target?.name ?? tr.chooseLanguage} open={picking} onClick={() => setPicking(!picking)} />
+            ) : (
+              explainedAs
+            )}
+          </PanelLabel>
+          {picking ? (
+            <LanguageSearch
+              languages={languages}
+              current={translating ? (state.target?.code ?? null) : null}
+              source={state.translate.source}
+              onPick={(l) => {
+                setPicking(false);
+                onTask("translate", l, true);
+              }}
+              onClose={() => setPicking(false)}
+            />
+          ) : (
+            <div aria-live="polite">
+              {state.error ? (
+                <ErrorBlock message={state.error.message} detail={state.error.detail} />
+              ) : text && pairs ? (
+                <LinkedResult pairs={pairs} hot={hot} onHot={setHot} streaming={streaming} />
+              ) : text ? (
+                <Reading text={text} streaming={streaming} />
+              ) : (
+                <div role="status">
+                  <Skeleton lines={passage ? 3 : 2} />
+                  <p className="mt-3 text-[12px] text-muted">{state.loadingModel ? t.loadingModel : t.thinking}</p>
+                </div>
+              )}
+              {state.truncated && !state.error && <p className="mt-3 text-[12px] text-muted">{t.truncated}</p>}
+              {translating && state.done && !state.error && web && (
+                <p className="mt-3">
+                  <TabLink onClick={() => onTab(webTab(web.id))}>{tr.compare(web.name)}</TabLink>
+                </p>
+              )}
+            </div>
+          )}
+        </section>
       </div>
 
       {flagged && (
@@ -626,31 +904,6 @@ export function Reading({ text, streaming }: { text: string; streaming: boolean 
         </p>
       ))}
     </div>
-  );
-}
-
-/** A translation sentence by sentence, each under its original (small and muted), so the
- * reader can map one onto the other. Pointing at a pair highlights it. */
-function Pairs({ pairs, streaming }: { pairs: Pair[]; streaming: boolean }) {
-  const writing = pairs.findLastIndex((p) => p.result);
-  const next = pairs.findIndex((p) => !p.result);
-  return (
-    <ol
-      aria-label={strings.translate.pairs}
-      className="-mx-2 space-y-0.5 [overflow-wrap:anywhere]"
-      style={{ fontFamily: "var(--reading-font)", fontSize: "var(--reading-size, 15px)", lineHeight: "var(--reading-leading, 1.6)" }}
-    >
-      {pairs.map((p, i) => (
-        <li key={i} className="rounded-lg px-2 py-1.5 transition-colors duration-150 hover:bg-surface-2">
-          <p className="text-[0.82em] leading-snug text-muted">{p.source}</p>
-          {p.result ? (
-            <p className={`mt-0.5 ${streaming && i === writing ? "stream-caret" : ""}`}>{p.result}</p>
-          ) : (
-            i === next && <div className="skeleton-line mt-2 h-2.5 w-2/3 rounded-full" aria-hidden />
-          )}
-        </li>
-      ))}
-    </ol>
   );
 }
 

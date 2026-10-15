@@ -7,8 +7,8 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     GWL_EXSTYLE, GetCursorPos, GetWindowLongPtrW, HWND_TOPMOST, SW_HIDE, SWP_NOACTIVATE,
-    SWP_SHOWWINDOW, SetWindowLongPtrW, SetWindowPos, ShowWindow, WS_EX_APPWINDOW, WS_EX_NOACTIVATE,
-    WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    SWP_SHOWWINDOW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, ShowWindow,
+    WS_EX_APPWINDOW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
 };
 
 use crate::{Error, Rect};
@@ -27,6 +27,28 @@ pub fn prepare_popup_window(raw: isize) -> Result<(), Error> {
         let new = (ex | (WS_EX_NOACTIVATE.0 | WS_EX_TOOLWINDOW.0 | WS_EX_TOPMOST.0) as isize)
             & !(WS_EX_APPWINDOW.0 as isize);
         SetWindowLongPtrW(h, GWL_EXSTYLE, new);
+    }
+    Ok(())
+}
+
+/// Lets the card take keyboard focus (`focus`: the person opened something to type in, such
+/// as the language search) or makes it non-activating again.
+pub fn set_popup_focus(raw: isize, focus: bool) -> Result<(), Error> {
+    let h = hwnd(raw);
+    // SAFETY: see `prepare_popup_window`.
+    unsafe {
+        let ex = GetWindowLongPtrW(h, GWL_EXSTYLE);
+        let no_activate = WS_EX_NOACTIVATE.0 as isize;
+        let new = if focus {
+            ex & !no_activate
+        } else {
+            ex | no_activate
+        };
+        SetWindowLongPtrW(h, GWL_EXSTYLE, new);
+        if focus {
+            // Allowed: the person just clicked this window.
+            let _ = SetForegroundWindow(h);
+        }
     }
     Ok(())
 }

@@ -78,22 +78,64 @@ pub enum Availability {
     Unsupported { name: String },
 }
 
-/// Can `selection` (cleaned) be translated by the AI into `translate_to`? A word or short
-/// term says little about its language, so the sentence around it decides when the word
-/// alone can't. When the language can't be told, translating is allowed.
+/// The selection's language: a word or short term says little about its language, so the
+/// sentence around it decides when the word alone can't.
+fn detected(selection: &str, context: Option<&str>) -> Option<&'static Language> {
+    language::detect_known(selection).or_else(|| context.and_then(language::detect_known))
+}
+
+/// Can `selection` (cleaned) be translated by the AI into `translate_to`? When the
+/// language can't be told, translating is allowed.
 pub fn availability(selection: &str, context: Option<&str>, translate_to: &str) -> Availability {
     let name = display_name(translate_to);
     let Some(to) = target(translate_to) else {
         return Availability::Unsupported { name };
     };
-    let from =
-        language::detect_known(selection).or_else(|| context.and_then(language::detect_known));
+    let from = detected(selection, context);
     if from.is_some_and(|l| l.code == to.code) {
         return Availability::SameLanguage { name };
     }
     Availability::Available {
         code: translate_to.to_string(),
         name,
+    }
+}
+
+/// A language as the card names it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Named {
+    pub code: String,
+    pub name: String,
+}
+
+/// What the card's AI tab offers to translate into, and the selection's own language.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Offer {
+    #[serde(flatten)]
+    pub availability: Availability,
+    /// The selection's language when it can be told ("English · detected").
+    pub source: Option<Named>,
+}
+
+/// Like Google Translate: text already in the chosen language goes into English instead
+/// (Bangla text with "Translate into" set to Bangla is translated to English).
+pub fn offer(selection: &str, context: Option<&str>, translate_to: &str) -> Offer {
+    let from = detected(selection, context);
+    let mut availability = availability(selection, context, translate_to);
+    if matches!(availability, Availability::SameLanguage { .. })
+        && from.is_some_and(|l| l.code != "en")
+    {
+        availability = Availability::Available {
+            code: "en".into(),
+            name: "English".into(),
+        };
+    }
+    Offer {
+        availability,
+        source: from.map(|l| Named {
+            code: l.code.into(),
+            name: display_name(l.code),
+        }),
     }
 }
 
@@ -217,6 +259,42 @@ mod tests {
             super::availability("12,345", None, "en"),
             Available { .. }
         ));
+    }
+
+    #[test]
+    fn text_in_the_chosen_language_goes_into_english() {
+        let bn = "ভাড়া প্রতি মাসের প্রথম দিনে দিতে হবে।";
+        let o = super::offer(bn, None, "bn");
+        assert_eq!(
+            o.availability,
+            Availability::Available {
+                code: "en".into(),
+                name: "English".into()
+            }
+        );
+        assert_eq!(o.source.unwrap().code, "bn");
+        // English text in English: nothing to translate into.
+        let en = "The tenant must pay the rent on the first day of each month.";
+        assert!(matches!(
+            super::offer(en, None, "en").availability,
+            Availability::SameLanguage { .. }
+        ));
+        // Otherwise the chosen language, with the source named.
+        let o = super::offer(en, None, "bn");
+        assert!(matches!(o.availability, Availability::Available { ref code, .. } if code == "bn"));
+        assert_eq!(o.source.unwrap().name, "English");
+        // A bare number has no language.
+        assert_eq!(super::offer("12,345", None, "bn").source, None);
+    }
+
+    #[test]
+    fn offer_serializes_for_the_card() {
+        let json = serde_json::to_value(super::offer("ভাড়া দিন।", None, "bn")).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({"state": "available", "code": "en", "name": "English",
+                "source": {"code": "bn", "name": "Bangla"}})
+        );
     }
 
     #[test]

@@ -74,8 +74,9 @@ pub struct AppState {
     pub task: Mutex<Option<JoinHandle<()>>>,
     pub request_id: AtomicU64,
     pub last: Mutex<Option<LastRequest>>,
-    /// The AI tab's task and the request it was chosen on; any other request explains.
-    pub ai_task: Mutex<(u64, AiTask)>,
+    /// The AI tab's task, the language picked to translate into (if any), and the request
+    /// they were chosen on; any other request explains.
+    pub ai_task: Mutex<(u64, AiTask, Option<String>)>,
     pub popup: Mutex<Option<PopupPlacement>>,
     pub pinned: AtomicBool,
     pub paused: AtomicBool,
@@ -101,10 +102,10 @@ impl AppState {
     }
 
     /// The AI tab's task for request `id` (Explain unless the card chose otherwise on it).
-    pub fn ai_task(&self, id: u64) -> AiTask {
-        match *self.ai_task.lock().expect("ai task lock") {
-            (chosen_on, task) if chosen_on == id => task,
-            _ => AiTask::Explain,
+    pub fn ai_task(&self, id: u64) -> (AiTask, Option<String>) {
+        match &*self.ai_task.lock().expect("ai task lock") {
+            (chosen_on, task, to) if *chosen_on == id => (*task, to.clone()),
+            _ => (AiTask::Explain, None),
         }
     }
 

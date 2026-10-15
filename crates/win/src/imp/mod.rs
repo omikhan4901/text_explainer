@@ -16,7 +16,8 @@ pub use hook::ClickOutsideWatcher;
 pub use speech::speak;
 pub use system::{foreground_process_name, kill_with_app, memory, process_memory};
 pub use window::{
-    cursor_position, hide_window, prepare_popup_window, show_window_at, work_area_at,
+    cursor_position, hide_window, prepare_popup_window, set_popup_focus, show_window_at,
+    work_area_at,
 };
 
 use crate::{Error, Method, Selection};

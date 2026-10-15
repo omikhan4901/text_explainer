@@ -13,7 +13,7 @@ use tauri_plugin_opener::OpenerExt;
 use te_core::explain::Event;
 use te_core::sources::{self, WebTab};
 use te_core::text::{self, SelectionKind};
-use te_core::translate::Availability;
+use te_core::translate::Offer;
 use te_win::{Rect, choose_side, place_on_side};
 
 use crate::state::{AppState, PopupPlacement};
@@ -41,8 +41,8 @@ pub enum PopupEvent {
         query: String,
         /// Web source tabs, in order (empty while "Offline only" is on).
         web: Vec<WebTab>,
-        /// Whether the AI tab can translate this selection into `settings.translate_to`.
-        translate: Availability,
+        /// What the AI tab can translate this selection into, and its own language.
+        translate: Offer,
     },
     Explain {
         id: u64,
@@ -163,6 +163,27 @@ pub fn resize(app: &AppHandle, css_height: f64) {
     let _ = te_win::show_window_at(h, x, y, size.0, size.1);
     if !state.pinned.load(Ordering::SeqCst) {
         state.click_watcher.set_rect(Some(p.rect));
+    }
+}
+
+/// The card takes keyboard focus while the person types in it (the language search) and
+/// gives it up after. Esc belongs to the search field meanwhile, not to closing the card.
+pub fn set_focus(app: &AppHandle, focus: bool) {
+    let Some(h) = hwnd(app) else { return };
+    if let Err(e) = te_win::set_popup_focus(h, focus) {
+        tracing::warn!("couldn't change the card's focus: {e}");
+    }
+    let shortcuts = app.global_shortcut();
+    if focus {
+        let _ = shortcuts.unregister(ESCAPE);
+    } else if app
+        .state::<AppState>()
+        .popup
+        .lock()
+        .expect("popup lock")
+        .is_some()
+    {
+        let _ = shortcuts.register(ESCAPE);
     }
 }
 

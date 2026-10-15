@@ -248,14 +248,26 @@ export type ExportFormat = "csv" | "anki";
 export type AiTask = "explain" | "translate";
 
 /** Whether the AI can translate this selection into the language chosen in Settings. */
-export type TranslateAvailability =
+export type TranslateAvailability = (
   | { state: "available"; code: string; name: string }
   | { state: "same_language"; name: string }
-  | { state: "unsupported"; name: string };
+  | { state: "unsupported"; name: string }
+) & {
+  /** The selection's own language, when it can be told. */
+  source: LanguageName | null;
+};
+
+/** A language as the card names it ("bn", "Bangla"). */
+export interface LanguageName {
+  code: string;
+  name: string;
+}
 
 export interface TranslateLanguage {
   code: string;
   name: string;
   native: string;
   ai: boolean;
+  /** The language guard's code for it ("zh" for "zh-CN"), or null when only the web can. */
+  lang: string | null;
 }

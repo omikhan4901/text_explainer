@@ -180,12 +180,22 @@ model like an explanation, so the text never leaves the computer.
   a translation rightly writes them the target's way ("Geneva" becomes "Ginebra").
 - Token budgets are per target script (`prompt::max_tokens_for_translation`): Bangla,
   Hindi, Arabic and CJK take many more tokens per word than English.
-- A translated passage is shown sentence by sentence, each under its original (small and
-  muted), so the reader can map one onto the other; pointing at a pair highlights it. The
-  core sends each part's source with the `started` event; `src/popup/pairs.ts` pairs the
-  sentences within each part when both sides have as many (Unicode sentence rules, so
-  "।" and "。" count) and otherwise keeps the whole part as one pair, so a sentence is
-  never shown next to the wrong translation. The model's prompt is unchanged.
+- For passages the AI tab shows two panels, stacked to fit the card: **what you selected**
+  in full (labelled with its detected language, folded to four lines with "Show all"),
+  then the answer ("Plain English", or the language it was translated into). The core
+  sends each part's source with the `started` event; for translations,
+  `src/popup/pairs.ts` pairs sentences within each part when both sides have as many
+  (Unicode sentence rules, so "।" and "。" count), and pointing at a sentence in either
+  panel marks its partner in the other. Explanations are paired part by part (a rewrite
+  may split or merge sentences). The model's prompt is unchanged.
+- The language over a translation is a button: it opens a searchable list of languages
+  (type to filter, arrows and Enter to pick, Esc to close). Web-only languages and the
+  text's own language can't be picked. A pick becomes the default (`translate_to`) and
+  is sent with `set_ai_task`. The card takes keyboard focus only while this list is open
+  (`popup_focus`, which also hands Esc from the global shortcut to the field).
+- Which language by default (`translate::offer`): the setting's, unless the text is
+  already in it; then English, as Google Translate does (Bangla text with "Translate
+  into" Bangla goes into English).
 - The web translators work alongside it: the Translate tab (Google Translate) is on by
   default and Bing Translator can be turned on in Sources (it names Chinese "zh-Hans", so
   `sources::build_url` maps the setting's "zh-CN" for it). After an AI translation the

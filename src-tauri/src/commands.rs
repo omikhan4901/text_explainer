@@ -89,6 +89,8 @@ pub struct TranslateLanguage {
     #[serde(flatten)]
     choice: translate::Choice,
     ai: bool,
+    /// The guard's code for it ("zh" for "zh-CN"), to tell when a selection is already in it.
+    lang: Option<&'static str>,
 }
 
 #[derive(Serialize)]
@@ -159,6 +161,7 @@ pub async fn app_info(state: State<'_, AppState>) -> CmdResult<AppInfo> {
             .map(|&choice| TranslateLanguage {
                 choice,
                 ai: translate::target(choice.code).is_some(),
+                lang: translate::target(choice.code).map(|l| l.code),
             })
             .collect(),
         engine_found: state.paths.llama_server.is_file(),
@@ -336,8 +339,15 @@ pub fn explain_now(app: AppHandle, id: u64) {
 /// The card's AI tab switched between Explain and Translate: run request `id` again with
 /// that task (the card stays on its tab).
 #[tauri::command]
-pub fn set_ai_task(app: AppHandle, id: u64, task: AiTask) {
-    trigger::set_ai_task(&app, id, task);
+pub fn set_ai_task(app: AppHandle, id: u64, task: AiTask, to: Option<String>) {
+    trigger::set_ai_task(&app, id, task, to);
+}
+
+/// The card's language search opened (`true`) or closed: the card takes keyboard focus
+/// only while it's open.
+#[tauri::command]
+pub fn popup_focus(app: AppHandle, focus: bool) {
+    popup::set_focus(&app, focus);
 }
 
 /// Shows a web source's page in the card's content area. Async: creating a web view from

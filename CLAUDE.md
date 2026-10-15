@@ -45,7 +45,10 @@ The plan is `docs/IMPLEMENTATION_PLAN.md` (sources, translation and Definer pari
 
 ## Rules that are easy to break
 
-- The popup must never take focus from the app the person is reading in.
+- The popup must never take focus from the app the person is reading in. The one exception
+  is the AI tab's language search: while it is open the card takes focus (the person
+  clicked to type), and gives it back when it closes (`popup_focus`). Like the web view,
+  nothing else may make the card take focus.
 - Model output always goes through the language guard (grammar on the request, script check
   on the result) so a model can't answer in the wrong language.
 - The clipboard fallback restores the person's clipboard exactly, every time, even on error.
