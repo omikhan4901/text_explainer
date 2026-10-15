@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What the app's own pages may call. Nothing remote is ever loaded.",
+  "description": "What the app's own pages may call. Web pages in the card's web view are remote and get no permissions.",
   "windows": [
     "main",
     "popup"

@@ -75,6 +75,7 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         click_watcher,
         download: Mutex::new(None),
         dictionary: Mutex::new(dictionary),
+        web_url: Mutex::new(None),
     });
 
     popup::prepare(&handle);
@@ -174,6 +175,10 @@ pub fn run() {
             commands::popup_pin,
             commands::set_level,
             commands::explain_now,
+            commands::web_show,
+            commands::web_hide,
+            commands::validate_source,
+            commands::web_open_in_browser,
             commands::copy_text,
             commands::explain_text,
             commands::open_main,

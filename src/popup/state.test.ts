@@ -1,6 +1,14 @@
 import { bareTerm } from "./Popup";
-import { answerText, copyable, gradeBadge, initialState, isStreaming, reduce, tabs, type CardState, type Explaining } from "./state";
-import type { ExplainEvent, PopupEvent } from "../lib/types";
+import { answerText, copyable, gradeBadge, initialState, isStreaming, isWorking, reduce, tabs, type CardState, type Explaining } from "./state";
+import type { AiMode, ExplainEvent, PopupEvent, SelectionKind, WebTab } from "../lib/types";
+
+const SEARCHES: WebTab[] = [
+  { id: "google", name: "Google" },
+  { id: "bing", name: "Bing" },
+];
+function open(id: number, ai: AiMode, kind: SelectionKind = "passage", web: WebTab[] = []): PopupEvent {
+  return { type: "open", id, ai, kind, query: "Hard text.", web };
+}
 
 const ex = (id: number, event: ExplainEvent): PopupEvent => ({ type: "explain", id, event });
 const started: ExplainEvent = {
@@ -19,7 +27,7 @@ function run(events: PopupEvent[], from: CardState = initialState): CardState {
 
 test("streams parts and finishes with the cleaned text", () => {
   const s = run([
-    { type: "open", id: 1, ai: "running" },
+    open(1, "running"),
     ex(1, started),
     ex(1, { type: "loading" }),
     ex(1, { type: "delta", part: 0, text: "The tenant " }),
@@ -45,14 +53,14 @@ test("streams parts and finishes with the cleaned text", () => {
 });
 
 test("events from an older request are ignored", () => {
-  const s = run([{ type: "open", id: 1, ai: "running" }, ex(1, started), { type: "open", id: 2, ai: "running" }, ex(1, { type: "delta", part: 0, text: "stale" })]) as Explaining;
+  const s = run([open(1, "running"), ex(1, started), open(2, "running"), ex(1, { type: "delta", part: 0, text: "stale" })]) as Explaining;
   expect(s.id).toBe(2);
   expect(answerText(s)).toBe("");
 });
 
 test("a restarted part drops its drifted text", () => {
   const s = run([
-    { type: "open", id: 3, ai: "running" },
+    open(3, "running"),
     ex(3, started),
     ex(3, { type: "delta", part: 0, text: "这是" }),
     ex(3, { type: "restart_part", part: 0 }),
@@ -62,14 +70,14 @@ test("a restarted part drops its drifted text", () => {
 });
 
 test("errors end the request", () => {
-  const s = run([{ type: "open", id: 4, ai: "running" }, ex(4, started), ex(4, { type: "error", message: "boom", detail: "log" })]) as Explaining;
+  const s = run([open(4, "running"), ex(4, started), ex(4, { type: "error", message: "boom", detail: "log" })]) as Explaining;
   expect(s.done).toBe(true);
   expect(s.error).toEqual({ message: "boom", detail: "log" });
 });
 
 test("words have no grade badge", () => {
   const s = run([
-    { type: "open", id: 5, ai: "running" },
+    open(5, "running"),
     ex(5, { ...started, kind: "word", grade_before: null, parts: 1 } as ExplainEvent),
     ex(5, { type: "done", text: "x", grade_after: null, report: { missing: [], added: [] }, timings: null, elapsed_ms: 1 }),
   ]) as Explaining;
@@ -88,7 +96,7 @@ test("other views", () => {
 test("dictionary entries attach to the current request", () => {
   const entry = { lemma: "mouse", senses: [{ pos: "noun" as const, definition: "a small rodent", example: null, synonyms: [] }] };
   const s = run([
-    { type: "open", id: 7, ai: "running" },
+    open(7, "deferred", "word"),
     { type: "dictionary", id: 7, entry },
     { type: "dictionary", id: 6, entry: { ...entry, lemma: "old" } },
   ]) as Explaining;
@@ -105,19 +113,22 @@ test("terms are shown without surrounding punctuation", () => {
 
 const mouse = { lemma: "mouse", senses: [{ pos: "noun" as const, definition: "a small rodent", example: "a mouse ran by", synonyms: ["rodent"] }] };
 
-test("a word opens on its dictionary entry and the model waits for its tab", () => {
-  const s = run([
-    { type: "open", id: 8, ai: "deferred" },
-    { type: "dictionary", id: 8, entry: mouse },
-  ]) as Explaining;
-  expect(tabs(s)).toEqual(["dictionary", "explain"]);
-  expect(s.tab).toBe("dictionary");
+test("the card opens on the first web search; the AI waits for its tab", () => {
+  const s = run([open(8, "deferred", "word", SEARCHES), { type: "dictionary", id: 8, entry: mouse }]) as Explaining;
+  expect(tabs(s)).toEqual(["web:google", "web:bing", "dictionary", "explain"]);
+  expect(s.tab).toBe("web:google");
   expect(s.ai).toBe("deferred");
-  expect(copyable(s)).toBe('mouse\n1. (noun) a small rodent "a mouse ran by"');
+  expect(isWorking(s)).toBe(false);
+  expect(copyable(s)).toBe("");
 
-  const asked = reduce(s, { type: "select_tab", tab: "explain" }) as Explaining;
+  const dict = reduce(s, { type: "select_tab", tab: "dictionary" }) as Explaining;
+  expect(copyable(dict)).toBe('mouse\n1. (noun) a small rodent "a mouse ran by"');
+  expect(dict.ai).toBe("deferred");
+
+  const asked = reduce(dict, { type: "select_tab", tab: "explain" }) as Explaining;
   expect(asked.tab).toBe("explain");
   expect(asked.ai).toBe("requested");
+  expect(isWorking(asked)).toBe(true);
   expect(copyable(asked)).toBe("");
 
   const answering = run([ex(8, { ...started, kind: "word", grade_before: null, parts: 1 } as ExplainEvent)], asked) as Explaining;
@@ -126,34 +137,56 @@ test("a word opens on its dictionary entry and the model waits for its tab", () 
   expect(answering.dictionary?.lemma).toBe("mouse");
 
   // Going back and forth doesn't ask again.
-  const back = reduce(reduce(answering, { type: "select_tab", tab: "dictionary" }), { type: "select_tab", tab: "explain" }) as Explaining;
+  const back = reduce(reduce(answering, { type: "select_tab", tab: "web:bing" }), { type: "select_tab", tab: "explain" }) as Explaining;
   expect(back.ai).toBe("running");
 });
 
-test("without a model a word has only its dictionary tab", () => {
-  const s = run([
-    { type: "open", id: 9, ai: "off" },
-    { type: "dictionary", id: 9, entry: mouse },
-  ]) as Explaining;
-  expect(tabs(s)).toEqual(["dictionary"]);
-  expect(reduce(s, { type: "select_tab", tab: "explain" })).toBe(s);
+test("offline, a word opens on its dictionary entry", () => {
+  const s = run([open(9, "deferred", "word"), { type: "dictionary", id: 9, entry: mouse }]) as Explaining;
+  expect(tabs(s)).toEqual(["dictionary", "explain"]);
+  expect(s.tab).toBe("dictionary");
 });
 
-test("a passage has only the Explain tab and copies the finished answer", () => {
-  const s = run([{ type: "open", id: 10, ai: "running" }, ex(10, started), ex(10, { type: "part_done", part: 0, text: "Plain." })]) as Explaining;
+test("without a model the AI tab stays, to say how to set one up", () => {
+  const s = run([open(10, "off", "word"), { type: "dictionary", id: 10, entry: mouse }]) as Explaining;
+  expect(tabs(s)).toEqual(["dictionary", "explain"]);
+  const ai = reduce(s, { type: "select_tab", tab: "explain" }) as Explaining;
+  expect(ai.tab).toBe("explain");
+  expect(ai.ai).toBe("off");
+  expect(isWorking(ai)).toBe(false);
+});
+
+test("offline with nothing else to show, a passage is explained at once", () => {
+  const s = run([open(11, "running"), ex(11, started), ex(11, { type: "part_done", part: 0, text: "Plain." })]) as Explaining;
   expect(tabs(s)).toEqual(["explain"]);
   expect(s.tab).toBe("explain");
   expect(copyable(s)).toBe("");
-  const done = run([ex(10, { type: "done", text: "", grade_after: 5, report: { missing: [], added: [] }, timings: null, elapsed_ms: 1 })], s) as Explaining;
+  const done = run([ex(11, { type: "done", text: "", grade_after: 5, report: { missing: [], added: [] }, timings: null, elapsed_ms: 1 })], s) as Explaining;
   expect(copyable(done)).toBe("Plain.");
   expect(reduce(done, { type: "select_tab", tab: "dictionary" })).toBe(done);
+  expect(reduce(done, { type: "select_tab", tab: "web:google" })).toBe(done);
+});
+
+test("a new reading level starts over without leaving the tab", () => {
+  const first = run([
+    open(12, "running"),
+    ex(12, started),
+    ex(12, { type: "part_done", part: 0, text: "Old." }),
+    ex(12, { type: "done", text: "", grade_after: 9, report: { missing: [{ kind: "number", text: "5%" }], added: [] }, timings: null, elapsed_ms: 1 }),
+  ]) as Explaining;
+  const again = run([ex(12, started)], first) as Explaining;
+  expect(answerText(again)).toBe("");
+  expect(again.done).toBe(false);
+  expect(again.report).toBeNull();
+  expect(again.gradeAfter).toBeNull();
+  expect(again.tab).toBe("explain");
 });
 
 test("a dictionary entry arriving after the model started keeps the open tab", () => {
   const s = run([
-    { type: "open", id: 11, ai: "running" },
-    ex(11, { ...started, kind: "word", parts: 1 } as ExplainEvent),
-    { type: "dictionary", id: 11, entry: mouse },
+    open(13, "running"),
+    ex(13, { ...started, kind: "word", parts: 1 } as ExplainEvent),
+    { type: "dictionary", id: 13, entry: mouse },
   ]) as Explaining;
   expect(s.tab).toBe("explain");
   expect(s.kind).toBe("word");

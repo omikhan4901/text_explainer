@@ -76,6 +76,8 @@ pub struct AppState {
     pub download: Mutex<Option<(String, Cancel)>>,
     /// WordNet, for single words (None if the file is missing).
     pub dictionary: Mutex<Option<Dictionary>>,
+    /// The address last loaded in the card's web view, so reopening a tab doesn't reload.
+    pub web_url: Mutex<Option<String>>,
 }
 
 impl AppState {

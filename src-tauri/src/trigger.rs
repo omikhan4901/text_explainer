@@ -7,6 +7,7 @@ use std::sync::atomic::Ordering;
 use tauri::{AppHandle, Manager};
 use te_core::engine::{Backend, Sampling};
 use te_core::explain::{self, Event, Request};
+use te_core::sources;
 use te_core::text::{self, SelectionKind};
 use te_win::Rect;
 
@@ -61,9 +62,10 @@ pub fn start(app: &AppHandle, text: String, context: Option<String>, bounds: Opt
     run(app);
 }
 
-/// Explains the last selection with the current settings (also used when the reading
-/// level changes). A single word or short term with a dictionary entry opens on that
-/// entry, and the model only starts if the person opens the Explain tab (`explain_now`).
+/// Opens the card on the last selection with the current settings (also used when the
+/// reading level changes). The card's tabs come first: web searches, then a word's
+/// dictionary entry. The model only starts when the person opens the "Explain with AI" tab
+/// (`explain_now`), or at once when there is nothing else to show.
 pub fn run(app: &AppHandle) {
     let state = app.state::<AppState>();
     let Some(last) = state.last.lock().expect("last lock").clone() else {
@@ -78,7 +80,10 @@ pub fn run(app: &AppHandle) {
 
     // Single words and short terms: the dictionary answers at once.
     let cleaned = text::clean(&last.text);
-    let entry = match text::classify(&cleaned) {
+    let kind = text::classify(&cleaned);
+    let word = matches!(kind, SelectionKind::Word | SelectionKind::Phrase);
+    let web = sources::tabs_for(&settings.sources, settings.offline_only, word);
+    let entry = match kind {
         SelectionKind::Word | SelectionKind::Phrase => state
             .dictionary
             .lock()
@@ -87,21 +92,42 @@ pub fn run(app: &AppHandle) {
             .and_then(|d| d.lookup(&cleaned)),
         _ => None,
     };
-    if backend == Backend::None && entry.is_none() {
+    let something_else = !web.is_empty() || entry.is_some();
+    if backend == Backend::None && !something_else {
         popup::emit(app, PopupEvent::NoModel);
         return;
     }
-    let ai = match (backend, &entry) {
-        (Backend::None, _) => AiMode::Off,
-        (_, Some(_)) => AiMode::Deferred,
-        (_, None) => AiMode::Running,
+    let ai = if backend == Backend::None {
+        AiMode::Off
+    } else if something_else {
+        AiMode::Deferred
+    } else {
+        AiMode::Running
     };
-    popup::emit(app, PopupEvent::Open { id, ai });
+    popup::emit(
+        app,
+        PopupEvent::Open {
+            id,
+            ai,
+            kind,
+            query: header_text(&cleaned),
+            web,
+        },
+    );
     if let Some(entry) = entry {
         popup::emit(app, PopupEvent::Dictionary { id, entry });
     }
     if ai == AiMode::Running {
         explain(app, id);
+    }
+}
+
+/// The selection as the card's header shows it: one line, at most 120 characters.
+fn header_text(cleaned: &str) -> String {
+    let line = cleaned.split_whitespace().collect::<Vec<_>>().join(" ");
+    match line.char_indices().nth(120) {
+        Some((cut, _)) => format!("{}…", line[..cut].trim_end()),
+        None => line,
     }
 }
 
@@ -116,6 +142,13 @@ pub fn explain_now(app: &AppHandle, id: u64) {
         return;
     }
     explain(app, id);
+}
+
+/// Explains the current request again (the reading level changed); its "started" event
+/// clears the card's previous answer.
+pub fn explain_again(app: &AppHandle) {
+    let id = app.state::<AppState>().request_id.load(Ordering::SeqCst);
+    explain_now(app, id);
 }
 
 /// Streams the model's answer for the last selection into the card as request `id`.
@@ -171,4 +204,18 @@ fn explain(app: &AppHandle, id: u64) {
         }
     });
     *state.task.lock().expect("task lock") = Some(task);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::header_text;
+
+    #[test]
+    fn header_is_one_short_line() {
+        assert_eq!(header_text("two\n\nlines  here"), "two lines here");
+        let long = "ভা".repeat(200);
+        let h = header_text(&long);
+        assert_eq!(h.chars().count(), 121);
+        assert!(h.ends_with('…'));
+    }
 }

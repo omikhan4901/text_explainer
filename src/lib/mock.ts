@@ -1,7 +1,7 @@
 // A stand-in for the Rust app when the pages run in a plain browser. It keeps settings in
 // memory, simulates downloads, and can play scripted reading-card scenarios
 // (`popup.html?demo=passage`) for development, tests and screenshots.
-import type { AppInfo, ExplainEvent, ModelInfo, PopupEvent, Settings } from "./types";
+import type { AppInfo, ExplainEvent, ModelInfo, PopupEvent, Settings, WebSource, WebTab } from "./types";
 
 type Handler = (payload: unknown) => void;
 
@@ -23,20 +23,28 @@ export const DEFAULT_SETTINGS: Settings = {
   appearance: { theme: "system", accent: "ink", reading_font: "plex", font_size: 15, line_height: 1.6 },
   start_with_windows: true,
   first_run_done: false,
+  sources: [
+    source("google", "Google", "https://www.google.com/search?q={query}", true, true, true),
+    source("bing", "Bing", "https://www.bing.com/search?q={query}", true, true, true),
+    source("duckduckgo", "DuckDuckGo", "https://duckduckgo.com/?q={query}", true, true, true),
+    source("wikipedia", "Wikipedia", "https://en.wikipedia.org/w/index.php?search={query}", true, true, false),
+    source("translate", "Translate", "https://translate.google.com/?sl=auto&tl={lang}&text={query}&op=translate", true, true, true),
+    source("wiktionary", "Wiktionary", "https://en.wiktionary.org/w/index.php?search={query}", false, true, false),
+    source("cambridge", "Cambridge", "https://dictionary.cambridge.org/search/english/direct/?q={query}", false, true, false),
+    source("brave", "Brave", "https://search.brave.com/search?q={query}", false, true, true),
+    source("images", "Images", "https://www.bing.com/images/search?q={query}", false, true, false),
+  ],
+  offline_only: false,
+  translate_to: "en",
 };
+
+function source(id: string, name: string, url: string, enabled: boolean, words: boolean, passages: boolean): WebSource {
+  return { id, name, url, enabled, words, passages };
+}
 
 const GB = 1024 ** 3;
 
-function model(
-  id: string,
-  name: string,
-  maker: string,
-  tier: ModelInfo["tier"],
-  params: string,
-  size: number,
-  license: string,
-  note: string,
-): ModelInfo {
+function model(id: string, name: string, maker: string, tier: ModelInfo["tier"], params: string, size: number, license: string, note: string): ModelInfo {
   const ram = size + 0.9 * 1024 ** 3;
   const total = 8 * GB;
   return {
@@ -61,12 +69,57 @@ function model(
 }
 
 const MODELS: ModelInfo[] = [
-  model("gemma-4-e2b", "Gemma 4 E2B", "Google", "balanced", "2B effective", 2_620_370_976, "Apache 2.0", "Fastest of the balanced models here and the best at keeping facts in our tests."),
-  model("qwen3.5-4b", "Qwen3.5 4B", "Alibaba Qwen", "balanced", "4B", 2_740_937_888, "Apache 2.0", "Good rewrites; slower than Gemma 4 E2B on a CPU and needs more memory."),
+  model(
+    "gemma-4-e2b",
+    "Gemma 4 E2B",
+    "Google",
+    "balanced",
+    "2B effective",
+    2_620_370_976,
+    "Apache 2.0",
+    "Fastest of the balanced models here and the best at keeping facts in our tests.",
+  ),
+  model(
+    "qwen3.5-4b",
+    "Qwen3.5 4B",
+    "Alibaba Qwen",
+    "balanced",
+    "4B",
+    2_740_937_888,
+    "Apache 2.0",
+    "Good rewrites; slower than Gemma 4 E2B on a CPU and needs more memory.",
+  ),
   model("qwen3.5-2b", "Qwen3.5 2B", "Alibaba Qwen", "fast", "2B", 1_280_835_840, "Apache 2.0", "Light on memory and quick; drops details more often."),
-  model("lfm2.5-1.2b", "LFM2.5 1.2B", "Liquid AI", "fastest", "1.2B", 730_895_168, "LFM Open License v1.0", "Very fast, but often drops or changes facts and is English only in practice. Free for personal use and smaller companies; check the license."),
-  model("gemma-4-e4b", "Gemma 4 E4B", "Google", "best", "4B effective", 4_215_695_776, "Apache 2.0", "Higher quality, larger download; best with 12 GB of RAM or more."),
-  model("qwen3.5-9b", "Qwen3.5 9B", "Alibaba Qwen", "best", "9B", 5_680_522_464, "Apache 2.0", "The most capable here; needs 16 GB of RAM and is slower on CPU."),
+  model(
+    "lfm2.5-1.2b",
+    "LFM2.5 1.2B",
+    "Liquid AI",
+    "fastest",
+    "1.2B",
+    730_895_168,
+    "LFM Open License v1.0",
+    "Very fast, but often drops or changes facts and is English only in practice. Free for personal use and smaller companies; check the license.",
+  ),
+  model(
+    "gemma-4-e4b",
+    "Gemma 4 E4B",
+    "Google",
+    "best",
+    "4B effective",
+    4_215_695_776,
+    "Apache 2.0",
+    "Higher quality, larger download; best with 12 GB of RAM or more.",
+  ),
+  model(
+    "qwen3.5-9b",
+    "Qwen3.5 9B",
+    "Alibaba Qwen",
+    "best",
+    "9B",
+    5_680_522_464,
+    "Apache 2.0",
+    "The most capable here; needs 16 GB of RAM and is slower on CPU.",
+  ),
 ];
 
 const SYSTEM = (style: string) =>
@@ -74,6 +127,10 @@ const SYSTEM = (style: string) =>
 
 let settings: Settings = structuredClone(DEFAULT_SETTINGS);
 const installed = new Set<string>();
+// `?offline=1` starts with "Offline only" on (no web tabs).
+if (typeof location !== "undefined" && new URLSearchParams(location.search).get("offline") === "1") {
+  settings = { ...settings, offline_only: true };
+}
 // `?state=ready` starts as if set up already (for screenshots of the settings pages).
 if (typeof location !== "undefined" && new URLSearchParams(location.search).get("state") === "ready") {
   installed.add("gemma-4-e2b");
@@ -162,11 +219,23 @@ async function call<T>(command: string, args: Record<string, unknown> = {}): Pro
     }
     case "set_level":
       settings = { ...settings, level: args.level as Settings["level"] };
-      void playDemo(currentDemo);
+      if (pendingAi) void pendingAi(demoId);
       return undefined as T;
     case "explain_now":
-      if (args.id === demoId) void explainWord(demoId);
+      if (args.id === demoId && pendingAi) void pendingAi(demoId);
       return undefined as T;
+    case "web_show": {
+      const source = settings.sources.find((s) => s.id === args.source);
+      if (!source || settings.offline_only) throw "That source is turned off.";
+      const query = currentDemo.startsWith("word") ? "ubiquitous" : SOURCE;
+      return sourceUrl(source.url, query, settings.translate_to) as T;
+    }
+    case "validate_source": {
+      const url = String(args.url).trim();
+      if (!/^https?:\/\//i.test(url)) throw "the address must start with https:// or http://";
+      if (!url.includes("{query}")) throw "the address must contain {query} where the selected text goes";
+      return undefined as T;
+    }
     default:
       return undefined as T;
   }
@@ -193,6 +262,8 @@ const REWRITES: Record<Settings["level"], string> = {
 let currentDemo = "";
 let demoTimer: ReturnType<typeof setTimeout> | undefined;
 let demoId = 0;
+/** What the AI tab does in the current demo, once the card asks for it. */
+let pendingAi: ((id: number) => Promise<void>) | null = null;
 
 function sleep(ms: number) {
   return new Promise<void>((r) => {
@@ -200,29 +271,51 @@ function sleep(ms: number) {
   });
 }
 
+const UBIQUITOUS = {
+  lemma: "ubiquitous",
+  senses: [
+    { pos: "adjective" as const, definition: "being present everywhere at once", example: "ubiquitous computing", synonyms: ["omnipresent"] },
+    {
+      pos: "adjective" as const,
+      definition: "seeming to be everywhere, often to the point of being tiresome",
+      example: "the ubiquitous advertising on buses",
+      synonyms: ["pervasive", "universal"],
+    },
+  ],
+};
+
+/** The web tabs the app would send for a selection. */
+function webTabs(word: boolean): WebTab[] {
+  if (settings.offline_only) return [];
+  return settings.sources.filter((s) => s.enabled && (word ? s.words : s.passages)).map(({ id, name }) => ({ id, name }));
+}
+
 async function playDemo(name: string) {
   currentDemo = name;
   clearTimeout(demoTimer);
   const id = ++demoId;
-  const send = (event: ExplainEvent) => emit("te://popup", { type: "explain", id, event } satisfies PopupEvent);
-  const ai = name === "word_offline" ? "off" : name === "word" ? "deferred" : "running";
-  emit("te://popup", { type: "open", id, ai } satisfies PopupEvent);
   if (name === "no_model") return emit("te://popup", { type: "no_model" });
   if (name === "no_selection") return emit("te://popup", { type: "no_selection", hotkey: settings.hotkey });
-  if (name === "word" || name === "word_offline") {
-    emit("te://popup", {
-      type: "dictionary",
-      id,
-      entry: {
-        lemma: "ubiquitous",
-        senses: [
-          { pos: "adjective", definition: "being present everywhere at once", example: "ubiquitous computing", synonyms: ["omnipresent"] },
-          { pos: "adjective", definition: "seeming to be everywhere, often to the point of being tiresome", example: "the ubiquitous advertising on buses", synonyms: ["pervasive", "universal"] },
-        ],
-      },
-    } satisfies PopupEvent);
-    return;
-  }
+  const word = name === "word" || name === "word_offline";
+  if (name === "word_offline") settings = { ...settings, offline_only: true };
+  const web = webTabs(word);
+  const hasModel = name !== "word_offline";
+  const ai = !hasModel ? "off" : web.length > 0 || word ? "deferred" : "running";
+  emit("te://popup", {
+    type: "open",
+    id,
+    ai,
+    kind: word ? "word" : "passage",
+    query: word ? "ubiquitous" : SOURCE,
+    web,
+  } satisfies PopupEvent);
+  if (word) emit("te://popup", { type: "dictionary", id, entry: UBIQUITOUS } satisfies PopupEvent);
+  pendingAi = word ? explainWord : (requestId) => explainPassage(requestId, name);
+  if (ai === "running") void pendingAi(id);
+}
+
+async function explainPassage(id: number, name: string) {
+  const send = (event: ExplainEvent) => emit("te://popup", { type: "explain", id, event } satisfies PopupEvent);
   send({ type: "started", kind: "passage", source: SOURCE, truncated: false, grade_before: 17.4, parts: 1, language: "English" });
   if (name === "loading") {
     send({ type: "loading" });
@@ -243,10 +336,17 @@ async function playDemo(name: string) {
   }
   send({ type: "part_done", part: 0, text });
   const report = name === "check" ? { missing: [{ kind: "number" as const, text: "5%" }], added: [] } : { missing: [], added: [] };
-  send({ type: "done", text, grade_after: settings.level === "simpler" ? 4.9 : settings.level === "plain" ? 8.6 : 11.2, report, timings: { predicted_per_second: 14.2 }, elapsed_ms: 3200 });
+  send({
+    type: "done",
+    text,
+    grade_after: settings.level === "simpler" ? 4.9 : settings.level === "plain" ? 8.6 : 11.2,
+    report,
+    timings: { predicted_per_second: 14.2 },
+    elapsed_ms: 3200,
+  });
 }
 
-/** A word's meaning in its text, once the card's Explain tab asks for it. */
+/** A word's meaning in its text, once the card's AI tab asks for it. */
 async function explainWord(id: number) {
   const send = (event: ExplainEvent) => emit("te://popup", { type: "explain", id, event } satisfies PopupEvent);
   send({ type: "started", kind: "word", source: "ubiquitous", truncated: false, grade_before: null, parts: 1, language: "English" });
@@ -255,6 +355,11 @@ async function explainWord(id: number) {
   const text = "Here it means found almost everywhere: smartphones are part of nearly every moment of daily life.";
   send({ type: "part_done", part: 0, text });
   send({ type: "done", text, grade_after: null, report: { missing: [], added: [] }, timings: null, elapsed_ms: 480 });
+}
+
+/** A source's page address, as the app builds it (sources.rs). */
+export function sourceUrl(template: string, query: string, lang: string): string {
+  return template.replace("{query}", encodeURIComponent(query.split(/\s+/).join(" "))).replace("{lang}", encodeURIComponent(lang));
 }
 
 export const mock = { call, on, playDemo, emit };

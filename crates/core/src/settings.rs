@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use crate::explain::OutputChoice;
 use crate::prompt::Level;
+use crate::sources::{self, WebSource};
 
 pub const CURRENT_VERSION: u32 = 1;
 
@@ -37,6 +38,13 @@ pub struct Settings {
     pub appearance: Appearance,
     pub start_with_windows: bool,
     pub first_run_done: bool,
+    /// Web sources shown as tabs on the card (`sources.rs`).
+    pub sources: Vec<WebSource>,
+    /// Hides every web source: nothing the person reads leaves the computer. Off by
+    /// default: the card opens on a web search (the owner's decision, 15 October 2026).
+    pub offline_only: bool,
+    /// Language code for `{lang}` in source addresses (the Translate tab's target).
+    pub translate_to: String,
 }
 
 impl Default for Settings {
@@ -59,6 +67,9 @@ impl Default for Settings {
             appearance: Appearance::default(),
             start_with_windows: true,
             first_run_done: false,
+            sources: sources::defaults(),
+            offline_only: false,
+            translate_to: "en".into(),
         }
     }
 }
@@ -169,6 +180,16 @@ impl Settings {
             self.hotkey = Settings::default().hotkey;
         }
         self.extra_server_args.retain(|a| !a.trim().is_empty());
+        sources::sanitize(&mut self.sources);
+        let lang = self.translate_to.trim();
+        self.translate_to = if !lang.is_empty()
+            && lang.len() <= 12
+            && lang.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+        {
+            lang.to_string()
+        } else {
+            "en".into()
+        };
         self
     }
 
@@ -291,6 +312,49 @@ mod tests {
         assert_eq!(s.appearance.font_size, 24);
         assert_eq!(s.appearance.line_height, 1.2);
         assert_eq!(s.extra_server_args, vec!["--mlock".to_string()]);
+    }
+
+    #[test]
+    fn web_sources_default_on_and_survive_bad_files() {
+        let s = Settings::default();
+        assert!(
+            !s.offline_only,
+            "the card searches the web first by default"
+        );
+        assert!(s.sources.iter().any(|w| w.id == "wikipedia"));
+
+        // Older settings files have no sources: they get the built-in list.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(&path, r#"{"level":"plain"}"#).unwrap();
+        let loaded = Settings::load(&path);
+        assert_eq!(loaded.sources, sources::defaults());
+        assert!(!loaded.offline_only);
+
+        let odd = Settings {
+            translate_to: "en&x=<script>".into(),
+            sources: vec![WebSource {
+                id: "evil".into(),
+                name: "Evil".into(),
+                url: "javascript:alert({query})".into(),
+                enabled: true,
+                words: true,
+                passages: true,
+            }],
+            ..Default::default()
+        }
+        .sanitized();
+        assert_eq!(odd.translate_to, "en");
+        assert!(!odd.sources[0].enabled);
+        assert_eq!(
+            Settings {
+                translate_to: " zh-Hans ".into(),
+                ..Default::default()
+            }
+            .sanitized()
+            .translate_to,
+            "zh-Hans"
+        );
     }
 
     #[test]

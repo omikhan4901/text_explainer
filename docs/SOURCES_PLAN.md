@@ -6,6 +6,14 @@ plus the local AI that Definer can't do. **It stays desktop software, never a br
 extension.** Everything here is built into the app and works in browsers the same way it
 works in any other app.
 
+**Update, 15 October 2026 (owner):** searches come first. The card opens on the first
+web search (Google, Bing, DuckDuckGo, Wikipedia and Translate are on by default), the
+bundled dictionary follows for words, and **Explain with AI** is the last tab, run only
+when opened (or at once when Offline only leaves nothing else to show). Web tabs are on by
+default; first run asks, and Offline only in Sources turns them all off. Built so far: the
+tabbed card, page sources in a child web view, the Sources settings page (S1 except the
+Look up box, S3). Next: the Look up box, then data sources (S2), AI Translate (S4).
+
 ## 1. What it does
 
 ### What Definer does (parity)

@@ -286,7 +286,8 @@ pub fn popup_pin(app: AppHandle, pinned: bool) {
     popup::set_pinned(&app, pinned);
 }
 
-/// Changes the reading level from the card and explains the same text again.
+/// Changes the reading level from the card and explains the same text again (the card
+/// stays on its AI tab).
 #[tauri::command]
 pub async fn set_level(app: AppHandle, level: Level) -> CmdResult<()> {
     let state = app.state::<AppState>();
@@ -298,7 +299,7 @@ pub async fn set_level(app: AppHandle, level: Level) -> CmdResult<()> {
             .map_err(|e| format!("Couldn't save settings: {e}"))?;
         *state.settings.lock().expect("settings lock") = settings;
     }
-    trigger::run(&app);
+    trigger::explain_again(&app);
     Ok(())
 }
 
@@ -306,6 +307,38 @@ pub async fn set_level(app: AppHandle, level: Level) -> CmdResult<()> {
 #[tauri::command]
 pub fn explain_now(app: AppHandle, id: u64) {
     trigger::explain_now(&app, id);
+}
+
+/// Shows a web source's page in the card's content area. Async: creating a web view from
+/// a synchronous command can deadlock on Windows.
+#[tauri::command]
+pub async fn web_show(
+    app: AppHandle,
+    source: String,
+    bounds: popup::WebBounds,
+    background: Option<String>,
+) -> CmdResult<String> {
+    popup::web_show(&app, &source, bounds, background.as_deref())
+}
+
+/// Checks a web source address the person typed in Settings.
+#[tauri::command]
+pub fn validate_source(url: String) -> CmdResult<()> {
+    te_core::sources::validate(&url).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn web_hide(app: AppHandle) {
+    popup::web_hide(&app);
+}
+
+/// Opens a web source's page for the current selection in the person's browser.
+#[tauri::command]
+pub fn web_open_in_browser(app: AppHandle, source: String) -> CmdResult<()> {
+    let url = popup::web_url(&app, &source)?;
+    app.opener()
+        .open_url(url.as_str(), None::<&str>)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

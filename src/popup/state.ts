@@ -1,15 +1,19 @@
 // What the reading card shows, driven by events from the app. Pure so it's easy to test.
-import type { AiMode, DictionaryEntry, PopupEvent, Report, SelectionKind } from "../lib/types";
+import type { AiMode, DictionaryEntry, PopupEvent, Report, SelectionKind, WebTab } from "../lib/types";
 
-/** The card's tabs: the model's explanation and the bundled dictionary. */
-export type TabId = "explain" | "dictionary";
+/** The card's tabs: web searches (`web:<source id>`), the bundled dictionary, and the
+ * model's explanation ("Explain with AI"). */
+export type TabId = "explain" | "dictionary" | `web:${string}`;
 
 export interface Explaining {
   view: "explain";
   id: number;
-  /** "requested": the person opened Explain on a word and the card has asked the app. */
+  /** "requested": the person opened the AI tab and the card has asked the app. */
   ai: AiMode | "requested";
   tab: TabId;
+  /** The selection, one line, for the header. */
+  query: string;
+  web: WebTab[];
   started: boolean;
   kind: SelectionKind;
   source: string;
@@ -41,14 +45,21 @@ export type CardAction = { type: "select_tab"; tab: TabId };
 
 export const initialState: CardState = { view: "empty" };
 
-function fresh(id: number, ai: AiMode): Explaining {
+export const webTab = (id: string): TabId => `web:${id}`;
+export const webSourceOf = (tab: TabId): string | null => (tab.startsWith("web:") ? tab.slice(4) : null);
+
+function fresh(event: Extract<PopupEvent, { type: "open" }>): Explaining {
   return {
     view: "explain",
-    id,
-    ai,
-    tab: "explain",
+    id: event.id,
+    ai: event.ai,
+    // Searches come first; with none, the AI tab (a word's dictionary entry takes over
+    // when it arrives).
+    tab: event.web[0] ? webTab(event.web[0].id) : "explain",
+    query: event.query,
+    web: event.web,
     started: false,
-    kind: "passage",
+    kind: event.kind,
     source: "",
     truncated: false,
     language: null,
@@ -68,10 +79,10 @@ function fresh(id: number, ai: AiMode): Explaining {
 export function reduce(state: CardState, event: PopupEvent | CardAction): CardState {
   switch (event.type) {
     case "open":
-      return fresh(event.id, event.ai);
+      return fresh(event);
     case "select_tab":
       if (state.view !== "explain" || !tabs(state).includes(event.tab)) return state;
-      // Opening Explain on a word starts the model (the card then asks the app for it).
+      // Opening the AI tab starts the model (the card then asks the app for it).
       return { ...state, tab: event.tab, ai: event.tab === "explain" && state.ai === "deferred" ? "requested" : state.ai };
     case "no_selection":
       return { view: "no_selection", hotkey: event.hotkey };
@@ -81,22 +92,24 @@ export function reduce(state: CardState, event: PopupEvent | CardAction): CardSt
       return { view: "capture_failed", message: event.message };
     case "settings":
       return state;
-    case "dictionary":
+    case "dictionary": {
       if (state.view !== "explain" || state.id !== event.id) return state;
+      // With no searches, a word opens on its entry unless the model is already answering.
+      const toEntry = state.tab === "explain" && !state.started;
       return {
         ...state,
         dictionary: event.entry,
-        // A word opens on its dictionary entry unless the model is already answering.
-        tab: state.ai === "running" && state.started ? state.tab : "dictionary",
-        kind: state.started ? state.kind : "word",
+        tab: toEntry ? "dictionary" : state.tab,
         source: state.source || event.entry.lemma,
       };
+    }
     case "explain": {
       // Events from an earlier request (still finishing) are ignored.
       if (state.view !== "explain" || state.id !== event.id) return state;
       const e = event.event;
       switch (e.type) {
         case "started":
+          // Also the start of a redo at another reading level: the old answer goes.
           return {
             ...state,
             ai: "running",
@@ -106,7 +119,12 @@ export function reduce(state: CardState, event: PopupEvent | CardAction): CardSt
             truncated: e.truncated,
             language: e.language,
             gradeBefore: e.grade_before,
+            gradeAfter: null,
             parts: Array.from({ length: e.parts }, () => ""),
+            loadingModel: false,
+            done: false,
+            report: null,
+            error: null,
           };
         case "loading":
           return { ...state, loadingModel: true };
@@ -141,12 +159,16 @@ function setPart(parts: string[], index: number, text: string): string[] {
   return next;
 }
 
-/** The tabs this request has, in order: a word's dictionary entry comes first. */
+/** The searches and the dictionary, in order (the AI tab sits apart, at the end). */
 export function tabs(state: Explaining): TabId[] {
-  const list: TabId[] = [];
+  const list: TabId[] = state.web.map((w) => webTab(w.id));
   if (state.dictionary) list.push("dictionary");
-  if (state.ai !== "off") list.push("explain");
+  list.push("explain");
   return list;
+}
+
+export function isWord(state: Explaining): boolean {
+  return state.kind === "word" || state.kind === "phrase";
 }
 
 /** The full answer so far. */
@@ -163,12 +185,18 @@ export function entryText(entry: DictionaryEntry): string {
 /** What the copy button copies on the open tab ("" while there's nothing finished). */
 export function copyable(state: Explaining): string {
   if (state.tab === "dictionary") return state.dictionary ? entryText(state.dictionary) : "";
-  return state.done && !state.error ? answerText(state) : "";
+  if (state.tab === "explain") return state.done && !state.error ? answerText(state) : "";
+  return "";
 }
 
 /** True while the answer is still arriving (show the caret). */
 export function isStreaming(state: Explaining): boolean {
   return !state.done && state.parts.some((p) => p.length > 0);
+}
+
+/** True while the model works on this request. */
+export function isWorking(state: Explaining): boolean {
+  return (state.ai === "requested" || state.ai === "running") && !state.done;
 }
 
 /** Only show the grade when it means something (passages, both grades known). */

@@ -46,9 +46,14 @@ The plan is `docs/IMPLEMENTATION_PLAN.md` (sources, translation and Definer pari
 - Model output always goes through the language guard (grammar on the request, script check
   on the result) so a model can't answer in the wrong language.
 - The clipboard fallback restores the person's clipboard exactly, every time, even on error.
-- No network requests except downloads the person starts (models, dictionary) and the web
-  source tabs they turned on and opened (`docs/SOURCES_PLAN.md`). AI and dictionary
-  requests stay on the machine, and "Offline only" turns web sources off.
+- No network requests except downloads the person starts (models) and the card's web
+  tabs (`docs/SOURCES_PLAN.md`): the card opens on the first web search (the owner's
+  decision, 15 October 2026) and loads only the open tab. AI and dictionary requests stay
+  on the machine; "Offline only" (Sources page, and asked at first run) turns every web tab
+  off. The model runs only when "Explain with AI" is opened, or at once when the card has
+  nothing else to show.
+- The card's web view is remote content: it gets no app permissions, never focuses on its
+  own, opens new windows in the person's browser, and is closed with the card.
 - Desktop software only: never a browser extension.
 - Every UI string goes through `src/i18n` (English now; Bangla later).
 

@@ -3,6 +3,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { AppInfo, Level, Settings } from "./types";
+
+/** Where the card's content area is, in CSS pixels from the window's top left. */
+export interface WebBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 import { mock } from "./mock";
 
 export const inApp = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -30,6 +38,10 @@ export const api = {
   popupPin: (pinned: boolean) => call<void>("popup_pin", { pinned }),
   setLevel: (level: Level) => call<void>("set_level", { level }),
   explainNow: (id: number) => call<void>("explain_now", { id }),
+  webShow: (source: string, bounds: WebBounds, background: string | null) => call<string>("web_show", { source, bounds, background }),
+  webHide: () => call<void>("web_hide"),
+  webOpenInBrowser: (source: string) => call<void>("web_open_in_browser", { source }),
+  validateSource: (url: string) => call<void>("validate_source", { url }),
   copyText: (text: string) => call<void>("copy_text", { text }),
   explainText: (text: string) => call<void>("explain_text", { text }),
   openMain: () => call<void>("open_main"),

@@ -25,3 +25,4 @@ pub mod dictionary;
 pub mod download;
 pub mod models;
 pub mod settings;
+pub mod sources;

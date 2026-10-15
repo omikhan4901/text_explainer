@@ -6,16 +6,30 @@ async function expectAccessible(page: Page) {
   expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
 }
 
-for (const demo of ["passage", "check", "word", "word&tab=explain", "word_offline", "no_model", "no_selection", "loading", "error"]) {
+for (const demo of [
+  "passage",
+  "passage&tab=explain",
+  "passage&offline=1",
+  "check&tab=explain",
+  "word",
+  "word&tab=dictionary",
+  "word&tab=explain",
+  "word_offline",
+  "word_offline&tab=explain",
+  "no_model",
+  "no_selection",
+  "loading&tab=explain",
+  "error&tab=explain",
+]) {
   test(`reading card (${demo}) is accessible`, async ({ page }) => {
     await page.goto(`/popup.html?demo=${demo}`);
     await expect(page.getByRole("dialog")).toBeVisible();
-    await page.waitForTimeout(demo === "passage" || demo === "check" ? 2500 : 700);
+    await page.waitForTimeout(demo.includes("explain") || demo.includes("offline=1") ? 2500 : 700);
     await expectAccessible(page);
   });
 }
 
-for (const p of ["home", "model", "reading", "shortcuts", "about"]) {
+for (const p of ["home", "sources", "model", "reading", "shortcuts", "about"]) {
   test(`main window: ${p} is accessible`, async ({ page }) => {
     await page.goto(`/index.html?state=ready&page=${p}`);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

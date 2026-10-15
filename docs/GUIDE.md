@@ -25,22 +25,35 @@ A guide to the code for anyone changing it. Keep it true when you change how thi
    shown with `SWP_NOACTIVATE` so the reading app keeps focus. Esc is registered as a
    global shortcut only while it's open; a low-level mouse hook closes it on clicks
    elsewhere.
-3. **Dictionary** (`crates/core/src/dictionary.rs`). For one word or a short term, the
-   WordNet entry is sent to the card at once and the card opens on its Dictionary tab.
-   The model doesn't start: the card's `open` event says `ai: "deferred"`, and only if
-   the person opens the Explain tab does the card call `explain_now`, which runs step 4
-   for that request (if it's still the current one). Passages and words the dictionary
-   doesn't know go straight to step 4 (`ai: "running"`); with no model it's `"off"`.
-4. **Pipeline** (`crates/core/src/explain.rs`): repair the text (`text.rs`), classify it,
+3. **Tabs** (`trigger.rs`, `crates/core/src/sources.rs`). The `open` event lists the
+   card's web tabs (`sources::tabs_for`: enabled sources for words or for passages, none
+   while Offline only is on) and the selection's kind. For one word or a short term the
+   WordNet entry (`crates/core/src/dictionary.rs`) follows at once. The model doesn't
+   start (`ai: "deferred"`) unless there is nothing else to show (`"running"`); with no
+   model it's `"off"`. Opening "Explain with AI" makes the card call `explain_now`, which
+   runs step 4 for that request if it's still the current one; a new reading level calls
+   `explain_again` (same request, the card stays on its tab).
+4. **Web tabs** (`popup.rs`). The card measures its content area and calls `web_show`
+   (async: creating a web view from a sync command can deadlock on Windows), which builds
+   the page address from the source's template (`sources::build_url`: the selection is
+   percent-encoded and can't change the host) and shows one child web view (`popup-web`,
+   Tauri's `unstable` multi-webview) over that area: incognito, never focused on its own,
+   http(s) navigation only, new windows sent to the default browser. It gets no app
+   permissions (it's remote content). Other tabs call `web_hide`; closing the card closes
+   the web view to free its memory. The main window's Sources page edits the list
+   (`settings.sources`, `offline_only`, `translate_to`).
+5. **Pipeline** (`crates/core/src/explain.rs`): repair the text (`text.rs`), classify it,
    detect its language (`language.rs`), decide the allowed scripts and build the GBNF
    grammar, split long text into parts, then for each part: build the prompt
    (`prompt.rs`), stream from llama-server (`engine/`), clean the stream (`output.rs`),
    check the script; on drift, retry once with a stricter instruction. Finally the
    meaning check (`meaning.rs`) and reading grade (`readability.rs`, English only).
-5. **Card updates** (`src/popup/state.ts` reduces the events and the tab choice;
-   `Popup.tsx` renders them). The card is a set of tabs (`tabs()` in `state.ts`): the
-   dictionary entry first for words, then Explain. The level switch and grade sit in a
-   footer on passages. The window is resized to the card as text streams in.
+6. **Card updates** (`src/popup/state.ts` reduces the events and the tab choice;
+   `Popup.tsx` renders them). Tabs (`tabs()` in `state.ts`): web searches, then the
+   dictionary for words, then "Explain with AI", pinned at the right of the tab row. With
+   web tabs every tab keeps the page's height so switching doesn't resize the card;
+   otherwise the window is resized to the card as text streams in. The level switch and
+   grade sit in the AI tab's footer on passages.
 
 ## The interface
 
@@ -80,7 +93,8 @@ request, restarted if it crashes, and stopped after the idle time in Settings.
 ## Developing without Windows
 
 `npx vite` serves the interface in a browser against a mock (`src/lib/mock.ts`):
-`popup.html?demo=passage|word|word_offline|check|no_model|loading|error` (add `&tab=explain`
-to open a word's Explain tab), and
+`popup.html?demo=passage|word|word_offline|check|no_model|loading|error`, plus
+`&tab=explain` (or `dictionary`, `web:bing`) to open a tab and `&offline=1` for Offline
+only; a web tab shows its loading placeholder there (the page itself needs the app). And
 `index.html?state=ready&page=model`. `scripts/wincheck.sh clippy -p text-explainer`
 type-checks the Windows app from Linux.

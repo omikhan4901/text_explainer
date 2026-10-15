@@ -1,0 +1,402 @@
+//! Web sources: sites the card can show in a tab, next to the local Explain and Dictionary
+//! tabs (`docs/SOURCES_PLAN.md`). A source is a URL template where `{query}` becomes the
+//! selected text and `{lang}` the language chosen for translations. Nothing here goes
+//! online: the card loads a source's page in its open tab (the first search, unless the
+//! person picks another), and never while "Offline only" is on.
+
+use reqwest::Url;
+use serde::{Deserialize, Serialize};
+
+/// Longest selection put into a URL, in characters (search and translation sites accept
+/// far more, but very long URLs are refused by some servers).
+pub const MAX_QUERY_CHARS: usize = 1500;
+/// Most sources the settings keep.
+pub const MAX_SOURCES: usize = 24;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WebSource {
+    /// Stable id ("wikipedia", or "custom-…" for ones the person added).
+    pub id: String,
+    pub name: String,
+    /// `https://…{query}…`; `{lang}` is optional.
+    pub url: String,
+    pub enabled: bool,
+    /// Shown for single words and short terms.
+    pub words: bool,
+    /// Shown for sentences and longer.
+    pub passages: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum SourceError {
+    #[error("the address must start with https:// or http://")]
+    Scheme,
+    #[error("the address must contain {{query}} where the selected text goes")]
+    NoQuery,
+    #[error("that isn't a web address")]
+    Invalid,
+}
+
+fn source(
+    id: &str,
+    name: &str,
+    url: &str,
+    enabled: bool,
+    words: bool,
+    passages: bool,
+) -> WebSource {
+    WebSource {
+        id: id.into(),
+        name: name.into(),
+        url: url.into(),
+        enabled,
+        words,
+        passages,
+    }
+}
+
+/// The built-in sources: free sites that need no account or key.
+pub fn defaults() -> Vec<WebSource> {
+    vec![
+        source(
+            "google",
+            "Google",
+            "https://www.google.com/search?q={query}",
+            true,
+            true,
+            true,
+        ),
+        source(
+            "bing",
+            "Bing",
+            "https://www.bing.com/search?q={query}",
+            true,
+            true,
+            true,
+        ),
+        source(
+            "duckduckgo",
+            "DuckDuckGo",
+            "https://duckduckgo.com/?q={query}",
+            true,
+            true,
+            true,
+        ),
+        source(
+            "wikipedia",
+            "Wikipedia",
+            "https://en.wikipedia.org/w/index.php?search={query}",
+            true,
+            true,
+            false,
+        ),
+        source(
+            "translate",
+            "Translate",
+            "https://translate.google.com/?sl=auto&tl={lang}&text={query}&op=translate",
+            true,
+            true,
+            true,
+        ),
+        source(
+            "wiktionary",
+            "Wiktionary",
+            "https://en.wiktionary.org/w/index.php?search={query}",
+            false,
+            true,
+            false,
+        ),
+        source(
+            "cambridge",
+            "Cambridge",
+            "https://dictionary.cambridge.org/search/english/direct/?q={query}",
+            false,
+            true,
+            false,
+        ),
+        source(
+            "brave",
+            "Brave",
+            "https://search.brave.com/search?q={query}",
+            false,
+            true,
+            true,
+        ),
+        source(
+            "images",
+            "Images",
+            "https://www.bing.com/images/search?q={query}",
+            false,
+            true,
+            false,
+        ),
+    ]
+}
+
+/// A web source as the card lists it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct WebTab {
+    pub id: String,
+    pub name: String,
+}
+
+/// The web tabs for one selection, in the person's order: none while "Offline only" is on.
+pub fn tabs_for(sources: &[WebSource], offline_only: bool, word: bool) -> Vec<WebTab> {
+    if offline_only {
+        return Vec::new();
+    }
+    sources
+        .iter()
+        .filter(|s| s.enabled && if word { s.words } else { s.passages })
+        .map(|s| WebTab {
+            id: s.id.clone(),
+            name: s.name.clone(),
+        })
+        .collect()
+}
+
+/// Checks a template the person typed.
+pub fn validate(template: &str) -> Result<(), SourceError> {
+    let t = template.trim();
+    let lower = t.to_ascii_lowercase();
+    if !(lower.starts_with("https://") || lower.starts_with("http://")) {
+        return Err(SourceError::Scheme);
+    }
+    if !t.contains("{query}") {
+        return Err(SourceError::NoQuery);
+    }
+    // The site must be fixed by the template: the selection may never choose the host.
+    let host_with = |q: &str| -> Result<String, SourceError> {
+        let url = Url::parse(&t.replace("{query}", q).replace("{lang}", "en"))
+            .map_err(|_| SourceError::Invalid)?;
+        url.host_str()
+            .filter(|h| !h.is_empty())
+            .map(str::to_string)
+            .ok_or(SourceError::Invalid)
+    };
+    if host_with("one")? != host_with("two")? {
+        return Err(SourceError::Invalid);
+    }
+    Ok(())
+}
+
+/// The selection as it goes into a URL: whitespace collapsed, at most
+/// [`MAX_QUERY_CHARS`] characters.
+pub fn query_text(selection: &str) -> String {
+    let collapsed = selection.split_whitespace().collect::<Vec<_>>().join(" ");
+    match collapsed.char_indices().nth(MAX_QUERY_CHARS) {
+        Some((cut, _)) => collapsed[..cut].trim_end().to_string(),
+        None => collapsed,
+    }
+}
+
+/// The page to open: the template with the selection and language filled in.
+pub fn build_url(template: &str, selection: &str, lang: &str) -> Result<Url, SourceError> {
+    validate(template)?;
+    let filled = template
+        .trim()
+        .replace("{query}", &encode(&query_text(selection)))
+        .replace("{lang}", &encode(lang.trim()));
+    Url::parse(&filled).map_err(|_| SourceError::Invalid)
+}
+
+/// Percent-encodes everything but RFC 3986 unreserved characters, so the text is safe in a
+/// path or a query either way.
+fn encode(text: &str) -> String {
+    let mut out = String::with_capacity(text.len() * 3);
+    for b in text.bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~') {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
+}
+
+/// Keeps the list usable whatever a settings file says: unique, non-empty ids and names,
+/// invalid templates switched off, and at most [`MAX_SOURCES`].
+pub fn sanitize(sources: &mut Vec<WebSource>) {
+    let mut seen = std::collections::HashSet::new();
+    sources.retain(|s| !s.id.trim().is_empty() && seen.insert(s.id.clone()));
+    sources.truncate(MAX_SOURCES);
+    for s in sources.iter_mut() {
+        s.name = s.name.trim().chars().take(40).collect();
+        if s.name.is_empty() {
+            s.name = s.id.clone();
+        }
+        if validate(&s.url).is_err() {
+            s.enabled = false;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn built_in_sources_are_valid_and_unique() {
+        let all = defaults();
+        for s in &all {
+            assert_eq!(validate(&s.url), Ok(()), "{}", s.id);
+            assert!(s.url.starts_with("https://"), "{} must use https", s.id);
+            assert!(s.words || s.passages, "{} is never shown", s.id);
+        }
+        let mut copy = all.clone();
+        sanitize(&mut copy);
+        assert_eq!(copy, all);
+    }
+
+    #[test]
+    fn fills_in_the_selection_and_language() {
+        let url = build_url(
+            "https://translate.google.com/?sl=auto&tl={lang}&text={query}",
+            "Café & “rent” 5%",
+            "bn",
+        )
+        .unwrap();
+        assert_eq!(
+            url.as_str(),
+            "https://translate.google.com/?sl=auto&tl=bn&text=Caf%C3%A9%20%26%20%E2%80%9Crent%E2%80%9D%205%25"
+        );
+        let pairs: Vec<_> = url.query_pairs().collect();
+        assert_eq!(pairs[2].1, "Café & “rent” 5%");
+    }
+
+    #[test]
+    fn the_selection_cant_escape_its_place() {
+        // A selection with URL syntax stays one encoded value: no new parameters, no new path.
+        let url = build_url(
+            "https://example.com/s?q={query}&x=1",
+            "a&x=2#frag/../../admin?y",
+            "en",
+        )
+        .unwrap();
+        let pairs: Vec<_> = url.query_pairs().collect();
+        assert_eq!(pairs.len(), 2);
+        assert_eq!(pairs[0].1, "a&x=2#frag/../../admin?y");
+        assert_eq!(pairs[1].1, "1");
+        assert_eq!(url.fragment(), None);
+        assert_eq!(url.host_str(), Some("example.com"));
+
+        let path = build_url("https://dict.example/{query}", "../../etc", "en").unwrap();
+        assert_eq!(path.path(), "/..%2F..%2Fetc");
+    }
+
+    #[test]
+    fn non_latin_selections_work() {
+        let url = build_url(
+            "https://bn.wikipedia.org/w/index.php?search={query}",
+            "ভাড়া",
+            "en",
+        )
+        .unwrap();
+        assert_eq!(url.query_pairs().next().unwrap().1, "ভাড়া");
+    }
+
+    #[test]
+    fn long_selections_are_cut_on_a_character_boundary() {
+        let text = "ভা ".repeat(1000);
+        let q = query_text(&text);
+        assert!(q.chars().count() <= MAX_QUERY_CHARS);
+        assert!(!q.ends_with(' '));
+        assert_eq!(
+            query_text("  two\n\nlines\tand  spaces "),
+            "two lines and spaces"
+        );
+    }
+
+    #[test]
+    fn tabs_follow_the_selection_and_offline_only() {
+        let all = defaults();
+        let ids = |v: Vec<WebTab>| v.into_iter().map(|t| t.id).collect::<Vec<_>>();
+        assert!(tabs_for(&all, true, true).is_empty());
+        let words = ids(tabs_for(&all, false, true));
+        assert_eq!(words[0], "google", "searches come first");
+        assert!(words.contains(&"wikipedia".to_string()));
+        let passages = ids(tabs_for(&all, false, false));
+        assert!(!passages.contains(&"wikipedia".to_string()));
+        assert!(passages.contains(&"translate".to_string()));
+        assert!(!words.contains(&"cambridge".to_string()), "off by default");
+    }
+
+    #[test]
+    fn rejects_bad_templates() {
+        assert_eq!(validate("ftp://x.com/{query}"), Err(SourceError::Scheme));
+        assert_eq!(
+            validate("javascript:alert({query})"),
+            Err(SourceError::Scheme)
+        );
+        assert_eq!(validate("file:///C:/{query}"), Err(SourceError::Scheme));
+        assert_eq!(
+            validate("https://example.com/search"),
+            Err(SourceError::NoQuery)
+        );
+        assert_eq!(validate("https://{query}"), Err(SourceError::Invalid));
+        assert_eq!(
+            validate("https://{query}.example.com/"),
+            Err(SourceError::Invalid)
+        );
+        assert_eq!(validate("https://user:{query}@example.com/"), Ok(()));
+        assert_eq!(
+            validate("https:// bad host/{query}"),
+            Err(SourceError::Invalid)
+        );
+        assert_eq!(validate("  HTTPS://Example.com/?q={query}  "), Ok(()));
+        assert!(build_url("https://example.com", "x", "en").is_err());
+    }
+
+    #[test]
+    fn sanitize_fixes_what_a_file_can_break() {
+        let mut list = vec![
+            source("a", "  ", "https://a.example/?q={query}", true, true, true),
+            source(
+                "a",
+                "Duplicate",
+                "https://b.example/?q={query}",
+                true,
+                true,
+                true,
+            ),
+            source(
+                "",
+                "No id",
+                "https://c.example/?q={query}",
+                true,
+                true,
+                true,
+            ),
+            source("bad", "Bad", "notaurl", true, true, true),
+            source(
+                "long",
+                &"x".repeat(100),
+                "https://d.example/?q={query}",
+                true,
+                true,
+                true,
+            ),
+        ];
+        sanitize(&mut list);
+        let ids: Vec<_> = list.iter().map(|s| s.id.as_str()).collect();
+        assert_eq!(ids, ["a", "bad", "long"]);
+        assert_eq!(list[0].name, "a");
+        assert!(!list[1].enabled);
+        assert_eq!(list[2].name.chars().count(), 40);
+
+        let mut many: Vec<_> = (0..40)
+            .map(|i| {
+                source(
+                    &format!("s{i}"),
+                    "S",
+                    "https://e.example/?q={query}",
+                    true,
+                    true,
+                    true,
+                )
+            })
+            .collect();
+        sanitize(&mut many);
+        assert_eq!(many.len(), MAX_SOURCES);
+    }
+}

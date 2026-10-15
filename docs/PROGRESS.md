@@ -43,9 +43,15 @@ AI Translate and the offline dictionary. Desktop software only, never a browser 
       (Ink default), Geist and Phosphor icons; text sidebar instead of the icon rail; no
       hero banner or pill clutter. The card is now tabbed, and a word opens on its
       Dictionary tab with the model started only if Explain is opened.
-- [ ] S1 Tabs and Look up (tabs done with the redesign; Look up box next)
+- [x] Search first (15 October 2026, owner): the card opens on a web search (Google,
+      Bing, DuckDuckGo, Wikipedia, Translate on by default), then the dictionary, then
+      "Explain with AI", which runs only when opened. Web pages show in a child web view
+      inside the card (Tauri `unstable` multi-webview), checked only by lint for the
+      Windows target so far: needs the owner's Windows test. Sources settings page,
+      Offline only (asked at first run), custom sites from URL templates.
+- [ ] S1 Tabs and Look up (tabs done; Look up box next)
 - [ ] S2 Web sources
-- [ ] S3 Page sources
+- [x] S3 Page sources (see "Search first")
 - [ ] S4 AI Translate
 - [ ] S5 Triggers and rules
 - [ ] S6 Polish

@@ -93,7 +93,7 @@ export function HomePage({ go }: { go: (p: PageId) => void }) {
       </Section>
 
       <p className="mt-8 flex items-center gap-2 text-[12px] text-muted">
-        <LockSimple size={13} aria-hidden /> {t.privacy}
+        <LockSimple size={13} aria-hidden /> {settings.offline_only ? t.privacy : t.privacyWeb}
       </p>
     </>
   );

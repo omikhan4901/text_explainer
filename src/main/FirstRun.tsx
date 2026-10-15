@@ -4,6 +4,7 @@ import { Button, LinkButton } from "../components/ui/Button";
 import { Kbd } from "../components/ui/Kbd";
 import { Progress } from "../components/ui/Progress";
 import { Group } from "../components/ui/Section";
+import { Switch } from "../components/ui/Switch";
 import { strings } from "../i18n";
 import { api, inApp } from "../lib/ipc";
 import { Reading } from "../popup/Popup";
@@ -63,7 +64,10 @@ export function FirstRun({ onSeeModels }: { onSeeModels: () => void }) {
               </div>
               <figcaption className="ml-4 text-[12px] text-muted">{t.example}</figcaption>
             </figure>
-            <Button variant="primary" className="mt-8" onClick={() => setStep(1)}>
+            <Group className="mt-8">
+              <Switch label={t.searchFirst} hint={t.searchFirstHint} checked={!settings.offline_only} onChange={(on) => void update({ offline_only: !on })} />
+            </Group>
+            <Button variant="primary" className="mt-6" onClick={() => setStep(1)}>
               {t.start}
             </Button>
           </div>

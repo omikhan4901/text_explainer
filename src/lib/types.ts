@@ -29,6 +29,21 @@ export interface CustomPrompts {
   clearer: string | null;
 }
 
+/** A site the card can show in a tab; `{query}` and `{lang}` are filled in. */
+export interface WebSource {
+  id: string;
+  name: string;
+  url: string;
+  enabled: boolean;
+  words: boolean;
+  passages: boolean;
+}
+
+export interface WebTab {
+  id: string;
+  name: string;
+}
+
 export interface Settings {
   version: number;
   hotkey: string;
@@ -47,6 +62,9 @@ export interface Settings {
   appearance: Appearance;
   start_with_windows: boolean;
   first_run_done: boolean;
+  sources: WebSource[];
+  offline_only: boolean;
+  translate_to: string;
 }
 
 export type Tier = "fastest" | "fast" | "balanced" | "best";
@@ -153,7 +171,7 @@ export interface DictionaryEntry {
 export type AiMode = "running" | "deferred" | "off";
 
 export type PopupEvent =
-  | { type: "open"; id: number; ai: AiMode }
+  | { type: "open"; id: number; ai: AiMode; kind: SelectionKind; query: string; web: WebTab[] }
   | { type: "dictionary"; id: number; entry: DictionaryEntry }
   | { type: "explain"; id: number; event: ExplainEvent }
   | { type: "no_selection"; hotkey: string }

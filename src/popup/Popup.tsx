@@ -1,4 +1,4 @@
-import { Check, Copy, PushPin, PushPinSlash, Warning, X } from "@phosphor-icons/react";
+import { ArrowSquareOut, Check, Copy, Globe, PushPin, PushPinSlash, Sparkle, Warning, X } from "@phosphor-icons/react";
 import { Tabs } from "radix-ui";
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState, type ReactNode } from "react";
 import { LinkButton } from "../components/ui/Button";
@@ -9,11 +9,28 @@ import { api, inApp, on } from "../lib/ipc";
 import { mock } from "../lib/mock";
 import { applyAppearance, followSystemTheme } from "../lib/theme";
 import type { DictionaryEntry, Level, PopupEvent, Sense, Settings } from "../lib/types";
-import { answerText, copyable, gradeBadge, initialState, isStreaming, reduce, tabs, type Explaining, type TabId } from "./state";
+import {
+  answerText,
+  copyable,
+  gradeBadge,
+  initialState,
+  isStreaming,
+  isWord,
+  isWorking,
+  reduce,
+  tabs,
+  webSourceOf,
+  type Explaining,
+  type TabId,
+} from "./state";
 
 const t = strings.card;
-/** Transparent space around the card for its shadow (matches popup.rs MARGIN). */
+/** Card width and the transparent space around it for its shadow (match popup.rs). */
+const WIDTH = 480;
 const MARGIN = 12;
+/** Height of the area a web page fills, and of the footer under every tab. */
+const PAGE_HEIGHT = 400;
+const FOOTER_HEIGHT = 40;
 const ICON = 15;
 
 export function Popup() {
@@ -41,9 +58,9 @@ export function Popup() {
     if (!inApp) {
       const params = new URLSearchParams(location.search);
       setTimeout(() => void mock.playDemo(params.get("demo") ?? "passage"), 50);
-      // `?demo=word&tab=explain` opens a tab as a click on it would (screenshots, tests).
-      const tab = params.get("tab");
-      if (tab === "explain" || tab === "dictionary") setTimeout(() => dispatch({ type: "select_tab", tab }), 120);
+      // `?tab=explain` (or `dictionary`, `web:bing`) opens a tab as a click would.
+      const tab = params.get("tab") as TabId | null;
+      if (tab) setTimeout(() => dispatch({ type: "select_tab", tab }), 120);
     }
     return () => {
       stopTheme();
@@ -69,14 +86,7 @@ export function Popup() {
     };
   }, []);
 
-  const togglePin = () => {
-    setPinned((p) => {
-      void api.popupPin(!p);
-      return !p;
-    });
-  };
-
-  // A word's explanation starts once its tab is opened, and only once per request.
+  // The AI tab starts the model once per request, when it is opened.
   const asked = useRef(0);
   const requestId = state.view === "explain" && state.ai === "requested" ? state.id : 0;
   useEffect(() => {
@@ -86,10 +96,21 @@ export function Popup() {
     }
   }, [requestId]);
 
-  const selectTab = (tab: TabId) => dispatch({ type: "select_tab", tab });
+  // Only a web tab shows the page; any other tab hides it.
+  const onWebTab = state.view === "explain" && webSourceOf(state.tab) !== null;
+  useEffect(() => {
+    if (!onWebTab) void api.webHide();
+  }, [onWebTab]);
+
+  const togglePin = () => {
+    setPinned((p) => {
+      void api.popupPin(!p);
+      return !p;
+    });
+  };
 
   return (
-    <div className="p-3" style={{ width: 440 + 2 * MARGIN }}>
+    <div className="p-3" style={{ width: WIDTH + 2 * MARGIN }}>
       <div
         ref={cardRef}
         role="dialog"
@@ -97,36 +118,27 @@ export function Popup() {
         className="flex max-h-[560px] flex-col overflow-hidden rounded-xl bg-surface text-text shadow-[var(--shadow-card)]"
       >
         {state.view === "explain" ? (
-          <ExplainCard state={state} level={settings?.level ?? "plain"} pinned={pinned} onPin={togglePin} onTab={selectTab} />
+          <ExplainCard
+            state={state}
+            level={settings?.level ?? "plain"}
+            pinned={pinned}
+            onPin={togglePin}
+            onTab={(tab) => dispatch({ type: "select_tab", tab })}
+          />
         ) : (
-          <MessageCard state={state} />
+          <MessageCard state={state} pinned={pinned} onPin={togglePin} />
         )}
       </div>
     </div>
   );
 }
 
-/** Pin, copy and close: the same three on every tab. */
-function Actions({ pinned, onPin, copyText }: { pinned?: boolean; onPin?: () => void; copyText?: string }) {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    if (!copyText) return;
-    await api.copyText(copyText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1200);
-  };
+function PinClose({ pinned, onPin }: { pinned: boolean; onPin: () => void }) {
   return (
     <div className="flex shrink-0 items-center gap-0.5">
-      {onPin && (
-        <IconButton label={pinned ? t.unpin : t.pin} active={pinned} aria-pressed={pinned} onClick={onPin}>
-          {pinned ? <PushPinSlash size={ICON} /> : <PushPin size={ICON} />}
-        </IconButton>
-      )}
-      {copyText !== undefined && (
-        <IconButton label={copied ? t.copied : t.copy} onClick={() => void copy()} disabled={!copyText}>
-          {copied ? <Check size={ICON} /> : <Copy size={ICON} />}
-        </IconButton>
-      )}
+      <IconButton label={pinned ? t.unpin : t.pin} active={pinned} aria-pressed={pinned} onClick={onPin}>
+        {pinned ? <PushPinSlash size={ICON} /> : <PushPin size={ICON} />}
+      </IconButton>
       <IconButton label={t.close} onClick={() => void api.popupClose()}>
         <X size={ICON} />
       </IconButton>
@@ -147,40 +159,216 @@ function ExplainCard({
   onPin: () => void;
   onTab: (tab: TabId) => void;
 }) {
-  const list = tabs(state);
+  const word = isWord(state);
+  // With web tabs every tab keeps the page's height, so switching never resizes the card.
+  const steady = state.web.length > 0 ? { height: PAGE_HEIGHT + FOOTER_HEIGHT } : undefined;
   return (
     <Tabs.Root value={state.tab} onValueChange={(v) => onTab(v as TabId)} className="flex min-h-0 flex-col">
-      <div className="flex h-10 shrink-0 items-stretch gap-2 border-b border-border pr-1.5 pl-2">
-        <Tabs.List aria-label={t.tabs} className="flex min-w-0 flex-1 items-stretch">
-          {list.map((id) => (
-            <Tabs.Trigger
-              key={id}
-              value={id}
-              className="relative px-2.5 text-[13px] font-medium text-muted transition-colors hover:text-text data-[state=active]:text-text data-[state=active]:after:absolute data-[state=active]:after:inset-x-2.5 data-[state=active]:after:-bottom-px data-[state=active]:after:h-0.5 data-[state=active]:after:rounded-full data-[state=active]:after:bg-accent"
-            >
-              {t.tab[id]}
-            </Tabs.Trigger>
-          ))}
-        </Tabs.List>
-        <Actions pinned={pinned} onPin={onPin} copyText={copyable(state)} />
+      <div className="flex h-11 shrink-0 items-center gap-3 pr-1.5 pl-4">
+        <p className="min-w-0 flex-1 truncate" title={state.query}>
+          {word ? (
+            <span className="text-[15px] font-semibold tracking-[-0.01em]">{bareTerm(state.query)}</span>
+          ) : (
+            <span className="text-[13px] text-muted">“{state.query}”</span>
+          )}
+        </p>
+        <PinClose pinned={pinned} onPin={onPin} />
       </div>
-      <Tabs.Content value="dictionary" className="min-h-0 overflow-y-auto focus-visible:outline-none" tabIndex={-1}>
-        {state.dictionary && <DictionaryView entry={state.dictionary} offline={state.ai === "off"} />}
+      {/* Only the AI tab (offline, no dictionary entry): no row of tabs to choose from. */}
+      {tabs(state).length > 1 ? <TabRail state={state} /> : <div className="border-b border-border" />}
+
+      {state.web.map((w) => (
+        <Tabs.Content key={w.id} value={`web:${w.id}`} className="focus-visible:outline-none">
+          <WebPane requestId={state.id} source={w.id} name={w.name} />
+        </Tabs.Content>
+      ))}
+      <Tabs.Content value="dictionary" className="flex min-h-0 flex-col focus-visible:outline-none" style={steady}>
+        {state.dictionary && <DictionaryPane entry={state.dictionary} copyText={copyable(state)} />}
       </Tabs.Content>
-      <Tabs.Content value="explain" className="flex min-h-0 flex-col focus-visible:outline-none" tabIndex={-1}>
-        <ExplainView state={state} level={level} />
+      <Tabs.Content value="explain" className="flex min-h-0 flex-col focus-visible:outline-none" style={steady}>
+        <ExplainPane state={state} level={level} />
       </Tabs.Content>
     </Tabs.Root>
   );
 }
 
-function ExplainView({ state, level }: { state: Explaining; level: Level }) {
+/** The tabs: searches and the dictionary scroll; "Explain with AI" stays pinned in reach. */
+function TabRail({ state }: { state: Explaining }) {
+  const scroller = useRef<HTMLDivElement>(null);
+  const [scrolled, setScrolled] = useState(false);
+  const local = tabs(state).filter((id) => id !== "explain");
+  const measure = () => setScrolled((scroller.current?.scrollLeft ?? 0) > 1);
+  // Keep the open tab in view, clear of the pinned AI tab.
+  useLayoutEffect(() => {
+    const list = scroller.current;
+    const active = list?.querySelector<HTMLElement>("[role=tab][data-state=active]");
+    const pinned = list?.querySelector<HTMLElement>("[role=tab]:last-child");
+    if (!list || !active || !pinned || active === pinned) return;
+    const view = list.getBoundingClientRect();
+    const tab = active.getBoundingClientRect();
+    const covered = view.right - pinned.getBoundingClientRect().width - 24;
+    if (tab.right > covered) list.scrollLeft += tab.right - covered;
+    else if (tab.left < view.left + 8) list.scrollLeft -= view.left + 8 - tab.left;
+  }, [state.tab]);
+  const working = isWorking(state);
+
+  return (
+    <Tabs.List
+      ref={scroller}
+      aria-label={t.tabs}
+      onScroll={measure}
+      onWheel={(e) => {
+        // The card never has focus, so a mouse wheel is how a long row of tabs scrolls.
+        if (scroller.current && Math.abs(e.deltaY) > Math.abs(e.deltaX)) scroller.current.scrollLeft += e.deltaY;
+      }}
+      className={`flex shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border px-2 pb-2 [scrollbar-width:none] ${scrolled ? "[mask-image:linear-gradient(90deg,transparent,#000_24px)]" : ""}`}
+    >
+      {local.map((id) => (
+        <Tabs.Trigger
+          key={id}
+          value={id}
+          className="h-7 shrink-0 rounded-md px-2.5 text-[13px] font-medium whitespace-nowrap text-muted transition-colors hover:bg-surface-2 hover:text-text data-[state=active]:bg-surface-2 data-[state=active]:text-text"
+        >
+          {tabName(state, id)}
+        </Tabs.Trigger>
+      ))}
+      <span className="min-w-4 flex-1" aria-hidden />
+      {/* Pinned to the right edge; tabs scrolling under it fade out behind its shadow. */}
+      <Tabs.Trigger
+        value="explain"
+        className="sticky right-0 flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-border-strong bg-surface px-2.5 text-[13px] font-medium whitespace-nowrap text-text shadow-[-16px_0_10px_0_var(--surface)] transition-colors hover:bg-surface-2 data-[state=active]:border-control data-[state=active]:bg-control data-[state=active]:text-on-control"
+      >
+        <Sparkle size={13} weight="fill" className={working ? "animate-pulse" : undefined} aria-hidden />
+        {t.tab.explain}
+      </Tabs.Trigger>
+    </Tabs.List>
+  );
+}
+
+function tabName(state: Explaining, id: TabId): string {
+  const source = webSourceOf(id);
+  if (source) return state.web.find((w) => w.id === source)?.name ?? source;
+  return id === "dictionary" ? t.tab.dictionary : t.tab.explain;
+}
+
+/** A web source's page. The app lays its web view over this area; until the page paints,
+ * a placeholder shaped like search results shows. */
+function WebPane({ requestId, source, name }: { requestId: number; source: string; name: string }) {
+  const area = useRef<HTMLDivElement>(null);
+  const [page, setPage] = useState<{ key: string; url: string | null; error: string | null }>({ key: "", url: null, error: null });
+  const key = `${requestId}:${source}`;
+
+  useLayoutEffect(() => {
+    const el = area.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const background = getComputedStyle(document.documentElement).getPropertyValue("--surface").trim() || null;
+    let live = true;
+    api
+      .webShow(source, { x: r.left, y: r.top, width: r.width, height: r.height }, background)
+      .then((url) => live && setPage({ key, url, error: null }))
+      .catch((e: unknown) => live && setPage({ key, url: null, error: String(e) }));
+    return () => {
+      live = false;
+    };
+  }, [key, source]);
+
+  const current = page.key === key ? page : { url: null, error: null };
+  const host = current.url ? hostOf(current.url) : name;
+  return (
+    <>
+      <div ref={area} className="relative overflow-hidden" style={{ height: PAGE_HEIGHT }} aria-busy={!current.url && !current.error}>
+        {current.error ? (
+          <div className="px-4 pt-4 text-[13px]">
+            <p className="font-semibold text-danger">{t.webFailed(name)}</p>
+            <p className="mt-1 text-muted first-letter:uppercase">{current.error}</p>
+          </div>
+        ) : (
+          <ResultsSkeleton label={t.loadingPage(host)} />
+        )}
+      </div>
+      <Footer>
+        <span className="flex min-w-0 items-center gap-1.5 pl-1.5 text-[12px] text-muted">
+          <Globe size={13} className="shrink-0" aria-hidden />
+          <span className="truncate">{host}</span>
+        </span>
+        <button
+          type="button"
+          onClick={() => void api.webOpenInBrowser(source)}
+          className="flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-[12px] font-medium text-muted transition-colors hover:bg-surface-2 hover:text-text"
+        >
+          {t.openInBrowser} <ArrowSquareOut size={13} aria-hidden />
+        </button>
+      </Footer>
+    </>
+  );
+}
+
+export function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+function ResultsSkeleton({ label }: { label: string }) {
+  return (
+    <div className="space-y-5 px-4 pt-4" role="status" aria-label={label}>
+      {[78, 64, 84].map((w, i) => (
+        <div key={i} className="space-y-2">
+          <div className="skeleton-line h-2 w-24 rounded-full" />
+          <div className="skeleton-line h-3 rounded-full" style={{ width: `${w}%` }} />
+          <div className="skeleton-line h-2 rounded-full" />
+          <div className="skeleton-line h-2 w-2/3 rounded-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Footer({ children }: { children: ReactNode }) {
+  return <div className="mt-auto flex h-10 shrink-0 items-center justify-between gap-3 border-t border-border px-2">{children}</div>;
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    if (!text) return;
+    await api.copyText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
+  };
+  return (
+    <IconButton label={copied ? t.copied : t.copy} onClick={() => void copy()} disabled={!text}>
+      {copied ? <Check size={ICON} /> : <Copy size={ICON} />}
+    </IconButton>
+  );
+}
+
+function ExplainPane({ state, level }: { state: Explaining; level: Level }) {
   const text = answerText(state);
   const streaming = isStreaming(state);
   const badge = gradeBadge(state);
   const report = state.report;
   const flagged = !state.error && report && (report.missing.length > 0 || report.added.length > 0);
   const passage = state.kind === "passage";
+
+  if (state.ai === "off") {
+    return (
+      <div className="card-in space-y-2 px-4 pt-3.5 pb-4 text-[13px]">
+        <p className="font-semibold">{t.noModelTitle}</p>
+        <p className="text-muted">{t.aiNeedsModel}</p>
+        <button
+          type="button"
+          onClick={() => void api.openMain()}
+          className="h-7 rounded-md bg-control px-3 text-[13px] font-medium text-on-control transition-colors hover:bg-control-hover"
+        >
+          {t.setUp}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -189,10 +377,11 @@ function ExplainView({ state, level }: { state: Explaining; level: Level }) {
           <ErrorBlock message={state.error.message} detail={state.error.detail} />
         ) : text ? (
           <Reading text={text} streaming={streaming} />
-        ) : state.loadingModel ? (
-          <p className="text-[13px] text-muted">{t.loadingModel}</p>
         ) : (
-          <Skeleton lines={passage ? 3 : 1} />
+          <div role="status">
+            <Skeleton lines={passage ? 3 : 2} />
+            <p className="mt-3 text-[12px] text-muted">{state.loadingModel ? t.loadingModel : t.thinking}</p>
+          </div>
         )}
         {state.truncated && !state.error && <p className="mt-3 text-[12px] text-muted">{t.truncated}</p>}
       </div>
@@ -215,8 +404,8 @@ function ExplainView({ state, level }: { state: Explaining; level: Level }) {
         </div>
       )}
 
-      {passage && (
-        <div className="flex h-10 shrink-0 items-center justify-between gap-3 border-t border-border px-2.5">
+      <Footer>
+        {passage ? (
           <Segmented<Level>
             size="sm"
             label={strings.level.label}
@@ -228,13 +417,18 @@ function ExplainView({ state, level }: { state: Explaining; level: Level }) {
               { value: "clearer", label: strings.level.clearer, title: strings.level.clearerHint },
             ]}
           />
+        ) : (
+          <span className="pl-1.5 text-[12px] text-muted">{t.onThisComputer}</span>
+        )}
+        <span className="flex items-center gap-2">
           {badge && (
-            <span title={t.gradeTitle} className="pr-1.5 text-[12px] text-muted">
+            <span title={t.gradeTitle} className="text-[12px] text-muted">
               {t.gradeLabel} <span className="font-medium text-text tabular-nums">{t.gradeShort(badge.before, badge.after)}</span>
             </span>
           )}
-        </div>
-      )}
+          <CopyButton text={state.done && !state.error ? text : ""} />
+        </span>
+      </Footer>
     </>
   );
 }
@@ -245,7 +439,7 @@ export function bareTerm(s: string): string {
 }
 
 /** A word's senses from the bundled dictionary, grouped by part of speech. */
-function DictionaryView({ entry, offline }: { entry: DictionaryEntry; offline: boolean }) {
+function DictionaryPane({ entry, copyText }: { entry: DictionaryEntry; copyText: string }) {
   // Senses are numbered straight through, grouped under each part of speech.
   const groups = entry.senses.slice(0, 5).reduce<{ pos: string; items: (Sense & { n: number })[] }[]>((acc, s, i) => {
     const last = acc[acc.length - 1];
@@ -254,35 +448,35 @@ function DictionaryView({ entry, offline }: { entry: DictionaryEntry; offline: b
     return acc;
   }, []);
   return (
-    <div className="card-in px-4 pt-3 pb-4">
-      <p className="text-[19px] font-semibold tracking-[-0.015em]">{bareTerm(entry.lemma)}</p>
-      <div className="mt-2 space-y-3">
+    <>
+      <div className="card-in min-h-0 space-y-3 overflow-y-auto px-4 pt-3.5 pb-4">
         {groups.map((g, gi) => (
           <section key={gi}>
             <h3 className="mb-1 text-[12px] text-muted italic">{g.pos}</h3>
             <ol className="space-y-2">
-              {g.items.map((sense) => {
-                return (
-                  <li key={sense.n} className="grid grid-cols-[1.25rem_1fr] text-[14px] leading-snug">
-                    <span className="pt-px font-mono text-[11px] text-muted tabular-nums">{sense.n}</span>
-                    <div>
-                      <p>{sense.definition}</p>
-                      {sense.example && <p className="mt-0.5 text-muted">“{sense.example}”</p>}
-                      {sense.synonyms.length > 0 && (
-                        <p className="mt-0.5 text-[12px] text-muted">
-                          {t.also}: <span className="text-text">{sense.synonyms.join(", ")}</span>
-                        </p>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
+              {g.items.map((sense) => (
+                <li key={sense.n} className="grid grid-cols-[1.25rem_1fr] text-[14px] leading-snug">
+                  <span className="pt-px font-mono text-[11px] text-muted tabular-nums">{sense.n}</span>
+                  <div>
+                    <p>{sense.definition}</p>
+                    {sense.example && <p className="mt-0.5 text-muted">“{sense.example}”</p>}
+                    {sense.synonyms.length > 0 && (
+                      <p className="mt-0.5 text-[12px] text-muted">
+                        {t.also}: <span className="text-text">{sense.synonyms.join(", ")}</span>
+                      </p>
+                    )}
+                  </div>
+                </li>
+              ))}
             </ol>
           </section>
         ))}
       </div>
-      {offline && <p className="mt-4 border-t border-border pt-2.5 text-[12px] text-muted">{t.noModelForWords}</p>}
-    </div>
+      <Footer>
+        <span className="pl-1.5 text-[12px] text-muted">{t.dictionarySource}</span>
+        <CopyButton text={copyText} />
+      </Footer>
+    </>
   );
 }
 
@@ -305,7 +499,7 @@ export function Reading({ text, streaming }: { text: string; streaming: boolean 
 
 function Skeleton({ lines = 3 }: { lines?: number }) {
   return (
-    <div className="space-y-2.5 py-1.5" role="status" aria-label={t.thinking}>
+    <div className="space-y-2.5 py-1.5" aria-hidden>
       {[94, 100, 68].slice(0, lines).map((w, i) => (
         <div key={i} className="skeleton-line h-2 rounded-full" style={{ width: `${w}%` }} />
       ))}
@@ -331,8 +525,14 @@ function ErrorBlock({ message, detail }: { message: string; detail: string | nul
   );
 }
 
-function MessageCard({ state }: { state: Exclude<ReturnType<typeof reduce>, Explaining> }) {
-  if (state.view === "empty") return <Bar />;
+function MessageCard({ state, pinned, onPin }: { state: Exclude<ReturnType<typeof reduce>, Explaining>; pinned: boolean; onPin: () => void }) {
+  if (state.view === "empty") {
+    return (
+      <div className="flex h-11 items-center justify-end pr-1.5">
+        <PinClose pinned={pinned} onPin={onPin} />
+      </div>
+    );
+  }
   const [title, body, action] =
     state.view === "no_selection"
       ? [t.noSelectionTitle, t.noSelection(state.hotkey), null]
@@ -341,10 +541,11 @@ function MessageCard({ state }: { state: Exclude<ReturnType<typeof reduce>, Expl
         : [t.captureFailed, state.message, null];
   return (
     <>
-      <Bar>
-        <span className="px-2 text-[13px] font-semibold">{title}</span>
-      </Bar>
-      <div className="card-in space-y-3 px-4 pt-3 pb-4 text-[13px] text-muted">
+      <div className="flex h-11 shrink-0 items-center gap-3 pr-1.5 pl-4">
+        <p className="min-w-0 flex-1 truncate text-[14px] font-semibold">{title}</p>
+        <PinClose pinned={pinned} onPin={onPin} />
+      </div>
+      <div className="card-in space-y-3 px-4 pb-4 text-[13px] text-muted">
         <p>{body}</p>
         {action && (
           <button
@@ -357,14 +558,5 @@ function MessageCard({ state }: { state: Exclude<ReturnType<typeof reduce>, Expl
         )}
       </div>
     </>
-  );
-}
-
-function Bar({ children }: { children?: ReactNode }) {
-  return (
-    <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border pr-1.5 pl-2">
-      <div className="flex min-w-0 flex-1 items-center">{children}</div>
-      <Actions />
-    </div>
   );
 }

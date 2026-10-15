@@ -12,7 +12,7 @@ for (const scheme of ["light", "dark"]) {
   await page.getByRole("button", { name: "Get started" }).click();
   await page.waitForTimeout(200);
   await page.screenshot({ path: `${out}/main-firstrun-model-${scheme}.png` });
-  for (const p of ["home", "model", "reading", "shortcuts", "about"]) {
+  for (const p of ["home", "sources", "model", "reading", "shortcuts", "about"]) {
     await page.goto(`http://localhost:1420/index.html?state=ready&page=${p}`);
     await page.waitForTimeout(500);
     await page.screenshot({ path: `${out}/main-${p}-${scheme}.png` });

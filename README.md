@@ -1,7 +1,10 @@
 # Text Explainer
 
-Select hard text anywhere, press one key, and a clearer version appears right next to it.
-Fully offline, on an ordinary 8 GB laptop with no graphics card.
+Select a word or hard text anywhere, press one key, and a card opens right next to it:
+web searches first (Google, Bing, Wikipedia, Translate, any site you add), the dictionary,
+and **Explain with AI**, a local model that rewrites it in plain language on an ordinary
+8 GB laptop with no graphics card. Like the Definer extension, but for every app on
+Windows, and with an AI that never leaves your computer.
 
 > **Status: ongoing work.** The Windows MVP is built and tested in CI on every push
 > (including installing it on a Windows runner and running real models through it); the
@@ -35,14 +38,18 @@ Fully offline, on an ordinary 8 GB laptop with no graphics card.
   token by token.
 - **Single words get a dictionary.** A WordNet entry appears instantly. Its Explain tab
   gives the meaning in this text, and the model only runs if you open that tab.
-- **Runs on your machine.** A small open model through llama.cpp. Nothing you read leaves
-  your computer.
+- **Searches first, AI when you ask.** The card opens on a web search; each source is a
+  tab, shown in the card itself with "Open in browser" a click away. Explain with AI is the
+  last tab and runs only when you open it, so lookups cost no model time.
+- **Runs on your machine.** A small open model through llama.cpp: what the AI and the
+  dictionary read never leaves your computer. Web tabs are like visiting those sites, and
+  Offline only turns them all off.
 - **Your model, your rules.** Pick a model that fits your memory, bring any GGUF file or a
   local Ollama / LM Studio server, and tune every setting, including the instructions.
 
 <p>
   <img src="docs/screenshots/card-check-light.png" alt="A card warning that 5% was not found in the rewrite" width="440">
-  <img src="docs/screenshots/card-word-dark.png" alt="A single word, ubiquitous: the card opens on its dictionary entry, with an Explain tab next to it, in dark mode" width="440">
+  <img src="docs/screenshots/card-word-dark.png" alt="A single word, ubiquitous: its dictionary tab, after the web search tabs and before Explain with AI, in dark mode" width="440">
 </p>
 
 ## The app
@@ -55,8 +62,8 @@ dark when the system is.
   <img src="docs/screenshots/main-model-light.png" alt="Model: the catalog with sizes, licenses and whether each fits this computer's memory" width="440">
 </p>
 <p>
+  <img src="docs/screenshots/main-sources-light.png" alt="Sources: Offline only, the web search tabs to show for words and passages in order, adding any site, and the translation language" width="440">
   <img src="docs/screenshots/main-reading-dark.png" alt="Reading: level, output language, font, size, spacing, theme and accent, in dark mode" width="440">
-  <img src="docs/screenshots/main-shortcuts-dark.png" alt="Shortcuts: the shortcut, copy twice to explain, clipboard fallback and start with Windows, in dark mode" width="440">
 </p>
 
 First run is three steps: one screen to say what it does, one to download a model that
