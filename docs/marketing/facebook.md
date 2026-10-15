@@ -18,7 +18,7 @@ Suggested order: post 1 (launch), then one feature post every two or three days.
 
 ## 1. Launch
 
-**Image:** `card-passage-light.png` (the lease sentence made readable)
+**Image:** `feature-explain.png` (the lease sentence made readable)
 
 > I've been building something for everyone who has ever read a sentence three times and
 > still not understood it.
@@ -41,12 +41,15 @@ Suggested order: post 1 (launch), then one feature post every two or three days.
 
 ## 2. Private translation
 
-**Image:** `card-translate-light.png` (the AI tab set to "Translate to Bangla")
+**Image:** `feature-translate.png` (each sentence above its Bangla translation)
 
 > New in Text Explainer: translate without sending your text to anyone.
 >
 > The AI tab now has two buttons: Explain and Translate. Translation runs on your
 > computer, so contracts, medical letters and private messages stay private.
+>
+> Each sentence sits right under its original, so you can see which words became which.
+> Great if you're learning a language, or checking a letter before you sign it.
 >
 > It also checks itself: if a number or a date goes missing in the translation, the card
 > tells you, and the answer can't drift into the wrong language. You can translate into
@@ -59,7 +62,7 @@ Suggested order: post 1 (launch), then one feature post every two or three days.
 
 ## 3. The Word book (for students)
 
-**Image:** `main-words-light.png` (the Words page with saved words)
+**Image:** `feature-words.png` (the Words page with saved words)
 
 > Students: Text Explainer now keeps the words you look up.
 >
@@ -75,7 +78,7 @@ Suggested order: post 1 (launch), then one feature post every two or three days.
 
 ## 4. Look up anything
 
-**Image:** `lookup-light.png` (the Look up box)
+**Image:** `feature-lookup.png` (the Look up box)
 
 > Sometimes the word isn't on your screen: you heard it in a lecture or a meeting.
 >
@@ -105,7 +108,7 @@ Suggested order: post 1 (launch), then one feature post every two or three days.
 
 ## 6. Launch, in Bangla
 
-**Image:** `card-translate-light.png`
+**Image:** `feature-translate.png`
 
 > কোনো বাক্য তিনবার পড়েও বুঝতে পারেননি? এমন সবার জন্য একটা ছোট অ্যাপ বানাচ্ছি।
 >

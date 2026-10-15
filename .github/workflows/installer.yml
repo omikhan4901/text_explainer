@@ -1,7 +1,8 @@
 name: Installer (latest build)
 
 # Builds the Windows installer from every push to main, smoke-tests it on the runner, and
-# puts it on the "latest-build" pre-release, which always holds the newest one:
+# puts it on the "latest-build" release (marked Latest, so the repo page shows it), which
+# always holds the newest one:
 # https://github.com/omikhan4901/text_explainer/releases/tag/latest-build
 # Stable download link (the file name never changes):
 # https://github.com/omikhan4901/text_explainer/releases/download/latest-build/TextExplainer-x64-setup.exe
@@ -40,7 +41,7 @@ jobs:
       - name: Smoke test (install, run the engine, start the app)
         run: ./scripts/smoke-windows.ps1
         timeout-minutes: 5
-      - name: Publish to the latest-build pre-release
+      - name: Publish to the latest-build release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -66,4 +67,4 @@ jobs:
           # (The first time there is none, and that's fine.)
           try { gh release delete latest-build --cleanup-tag --yes } catch { }
           $global:LASTEXITCODE = 0
-          gh release create latest-build $exe --prerelease --title "Latest build (preview)" --notes $notes --target $env:GITHUB_SHA
+          gh release create latest-build $exe --latest --title "Text Explainer (preview build)" --notes $notes --target $env:GITHUB_SHA

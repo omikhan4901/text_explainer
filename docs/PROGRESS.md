@@ -79,6 +79,11 @@ by security, database and AI engineers before it reaches `main`:
       paragraphs were treated as one word, same-script text handed back went unnoticed,
       false alarms on names, a translation could overwrite a saved explanation, a history
       file could be deleted when it couldn't be moved aside, and smaller ones)
+- [x] After the review (15 October 2026): web translators beside the AI (compare in the
+      Translate tab, Bing Translator as an option), a translated passage shown sentence by
+      sentence under its original, a new logo (a line of text with one word highlighted),
+      the README redone as a product page, and the installer published as the repo's
+      Latest release
 - [ ] Not verified on Windows yet: the Look up box's focus and placement, app rules on
       real apps, the Windows voice, export through the save dialog
 
@@ -92,9 +97,9 @@ Decisions that belong to the owner (not built until decided):
 
 ## Numbers (for the marketing kit; measured, not estimated)
 
-- Tests (15 October 2026): 192 Rust (core and Windows crate, including end-to-end engine
+- Tests (15 October 2026): 194 Rust (core and Windows crate, including end-to-end engine
   tests against a stand-in llama-server, download tests against a flaky local server, and
-  the word book's SQLite tests), 30 front-end unit tests, 92 Playwright checks (journeys
+  the word book's SQLite tests), 35 front-end unit tests, 92 Playwright checks (journeys
   and WCAG 2.2 AA scans, each in light and dark).
 - Model evaluation (4-vCPU GitHub runner, no GPU, 56 rewrites per model; `docs/models.md`):
   Gemma 4 E2B 17.3 tok/s, 5.8 s median per answer (first words after 2.2 s), 3.9 GB

@@ -17,3 +17,7 @@ interface running in a browser against the app's built-in mock, not of the insta
 What is public: a free preview build (the README's Download link), rebuilt on every
 change. **Not yet true, so not claimed anywhere:** a numbered release, users or download
 numbers, translation quality per language (not measured yet), speed on a real laptop (the measured numbers are from a 4-vCPU CI runner; say so), macOS or Linux.
+
+The logo (`src-tauri/icons/`, 1024 px master drawn by script): an ink square with a line of
+text and one word highlighted in saffron, the app's own colours. It reads as the moment the
+app is for: select a word, get help.

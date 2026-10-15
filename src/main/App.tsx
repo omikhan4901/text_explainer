@@ -85,15 +85,20 @@ function Shell() {
 }
 
 /** The app's mark: a highlighted line between two plain ones. */
+/** The app's mark: a line of text with one word highlighted (same drawing as the icon). */
 export function Mark({ size = 22 }: { size?: number }) {
   return (
-    <span className="grid place-items-center rounded-[6px] bg-control text-on-control" style={{ width: size, height: size }} aria-hidden>
-      <svg viewBox="0 0 16 16" width={size * 0.68} height={size * 0.68} fill="currentColor">
-        <rect x="2" y="3" width="9" height="1.6" rx="0.8" opacity="0.55" />
-        <rect x="2" y="7" width="12" height="2.4" rx="1" />
-        <rect x="2" y="11.6" width="7" height="1.6" rx="0.8" opacity="0.55" />
-      </svg>
-    </span>
+    <svg viewBox="0 0 16 16" width={size} height={size} aria-hidden className="shrink-0">
+      {/* Brand colours are fixed: the icon looks the same in light and dark. */}
+      <rect width="16" height="16" rx="3.6" fill="#1b1b1a" />
+      <rect x="0.25" y="0.25" width="15.5" height="15.5" rx="3.4" fill="none" stroke="rgb(255 255 255 / 0.08)" strokeWidth="0.5" />
+      <g fill="#7a7a74">
+        <rect x="3.1" y="4.1" width="9.7" height="1.4" rx="0.7" />
+        <rect x="3.1" y="7.3" width="2.9" height="1.4" rx="0.7" />
+        <rect x="3.1" y="10.5" width="7" height="1.4" rx="0.7" />
+      </g>
+      <rect x="6.9" y="7" width="5.9" height="2" rx="1" fill="#e7b46a" />
+    </svg>
   );
 }
 
