@@ -172,18 +172,126 @@ pub fn word_meaning(word: &str, context: Option<&str>, out: OutputLanguage<'_>) 
          3. Do not repeat the sentence. Do not add examples, synonyms lists or notes.\n\
          4. Reply with the explanation only."
     );
-    let user = match context {
+    vec![
+        msg(Role::System, system),
+        msg(Role::User, word_request(word, context)),
+    ]
+}
+
+/// "Word: bank\nSentence: We sat on the river bank." (the sentence only when it adds
+/// something).
+fn word_request(word: &str, context: Option<&str>) -> String {
+    match context {
         Some(c) if !c.trim().is_empty() && c.trim() != word.trim() => {
             format!("Word: {word}\nSentence: {}", c.trim())
         }
         _ => format!("Word: {word}"),
+    }
+}
+
+/// The system prompt for translating a passage into `to`. No worked example: one in a
+/// single language pair would pull other pairs towards it, and a wrong one would teach
+/// the error to every request.
+pub fn translate_system(to: &Language) -> String {
+    let lang = to.name;
+    format!(
+        "You are a careful translator. You translate the text the user gives you into {lang}.\n\
+         \n\
+         Rules:\n\
+         1. Translate all of it: every sentence, in the same order. Do not shorten, summarise or skip anything.\n\
+         2. Keep the meaning exactly. Do not add facts, explanations, opinions or warnings.\n\
+         3. Keep every number, amount, percentage and date. Write numbers with digits.\n\
+         4. Keep the names of people, places, organisations and products, and acronyms; write them the way {lang} usually does.\n\
+         5. Write plain, natural {lang} that is easy to read, the way a careful native speaker would.\n\
+         6. Keep lists as lists and keep paragraph breaks.\n\
+         7. Write only in {lang}. Do not add the original text, a transliteration or a pronunciation guide.\n\
+         8. Reply with the translation only: no title, no introduction, no notes."
+    )
+}
+
+/// Messages for translating `text` (one chunk of `part.1` when a long text is split).
+pub fn translate(text: &str, to: &Language, part: Option<(usize, usize)>) -> Vec<Message> {
+    let note = match part {
+        Some((i, n)) if n > 1 => {
+            format!(" This is part {i} of {n} of a longer text; translate only this part.")
+        }
+        _ => String::new(),
     };
-    vec![msg(Role::System, system), msg(Role::User, user)]
+    vec![
+        msg(Role::System, translate_system(to)),
+        msg(
+            Role::User,
+            format!(
+                "Translate this text into {}.{note}\n\n<text>\n{text}\n</text>",
+                to.name
+            ),
+        ),
+    ]
+}
+
+/// Messages for translating a word or short term, with a short note on the sense it has
+/// in its sentence when the sentence is known.
+pub fn translate_word(word: &str, context: Option<&str>, to: &Language) -> Vec<Message> {
+    let lang = to.name;
+    let system = format!(
+        "You translate words and short phrases into {lang}.\n\
+         Rules:\n\
+         1. Give the {lang} word or phrase that best translates it.\n\
+         2. If a sentence is given, translate it as it is used in that sentence, then add a very short explanation in {lang} of that sense, in brackets.\n\
+         3. Do not translate the sentence. Do not add examples, other meanings, a transliteration or notes.\n\
+         4. Write only in {lang}.\n\
+         5. Reply with the translation only."
+    );
+    vec![
+        msg(Role::System, system),
+        msg(Role::User, word_request(word, context)),
+    ]
 }
 
 /// The most tokens a rewrite of `words` source words may take.
 pub fn max_tokens_for_rewrite(words: usize, level: Level) -> u32 {
     ((words as f32 * level.tokens_per_source_word()) as u32 + 64).clamp(96, 3072)
+}
+
+/// A ceiling on the tokens a translation into `to` may take, per source word. Small
+/// models' tokenizers split some scripts into many more pieces than English: a word of
+/// Bangla or Hindi often takes 3 to 6 tokens, Arabic 2 to 4, Chinese about 1 per
+/// character (an English word is about 1.5 characters). These are estimates, set high on
+/// purpose: a model stops at the end of its answer, so a ceiling that is too high costs
+/// nothing, and one that is too low cuts the translation short. `te-eval --task
+/// translate` reports the tokens each model really used per source word.
+fn translation_tokens_per_word(to: &Language) -> f32 {
+    use crate::language::Script;
+    match to.scripts.first() {
+        Some(Script::Latin) => 2.5,
+        Some(Script::Cyrillic | Script::Greek | Script::Armenian | Script::Georgian) => 3.5,
+        Some(Script::Cjk | Script::Kana | Script::Hangul) => 3.5,
+        Some(Script::Arabic | Script::Hebrew) => 4.0,
+        // Indic scripts, Thai and the rest.
+        _ => 6.0,
+    }
+}
+
+/// How many English-sized words `text` has: Chinese and Japanese aren't split by spaces,
+/// so their characters are counted (about 1.5 per word).
+pub fn source_words(text: &str) -> usize {
+    use crate::language::{Script, script_of};
+    let dense = text
+        .chars()
+        .filter(|&c| matches!(script_of(c), Some(Script::Cjk | Script::Kana)))
+        .count();
+    crate::text::word_count(text).max(dense * 2 / 3)
+}
+
+/// The most tokens a translation of `text` into `to` may take.
+pub fn max_tokens_for_translation(text: &str, to: &Language) -> u32 {
+    ((source_words(text) as f32 * translation_tokens_per_word(to)) as u32 + 64).clamp(96, 3072)
+}
+
+/// The most tokens a word's translation and its short explanation (about 15 words) may
+/// take.
+pub fn max_tokens_for_word_translation(to: &Language) -> u32 {
+    (48.0 + 20.0 * translation_tokens_per_word(to)) as u32
 }
 
 /// Prompt used when an answer drifted into another language and is retried.
@@ -310,6 +418,84 @@ mod tests {
         assert_eq!(m[1].content, "Word: bank");
         let m = word_meaning("bank", None, en);
         assert_eq!(m[1].content, "Word: bank");
+    }
+
+    #[test]
+    fn translation_prompt_names_the_target_and_forbids_commentary() {
+        let bn = language("bn").unwrap();
+        let m = translate("The rent is $1,200.", bn, None);
+        assert_eq!(m.len(), 2, "no worked example");
+        assert_eq!(m[0].role, Role::System);
+        let s = &m[0].content;
+        assert!(s.contains("into Bangla (Bengali)."));
+        assert!(s.contains("Write only in Bangla (Bengali)."));
+        assert!(s.contains("Translate all of it"));
+        assert!(s.contains("Keep every number, amount, percentage and date"));
+        assert!(s.contains("transliteration"));
+        assert!(s.contains("no title, no introduction, no notes"));
+        assert_eq!(
+            m[1].content,
+            "Translate this text into Bangla (Bengali).\n\n<text>\nThe rent is $1,200.\n</text>"
+        );
+        let m = translate("Chunk.", bn, Some((2, 3)));
+        assert!(m[1].content.contains("This is part 2 of 3"));
+        assert!(m[1].content.contains("translate only this part"));
+    }
+
+    #[test]
+    fn translation_prefix_is_identical_across_requests_for_caching() {
+        let es = language("es").unwrap();
+        assert_eq!(
+            translate("One.", es, None)[0],
+            translate("Two.", es, None)[0]
+        );
+        assert_ne!(
+            translate("One.", es, None)[0],
+            translate("One.", language("hi").unwrap(), None)[0]
+        );
+    }
+
+    #[test]
+    fn word_translation_asks_for_the_sense_in_context() {
+        let es = language("es").unwrap();
+        let m = translate_word("bank", Some("We sat on the river bank."), es);
+        assert!(m[0].content.contains("into Spanish."));
+        assert!(m[0].content.contains("as it is used in that sentence"));
+        assert!(m[0].content.contains("Do not translate the sentence"));
+        assert_eq!(
+            m[1].content,
+            "Word: bank\nSentence: We sat on the river bank."
+        );
+        assert_eq!(translate_word("bank", None, es)[1].content, "Word: bank");
+    }
+
+    #[test]
+    fn translation_budget_depends_on_the_target_script() {
+        let text = "word ".repeat(100);
+        let budget = |code: &str| max_tokens_for_translation(&text, language(code).unwrap());
+        assert_eq!(budget("es"), 314);
+        assert!(budget("bn") > budget("ar"));
+        assert!(budget("ar") > budget("zh"));
+        assert!(budget("zh") > budget("es"));
+        assert_eq!(budget("bn"), 664);
+        assert_eq!(max_tokens_for_translation("", language("es").unwrap()), 96);
+        assert_eq!(
+            max_tokens_for_translation(&"word ".repeat(10_000), language("bn").unwrap()),
+            3072
+        );
+        assert!(
+            max_tokens_for_word_translation(language("bn").unwrap())
+                > max_tokens_for_word_translation(language("es").unwrap())
+        );
+    }
+
+    #[test]
+    fn chinese_source_is_measured_by_characters() {
+        // 30 characters, no spaces: about 20 English-sized words.
+        let zh = "租户应在每月第一天支付租金。".repeat(2) + "这是规定。!";
+        assert_eq!(crate::text::word_count(&zh), 1);
+        assert!(source_words(&zh) >= 18);
+        assert_eq!(source_words("The rent is due."), 4);
     }
 
     #[test]

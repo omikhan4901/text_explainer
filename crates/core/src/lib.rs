@@ -12,6 +12,7 @@ pub mod output;
 pub mod prompt;
 pub mod readability;
 pub mod text;
+pub mod translate;
 
 /// Installs the TLS backend (rustls with ring) once per process. Every HTTP client in the
 /// app calls this first; downloads need it, localhost requests don't mind it.
