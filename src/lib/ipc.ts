@@ -2,7 +2,7 @@
 // screenshots) a mock answers instead, so every screen can be built and checked anywhere.
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { AppInfo, Level, Settings } from "./types";
+import type { AppInfo, FoundModel, Level, Settings } from "./types";
 
 /** Where the card's content area is, in CSS pixels from the window's top left. */
 export interface WebBounds {
@@ -42,6 +42,7 @@ export const api = {
   webHide: () => call<void>("web_hide"),
   webOpenInBrowser: (source: string) => call<void>("web_open_in_browser", { source }),
   validateSource: (url: string) => call<void>("validate_source", { url }),
+  findModels: () => call<FoundModel[]>("find_models"),
   copyText: (text: string) => call<void>("copy_text", { text }),
   explainText: (text: string) => call<void>("explain_text", { text }),
   openMain: () => call<void>("open_main"),

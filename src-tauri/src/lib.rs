@@ -178,6 +178,7 @@ pub fn run() {
             commands::web_show,
             commands::web_hide,
             commands::validate_source,
+            commands::find_models,
             commands::web_open_in_browser,
             commands::copy_text,
             commands::explain_text,

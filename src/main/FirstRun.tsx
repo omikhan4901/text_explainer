@@ -10,6 +10,7 @@ import { api, inApp } from "../lib/ipc";
 import { Reading } from "../popup/Popup";
 import { Mark } from "./App";
 import { useData, useDownloadOf } from "./data";
+import { FoundModels, useFoundModels } from "./FoundModels";
 import { ModelRow } from "./ModelRow";
 
 const t = strings.firstRun;
@@ -22,6 +23,7 @@ export function FirstRun({ onSeeModels }: { onSeeModels: () => void }) {
   const recommended = info.models.find((m) => m.id === info.recommended) ?? info.models[0];
   const progress = useDownloadOf(recommended?.id ?? "");
   const hasModel = settings.model.kind !== "none";
+  const { found } = useFoundModels();
 
   const finish = () => void update({ first_run_done: true });
   const chooseFile = async () => {
@@ -81,6 +83,14 @@ export function FirstRun({ onSeeModels }: { onSeeModels: () => void }) {
             <Group className="mt-6">
               <ModelRow model={recommended} recommended compact />
             </Group>
+            {found && found.length > 0 && (
+              <>
+                <p className="mt-6 mb-2 text-[13px] font-medium">{t.alreadyHave}</p>
+                <Group>
+                  <FoundModels found={found} limit={3} onUse={() => setStep(2)} />
+                </Group>
+              </>
+            )}
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-[13px]">
               <LinkButton
                 onClick={() => {

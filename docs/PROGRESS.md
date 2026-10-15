@@ -49,6 +49,9 @@ AI Translate and the offline dictionary. Desktop software only, never a browser 
       inside the card (Tauri `unstable` multi-webview), checked only by lint for the
       Windows target so far: needs the owner's Windows test. Sources settings page,
       Offline only (asked at first run), custom sites from URL templates.
+- [x] Models already on the computer (15 October 2026, owner): found in LM Studio,
+      Ollama, Jan, GPT4All, Hugging Face and Downloads, each with its memory fit, usable
+      in one click from the Model page and first run.
 - [ ] S1 Tabs and Look up (tabs done; Look up box next)
 - [ ] S2 Web sources
 - [x] S3 Page sources (see "Search first")

@@ -11,6 +11,7 @@ import { api, inApp } from "../../lib/ipc";
 import type { Level, Settings } from "../../lib/types";
 import { PageTitle } from "../App";
 import { useData } from "../data";
+import { FoundModels, useFoundModels } from "../FoundModels";
 import { ModelRow } from "../ModelRow";
 
 const t = strings.model;
@@ -34,10 +35,30 @@ export function ModelPage() {
           ))}
         </Group>
       </Section>
+      <Found />
       <OwnModel />
       <Tuning />
       <Prompts />
     </>
+  );
+}
+
+function Found() {
+  const { found, search } = useFoundModels();
+  return (
+    <Section
+      title={t.found}
+      description={t.foundLead}
+      aside={
+        <Button size="sm" variant="ghost" onClick={search} disabled={found === null}>
+          {t.lookAgain}
+        </Button>
+      }
+    >
+      <Group>
+        <FoundModels found={found} />
+      </Group>
+    </Section>
   );
 }
 

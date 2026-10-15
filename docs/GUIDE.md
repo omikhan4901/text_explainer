@@ -74,6 +74,17 @@ console window, and logs to `%LOCALAPPDATA%\dev.omikhan.textexplainer\logs`. A W
 object (`te_win::kill_with_app`) ensures it dies with the app. It's started on the first
 request, restarted if it crashes, and stopped after the idle time in Settings.
 
+## Models already on the computer
+
+`crates/core/src/discover.rs` looks for GGUF files the person already has: LM Studio
+(`~/.lmstudio/models`, `~/.cache/lm-studio/models`), Jan, GPT4All, the Hugging Face cache,
+Downloads (top level), and Ollama (its manifests name each model; the model layer is a
+GGUF blob, checked to be a 64-hex-digit digest inside `blobs`). Files must start with the
+GGUF magic bytes and be at least 50 MB; vision projectors and later parts of split models
+are skipped, and the walk is bounded in depth and entries. Each result gets the same
+memory fit as the catalog (size plus half). The Model page and first run list them
+(`find_models`); "Use" sets a `file` model.
+
 ## Data on disk
 
 - Settings: `%APPDATA%\dev.omikhan.textexplainer\settings.json` (saved atomically; an

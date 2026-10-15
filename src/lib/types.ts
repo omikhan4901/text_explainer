@@ -90,6 +90,16 @@ export interface ModelInfo {
   partial_bytes: number;
 }
 
+/** A GGUF model already on this computer (`discover.rs`). */
+export interface FoundModel {
+  name: string;
+  path: string;
+  size_bytes: number;
+  source: string;
+  ram_needed_bytes: number;
+  fit: Fit;
+}
+
 export interface LanguageInfo {
   code: string;
   name: string;

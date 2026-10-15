@@ -230,6 +230,34 @@ async function call<T>(command: string, args: Record<string, unknown> = {}): Pro
       const query = currentDemo.startsWith("word") ? "ubiquitous" : SOURCE;
       return sourceUrl(source.url, query, settings.translate_to) as T;
     }
+    case "find_models":
+      await new Promise((r) => setTimeout(r, 250));
+      return [
+        {
+          name: "Qwen3-4B-Instruct-2507-Q4_K_M",
+          path: "C:\\Users\\Omi\\.lmstudio\\models\\lmstudio-community\\Qwen3-4B-Instruct-2507-GGUF\\Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+          size_bytes: 2_497_281_120,
+          source: "LM Studio",
+          ram_needed_bytes: 3_745_921_680,
+          fit: "comfortable",
+        },
+        {
+          name: "llama3.2:3b",
+          path: "C:\\Users\\Omi\\.ollama\\models\\blobs\\sha256-dde5aa3fc5ffc17176b5e8bdc82f587b24b2678c6c66101bf7da77af9f7ccdff",
+          size_bytes: 2_019_377_376,
+          source: "Ollama",
+          ram_needed_bytes: 3_029_066_064,
+          fit: "comfortable",
+        },
+        {
+          name: "Mistral-Small-24B-Q4_K_M",
+          path: "C:\\Users\\Omi\\Downloads\\Mistral-Small-24B-Q4_K_M.gguf",
+          size_bytes: 14_334_000_000,
+          source: "Downloads",
+          ram_needed_bytes: 21_501_000_000,
+          fit: "too_big",
+        },
+      ] as T;
     case "validate_source": {
       const url = String(args.url).trim();
       if (!/^https?:\/\//i.test(url)) throw "the address must start with https:// or http://";

@@ -44,8 +44,10 @@ Windows, and with an AI that never leaves your computer.
 - **Runs on your machine.** A small open model through llama.cpp: what the AI and the
   dictionary read never leaves your computer. Web tabs are like visiting those sites, and
   Offline only turns them all off.
-- **Your model, your rules.** Pick a model that fits your memory, bring any GGUF file or a
-  local Ollama / LM Studio server, and tune every setting, including the instructions.
+- **Your model, your rules.** Pick a model that fits your memory (it recommends one for
+  your PC and says when one is too big), use one you already downloaded (it finds models
+  from LM Studio, Ollama, Jan, GPT4All and Hugging Face), bring any GGUF file or a local
+  Ollama / LM Studio server, and tune every setting, including the instructions.
 
 <p>
   <img src="docs/screenshots/card-check-light.png" alt="A card warning that 5% was not found in the rewrite" width="440">

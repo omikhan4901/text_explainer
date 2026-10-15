@@ -103,3 +103,13 @@ test("sources: offline only, and adding a site checks its address", async ({ pag
   await page.getByRole("button", { name: "Remove Merriam-Webster" }).click();
   await expect(page.getByText("merriam-webster.com", { exact: true })).toHaveCount(0);
 });
+
+test("models already on the computer are found and can be used", async ({ page }) => {
+  await page.goto("/index.html?state=ready&page=model");
+  await expect(page.getByText("llama3.2:3b")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Use Mistral-Small-24B-Q4_K_M" })).toBeDisabled();
+  await page.getByRole("button", { name: "Use llama3.2:3b" }).click();
+  await expect(page.getByRole("button", { name: "Use llama3.2:3b" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Look again" }).click();
+  await expect(page.getByText("Qwen3-4B-Instruct-2507-Q4_K_M")).toBeVisible();
+});

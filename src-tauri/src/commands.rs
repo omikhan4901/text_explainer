@@ -321,6 +321,27 @@ pub async fn web_show(
     popup::web_show(&app, &source, bounds, background.as_deref())
 }
 
+/// GGUF models already on this computer (LM Studio, Ollama, Jan, GPT4All, Hugging Face,
+/// Downloads), best fit first.
+#[tauri::command]
+pub async fn find_models(
+    state: State<'_, AppState>,
+) -> CmdResult<Vec<te_core::discover::FoundModel>> {
+    use te_core::discover;
+    let total = te_win::memory().map_or(0, |m| m.total_bytes);
+    let own = state.paths.models.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        discover::discover(
+            &discover::default_roots(),
+            total,
+            Some(&own),
+            discover::MIN_MODEL_BYTES,
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
 /// Checks a web source address the person typed in Settings.
 #[tauri::command]
 pub fn validate_source(url: String) -> CmdResult<()> {
