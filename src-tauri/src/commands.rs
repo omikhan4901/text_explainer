@@ -286,13 +286,15 @@ pub async fn delete_model(app: AppHandle, id: String) -> CmdResult<()> {
         settings.model = ModelChoice::None;
         save_settings(app.clone(), settings).await?;
     }
-    let path = state.paths.model_file(model);
-    let _ = std::fs::remove_file(download::part_path(&path));
-    match std::fs::remove_file(&path) {
-        Ok(()) => Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(format!("Couldn't delete the model: {e}")),
+    for path in state.paths.model_files(model) {
+        let _ = std::fs::remove_file(download::part_path(&path));
+        match std::fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(format!("Couldn't delete the model: {e}")),
+        }
     }
+    Ok(())
 }
 
 #[tauri::command]

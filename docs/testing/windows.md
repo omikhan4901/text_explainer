@@ -44,6 +44,9 @@ Try each in **Notepad**, **Edge or Chrome**, **Microsoft Word** (if you have it)
 - [ ] Task Manager shows the app as **Plainly.exe** (not text-explainer.exe), and after
       updating from an older build there's no text-explainer.exe left in the install
       folder. With "Start with Windows" on, it starts after a restart.
+- [ ] Install to another drive (say `D:\Plainly`) and download a model: it lands in
+      `D:\Plainly\models`. Uninstall without "Delete the application data": a message says
+      how many GB of models stay and offers to delete them.
 - [ ] Accept an update: the main window shows the download with its size, then
       "Installing", then the new version opens.
 - [ ] Google and Bing pages fit the card (no sideways scrolling). Click into Google's

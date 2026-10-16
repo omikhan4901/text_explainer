@@ -46,6 +46,11 @@ if rustup target list --installed 2>/dev/null | grep -q x86_64-pc-windows-msvc; 
   scripts/wincheck.sh clippy -q -p te-win -p text-explainer --all-targets -- -D warnings
 fi
 
+if command -v makensis >/dev/null 2>&1; then
+  step "installer: compile the NSIS hooks"
+  scripts/ci/check-installer-hooks.sh
+fi
+
 step "rust: tests"
 cargo test -q -p te-core -p te-win
 

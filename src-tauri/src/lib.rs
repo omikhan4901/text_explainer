@@ -51,6 +51,15 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
     let settings = Settings::load(&paths.settings);
+    if paths.models != paths.old_models {
+        let moved = te_core::models::move_models(&paths.old_models, &paths.models);
+        if moved > 0 {
+            tracing::info!(
+                "moved {moved} model(s) next to the app: {}",
+                paths.models.display()
+            );
+        }
+    }
 
     let mut engine = Engine::new(Backend::None);
     engine.set_spawn_hook(|pid| {

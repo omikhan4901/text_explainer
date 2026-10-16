@@ -258,8 +258,13 @@ memory fit as the catalog (size plus half). The Model page and first run list th
 
 - Settings: `%APPDATA%\dev.omikhan.textexplainer\settings.json` (saved atomically; an
   unreadable file is kept as `settings.broken.json`).
-- Models: `%LOCALAPPDATA%\dev.omikhan.textexplainer\models` (downloads resume from
-  `.part` files and are checked against SHA-256 before use).
+- Models: `models` in the install folder, so they go on the drive the person installed to
+  (`%LOCALAPPDATA%\Plainly\models` by default; the owner's call, 16 October 2026). If the
+  app can't write there, and in development builds, `%LOCALAPPDATA%\dev.omikhan.textexplainer\models`,
+  where they were before: still read, and moved from at start when that's instant (same
+  drive). Downloads resume from `.part` files and are checked against SHA-256 before use.
+  Uninstalling keeps them unless "Delete the application data" is ticked; otherwise it
+  says how many GB stay and offers to delete them (`installer-hooks.nsh`).
 - Logs: `%LOCALAPPDATA%\dev.omikhan.textexplainer\logs` (`app.log`, `llama-server.log`).
 - Word book and history: `%LOCALAPPDATA%\dev.omikhan.textexplainer\history.sqlite`
   (an unusable file is kept as `history.broken.sqlite`).

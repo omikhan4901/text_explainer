@@ -1,6 +1,8 @@
 //! The model catalog. Sizes and SHA-256 hashes come from Hugging Face's API (see
 //! `.github/workflows/probe.yml`), so every download is checked against a known file.
 
+use std::path::{Path, PathBuf};
+
 use serde::Serialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -198,8 +200,73 @@ pub fn recommend(total_ram_bytes: u64) -> &'static CatalogModel {
         .unwrap_or_else(|| by_id("lfm2.5-1.2b").expect("smallest model in catalog"))
 }
 
+/// Where a downloaded model's file is: in the first of `dirs` that has it, else (for a new
+/// download) in the first. `dirs` lists the models folder, then older ones still read.
+pub fn locate(dirs: &[&Path], file_name: &str) -> PathBuf {
+    dirs.iter()
+        .map(|d| d.join(file_name))
+        .find(|p| p.is_file())
+        .unwrap_or_else(|| dirs[0].join(file_name))
+}
+
+/// Moves finished model files from `old` into `new` when that's instant (a rename on the
+/// same drive); across drives they stay where they are and are still found there. Files
+/// already in `new` and unfinished downloads are left alone. Returns how many moved.
+pub fn move_models(old: &Path, new: &Path) -> usize {
+    let Ok(entries) = std::fs::read_dir(old) else {
+        return 0;
+    };
+    let mut moved = 0;
+    for entry in entries.flatten() {
+        let from = entry.path();
+        let is_model = from
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("gguf"));
+        let to = new.join(entry.file_name());
+        if is_model && from.is_file() && !to.exists() && std::fs::rename(&from, &to).is_ok() {
+            moved += 1;
+        }
+    }
+    moved
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_model_is_found_where_it_is_and_new_downloads_go_to_the_first_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let (new, old) = (dir.path().join("new"), dir.path().join("old"));
+        std::fs::create_dir_all(&new).unwrap();
+        std::fs::create_dir_all(&old).unwrap();
+        let dirs = [new.as_path(), old.as_path()];
+        assert_eq!(locate(&dirs, "a.gguf"), new.join("a.gguf"));
+        std::fs::write(old.join("a.gguf"), b"x").unwrap();
+        assert_eq!(locate(&dirs, "a.gguf"), old.join("a.gguf"));
+        std::fs::write(new.join("a.gguf"), b"x").unwrap();
+        assert_eq!(locate(&dirs, "a.gguf"), new.join("a.gguf"));
+    }
+
+    #[test]
+    fn finished_models_move_to_the_new_folder_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let (new, old) = (dir.path().join("new"), dir.path().join("old"));
+        std::fs::create_dir_all(&new).unwrap();
+        std::fs::create_dir_all(&old).unwrap();
+        std::fs::write(old.join("a.gguf"), b"old a").unwrap();
+        std::fs::write(old.join("b.gguf"), b"old b").unwrap();
+        std::fs::write(old.join("c.gguf.part"), b"half").unwrap();
+        std::fs::write(new.join("b.gguf"), b"new b").unwrap();
+        assert_eq!(move_models(&old, &new), 1);
+        assert_eq!(std::fs::read(new.join("a.gguf")).unwrap(), b"old a");
+        // One already there wins; the old copy stays (deleted with the app data).
+        assert_eq!(std::fs::read(new.join("b.gguf")).unwrap(), b"new b");
+        assert!(old.join("b.gguf").exists());
+        // Unfinished downloads aren't moved.
+        assert!(old.join("c.gguf.part").exists());
+        assert_eq!(move_models(&old, &new), 0);
+        assert_eq!(move_models(&dir.path().join("missing"), &new), 0);
+    }
+
     use super::*;
 
     const GB: u64 = 1024 * MB;

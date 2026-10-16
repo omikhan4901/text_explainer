@@ -139,6 +139,9 @@ by security, database and AI engineers before it reaches `main`:
       now updates WebView2 below 110.0.1587.40, and the app checks at start and asks for a
       Windows update instead of opening half working. The program file is Plainly.exe
       (was text-explainer.exe, which looked like a different app).
+- [x] Models go next to the app (the drive it was installed to, not always C:), and
+      uninstalling says how many GB of models stay and offers to delete them (owner).
+      The installer hooks are compile-checked with makensis (scripts/ci/check-installer-hooks.sh).
 - [ ] Not verified on Windows yet: the Look up box's focus and placement, app rules on
       real apps, the Windows voice, export through the save dialog
 

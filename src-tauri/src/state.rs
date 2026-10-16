@@ -20,7 +20,11 @@ use crate::popup::AiTask;
 
 pub struct Paths {
     pub settings: PathBuf,
+    /// Where models are downloaded: `models` next to the app, so they go on the drive the
+    /// person installed to (the owner's call, 16 October 2026: a nearly full C: drive).
     pub models: PathBuf,
+    /// Where models were downloaded before; still read, and moved from when that's instant.
+    pub old_models: PathBuf,
     pub logs: PathBuf,
     pub llama_server: PathBuf,
     pub dictionary: PathBuf,
@@ -35,7 +39,8 @@ impl Paths {
         let resources = app.path().resource_dir()?;
         Ok(Paths {
             settings: config.join("settings.json"),
-            models: data.join("models"),
+            models: models_dir(&resources, &data),
+            old_models: data.join("models"),
             logs: data.join("logs"),
             llama_server: resources
                 .join("resources")
@@ -46,9 +51,35 @@ impl Paths {
         })
     }
 
+    /// A catalog model's file: where it is, or where a new download goes.
     pub fn model_file(&self, m: &models::CatalogModel) -> PathBuf {
-        self.models.join(m.file_name)
+        models::locate(&[&self.models, &self.old_models], m.file_name)
     }
+
+    /// Every place a catalog model's file may be (deleting removes all of them).
+    pub fn model_files(&self, m: &models::CatalogModel) -> [PathBuf; 2] {
+        [
+            self.models.join(m.file_name),
+            self.old_models.join(m.file_name),
+        ]
+    }
+}
+
+/// `models` in the app's install folder when the app can write there, else in its data
+/// folder. Development builds keep using the data folder (the "install folder" is target/).
+fn models_dir(install: &std::path::Path, data: &std::path::Path) -> PathBuf {
+    let next_to_app = install.join("models");
+    if cfg!(debug_assertions) || !writable(&next_to_app) {
+        return data.join("models");
+    }
+    next_to_app
+}
+
+fn writable(dir: &std::path::Path) -> bool {
+    let probe = dir.join(".write-test");
+    let ok = std::fs::create_dir_all(dir).is_ok() && std::fs::write(&probe, b"").is_ok();
+    let _ = std::fs::remove_file(probe);
+    ok
 }
 
 /// The selection being explained, kept so changing the reading level can redo it.
