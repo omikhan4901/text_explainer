@@ -148,7 +148,7 @@ selection ─▶ UI Automation (or clipboard-safe copy) ─▶ repair PDF text �
 
 Rust · Tauri 2 · React + TypeScript · Tailwind CSS · Radix · llama.cpp · SQLite
 
-198 Rust tests, 37 front-end unit tests and 108 Playwright checks (journeys and WCAG 2.2 AA
+201 Rust tests, 37 front-end unit tests and 118 Playwright checks (journeys and WCAG 2.2 AA
 accessibility scans in light and dark) pass before every push. More in
 [`docs/GUIDE.md`](docs/GUIDE.md) and [`docs/marketing/architecture.md`](docs/marketing/architecture.md).
 

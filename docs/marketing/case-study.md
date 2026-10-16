@@ -68,7 +68,7 @@ anything leaving the computer. It must not get in the way of the work you are do
   (fewer false alarms on contract terms and shortened names), and the engine's prompt
   cache, sized by measurement after a memory-saving idea made answers 4 to 7 seconds
   slower.
-- 198 Rust tests, 37 front-end unit tests and 108 Playwright checks (journeys plus WCAG
+- 201 Rust tests, 37 front-end unit tests and 118 Playwright checks (journeys plus WCAG
   2.2 AA scans in light and dark), run before every push; every push also builds the
   Windows installer, smoke-tests it on a Windows runner and publishes it as the preview
   download.

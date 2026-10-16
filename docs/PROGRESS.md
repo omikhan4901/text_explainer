@@ -147,9 +147,9 @@ Decisions that belong to the owner (not built until decided):
 
 ## Numbers (for the marketing kit; measured, not estimated)
 
-- Tests (15 October 2026): 198 Rust (core and Windows crate, including end-to-end engine
+- Tests (16 October 2026): 201 Rust (core and Windows crate, including end-to-end engine
   tests against a stand-in llama-server, download tests against a flaky local server, and
-  the word book's SQLite tests), 37 front-end unit tests, 108 Playwright checks (journeys
+  the word book's SQLite tests), 37 front-end unit tests, 118 Playwright checks (journeys
   and WCAG 2.2 AA scans, each in light and dark).
 - Model evaluation (4-vCPU GitHub runner, no GPU, 56 rewrites per model; `docs/models.md`):
   Gemma 4 E2B 17.3 tok/s, 5.8 s median per answer (first words after 2.2 s), 3.9 GB

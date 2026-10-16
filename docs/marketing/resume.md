@@ -14,14 +14,17 @@ downloads until they exist.
 - Designed a deterministic meaning check that compares numbers, dates, acronyms and names
   between source and rewrite and flags omissions or invented facts in the UI.
 - Implemented selection capture through Windows UI Automation with a clipboard fallback
-  that snapshots and restores every clipboard format, and a non-activating popup that
-  never steals focus.
+  that snapshots and restores every clipboard format, and a popup that opens beside the
+  text without stealing focus from the app being read.
 - Built an evaluation harness that runs a 28-passage corpus through candidate models in
   parallel GitHub Actions jobs; chose Gemma 4 E2B as default (about 6 s median per rewrite
   on a 4-core CPU, 3.9 GB, fewest dropped facts), replacing a slower first choice, and
   sized the engine's prompt cache by measurement (first words 4x faster than with it off).
-- Wrote 111 Rust tests, 10 front-end tests and 38 Playwright journey and WCAG 2.2 AA
-  checks, gated in GitHub Actions on Linux and Windows with an installer built per push.
+- Wrote 201 Rust tests, 37 front-end unit tests and 118 Playwright journey and WCAG 2.2 AA
+  checks, run before every push; each push builds, smoke-tests and publishes a Windows
+  installer on a GitHub runner.
+- Shipped signed self-updates (minisign, Tauri updater): installed copies check hourly,
+  ask before installing, show download progress and refuse an unsigned build.
 
 **Keywords (ATS):** Rust, Tauri, TypeScript, React, Tailwind CSS, Radix UI, llama.cpp,
 GGUF, local LLM inference, prompt engineering, constrained decoding (GBNF), Win32 API,
