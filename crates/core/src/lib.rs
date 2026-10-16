@@ -30,3 +30,4 @@ pub mod models;
 pub mod rules;
 pub mod settings;
 pub mod sources;
+pub mod webview;

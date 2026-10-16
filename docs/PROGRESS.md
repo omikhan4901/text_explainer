@@ -134,6 +134,11 @@ by security, database and AI engineers before it reaches `main`:
       starting and then every hour (was 90 seconds and 6 hours, so new builds were
       rarely noticed), asked over the main window so the question is seen, quiet when
       offline; "Later" isn't asked again for that version by the hourly check.
+- [x] Owner's laptop, behind on Windows updates (16 October 2026): the app looked broken
+      until Windows Update ran, most likely an old WebView2 (not confirmed). The installer
+      now updates WebView2 below 110.0.1587.40, and the app checks at start and asks for a
+      Windows update instead of opening half working. The program file is Plainly.exe
+      (was text-explainer.exe, which looked like a different app).
 - [ ] Not verified on Windows yet: the Look up box's focus and placement, app rules on
       real apps, the Windows voice, export through the save dialog
 

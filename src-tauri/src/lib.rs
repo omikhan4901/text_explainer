@@ -46,6 +46,10 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let handle = app.handle().clone();
     let paths = Paths::resolve(&handle)?;
     init_logging(&paths);
+    if webview_unusable(&handle) {
+        // Nothing else starts: the message explains, and the app quits after it.
+        return Ok(());
+    }
     let settings = Settings::load(&paths.settings);
 
     let mut engine = Engine::new(Backend::None);
@@ -115,11 +119,12 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         tracing::warn!("double Ctrl+C won't work: {e}");
     }
 
+    // Written on every start, so the entry always points at this program file (it was
+    // text-explainer.exe until 16 October 2026; an entry left pointing there would do nothing).
     let autostart = handle.autolaunch();
-    let enabled = autostart.is_enabled().unwrap_or(false);
-    if settings.start_with_windows && !enabled {
+    if settings.start_with_windows {
         let _ = autostart.enable();
-    } else if !settings.start_with_windows && enabled {
+    } else if autostart.is_enabled().unwrap_or(false) {
         let _ = autostart.disable();
     }
 
@@ -184,6 +189,55 @@ fn spawn_shortcut_retry(app: AppHandle) {
             }
         }
     });
+}
+
+/// An old or missing WebView2 (a PC behind on Windows Update) draws a half-broken app, so
+/// the app says what to do and quits instead. Returns true when it does.
+fn webview_unusable(app: &AppHandle) -> bool {
+    if !cfg!(windows) {
+        return false;
+    }
+    let found = match tauri::webview_version() {
+        Ok(v) if !te_core::webview::too_old(&v) => return false,
+        Ok(v) => Some(v),
+        Err(_) => None,
+    };
+    tracing::warn!("WebView2 is too old or missing: {found:?}");
+    let min = te_core::webview::MIN_VERSION;
+    let message = match &found {
+        Some(v) => format!(
+            "Plainly needs a newer Microsoft Edge WebView2, the part of Windows that draws its \
+             windows. This computer has version {v}; Plainly needs {min} or newer.\n\nRun \
+             Windows Update, then open Plainly again."
+        ),
+        None => "Plainly needs Microsoft Edge WebView2, the part of Windows that draws its \
+                 windows, and it isn't on this computer.\n\nRun Windows Update, then open \
+                 Plainly again."
+            .to_string(),
+    };
+    let handle = app.clone();
+    // The native dialog waits for an answer; never on the main thread.
+    std::thread::spawn(move || {
+        use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+        use tauri_plugin_opener::OpenerExt;
+        let update = handle
+            .dialog()
+            .message(message)
+            .title("Plainly needs a Windows update")
+            .kind(MessageDialogKind::Warning)
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                "Open Windows Update".into(),
+                "Close".into(),
+            ))
+            .blocking_show();
+        if update {
+            let _ = handle
+                .opener()
+                .open_url("ms-settings:windowsupdate", None::<&str>);
+        }
+        handle.exit(0);
+    });
+    true
 }
 
 /// Frees the model's memory after the configured idle time.

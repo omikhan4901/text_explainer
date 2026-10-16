@@ -272,6 +272,22 @@ memory fit as the catalog (size plus half). The Model page and first run list th
 - **Dictionary**: `npm` dev dependencies `wordnet-db` and `wink-lexicon`;
   `scripts/build-dictionary.py` rebuilds it.
 
+## Installing
+
+The NSIS installer installs for the current user (no admin prompt) as `Plainly.exe`
+(`mainBinaryName`; until 16 October 2026 it was `text-explainer.exe`, the code package's
+name, which confused the owner on a fresh PC). Updating from an older install, a hook
+(`src-tauri/windows/installer-hooks.nsh`) closes a copy still running under the old name,
+the installer deletes the old file, and the app rewrites its start-with-Windows entry on
+every start so it points at the current file.
+
+The windows are drawn by Microsoft Edge WebView2. An old one (a PC behind on Windows
+Update) made the app look half broken on the owner's laptop, so: the installer updates
+WebView2 when it's older than `minimumWebview2Version` (installs it when missing), and the
+app checks again when it starts (`te_core::webview`, the same minimum). If it's still too
+old or missing, it shows one message ("Plainly needs a Windows update", with a button to
+Windows Update) and quits instead of opening half working.
+
 ## Updates
 
 Every push to `main` builds version `0.1.<run number>` (`installer.yml`). When the

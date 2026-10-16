@@ -41,6 +41,9 @@ Try each in **Notepad**, **Edge or Chrome**, **Microsoft Word** (if you have it)
       window. Drag it by its header: it follows the mouse. Drag its bottom right corner or
       any edge: the card and its web page resize together, and the next card opens at
       that size. Double-click the corner: it fits its content again.
+- [ ] Task Manager shows the app as **Plainly.exe** (not text-explainer.exe), and after
+      updating from an older build there's no text-explainer.exe left in the install
+      folder. With "Start with Windows" on, it starts after a restart.
 - [ ] Accept an update: the main window shows the download with its size, then
       "Installing", then the new version opens.
 - [ ] Google and Bing pages fit the card (no sideways scrolling). Click into Google's
