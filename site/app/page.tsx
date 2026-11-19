@@ -15,6 +15,25 @@ import { Reveal } from "./reveal";
 const DOWNLOAD = "https://github.com/omikhan4901/text_explainer/releases/download/latest-build/Plainly-x64-setup.exe";
 const REPO = "https://github.com/omikhan4901/text_explainer";
 
+// Every answer is something the README says is built today.
+const FAQ: [string, string][] = [
+  ["Is Plainly free?", "Yes. It's a free preview for Windows 10 and 11, and its source code is open under the MIT licence."],
+  [
+    "Does my text leave my computer?",
+    "Not for the AI or the dictionary: both run on your own computer. The web tabs (Google, Bing, Wikipedia and others) are like visiting those sites and load only when you open them. Offline only turns them all off.",
+  ],
+  ["What do I need to run it?", "A 64-bit Windows 10 or 11 PC. The default model is comfortable on 8 GB of memory and needs no graphics card. There's no account to create."],
+  [
+    "Which apps does it work in?",
+    "Anywhere you can select text: PDF readers, Word, email, chat apps and browsers. Select, then press Ctrl+Shift+Space, or press Ctrl+C twice. It never reads text in password managers or in apps you add to its list.",
+  ],
+  [
+    "Which languages can it translate?",
+    "The AI on your computer translates into languages such as Bangla, Hindi, Urdu, Arabic, Spanish, French, German, Chinese and Japanese. How well depends on the model and the language.",
+  ],
+  ["Is it on Mac or Linux?", "Not yet. Plainly is Windows only for now."],
+];
+
 function DownloadButton({ size = "md" }: { size?: "sm" | "md" }) {
   const box = size === "sm" ? "h-9 px-3.5 text-[13.5px]" : "h-12 px-5 text-[15px]";
   return (
@@ -133,6 +152,38 @@ export default function Home() {
               .
             </p>
           </div>
+        </section>
+
+        {/* Questions people search for, answered from the README. Also as FAQPage data. */}
+        <section id="faq" className="scroll-mt-16 border-t border-line">
+          <div className="mx-auto max-w-3xl px-5 py-24 md:px-8 md:py-28">
+            <Reveal>
+              <h2 className="text-4xl leading-[1.05] font-semibold tracking-[-0.03em] md:text-5xl">Questions</h2>
+            </Reveal>
+            <div className="mt-10 divide-y divide-line border-y border-line">
+              {FAQ.map(([q, a]) => (
+                <details key={q} className="group py-5">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-6 text-[18px] font-medium">
+                    {q}
+                    <span aria-hidden="true" className="text-muted transition-transform duration-300 group-open:rotate-45">
+                      +
+                    </span>
+                  </summary>
+                  <p className="mt-3 max-w-[60ch] text-[16px] leading-relaxed text-muted">{a}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify({
+                "@context": "https://schema.org",
+                "@type": "FAQPage",
+                mainEntity: FAQ.map(([q, a]) => ({ "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: a } })),
+              }),
+            }}
+          />
         </section>
 
         {/* Download. */}

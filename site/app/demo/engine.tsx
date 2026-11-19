@@ -40,6 +40,8 @@ export function Stage({
     <div
       ref={frame}
       role="img"
+      // Demo UI text (the same clause many times) is not what the page is about: keep it out of search snippets.
+      data-nosnippet=""
       aria-label={label}
       className="stage-frame relative"
       style={{
