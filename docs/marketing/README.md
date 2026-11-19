@@ -9,7 +9,8 @@ Everything here describes what is built and tested today. Numbers come from
   Word book, Look up, privacy) and a Bangla launch post, each with its screenshot
 - [LinkedIn post](linkedin.md) (draft: post it when the first release is out)
 - [Architecture one-pager](architecture.md)
-- [Demo video script](demo-script.md) (record it when the first release is out)
+- [Launch film](video/plan.md): an 84 s narrated film built from the real interface; script,
+  storyboard and rebuild steps (the earlier [demo script](demo-script.md) is superseded)
 
 Screenshots are in `docs/screenshots/`. Until the Windows release, they are of the real
 interface running in a browser against the app's built-in mock, not of the installed app.

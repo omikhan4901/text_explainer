@@ -15,13 +15,17 @@ For contracts, papers, letters and any word you don't know, in every app, not on
 
 <br>
 
-<img src="docs/screenshots/demo.gif" alt="The card: it opens on a Google search, then Explain with AI rewrites a lease clause in plain English, then translates it into Bangla on the computer" width="480">
+<img src="docs/screenshots/demo.gif" alt="A lease clause is selected in a PDF, Ctrl+Shift+Space opens the Plainly card beside it, and Explain with AI rewrites it in plain English while the reading grade drops from 17 to 9" width="600">
+
+<sub>Animations from <a href="https://plainly.omikhan.com">the website</a>, drawn from the card's real layout and texts.</sub>
 
 </div>
 
 <br>
 
 ## Before and after
+
+<p align="center"><img src="docs/screenshots/morph.gif" alt="The words of a lease clause that survive the rewrite move into the plain version, the rest fall away, the facts $1,200, 5th and Lessee light up, and the reading grade counts down from 17 to 9" width="720"></p>
 
 <table>
 <tr>
@@ -39,7 +43,7 @@ For contracts, papers, letters and any word you don't know, in every app, not on
 <table>
 <tr>
 <td width="50%" valign="top">
-<img src="docs/screenshots/feature-explain.png" alt="The card with the lease clause rewritten in plain language, the Simpler, Plain, Clearer switch and the grade going from 17 to 9">
+<img src="docs/screenshots/levels.gif" alt="The Simpler, Plain and Clearer switch: the card rewrites the lease clause at each level and the reading grade changes to 5, 9 and 11">
 <h3>Explain in plain words</h3>
 A small AI on your own computer rewrites jargon at the level you pick, right under what you
 selected, keeps every number, date and name, and shows the reading grade before and after.
