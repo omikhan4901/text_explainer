@@ -15,8 +15,9 @@ npx next build     # the production build Vercel runs
 ```
 
 `scripts/check.sh` type-checks and builds it when `site/node_modules` exists. Vercel
-redeploys on every push that changes `site/` (`vercel.json` skips the rest); the Windows
-installer build skips site-only changes.
+redeploys on every push that changes `site/` since its last deploy (`vercel.json` compares
+with `VERCEL_GIT_PREVIOUS_SHA`, not the previous commit, because Vercel only builds a push's
+newest commit); the Windows installer build skips site-only changes.
 
 ## Hosting it on plainly.omikhan.com with Vercel (once)
 
