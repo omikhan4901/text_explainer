@@ -15,6 +15,7 @@
   --saffron: #e7b46a;
   --mark: rgb(231 180 106 / 0.42);
   --shadow: 0 1px 2px rgb(27 27 26 / 0.04), 0 24px 48px -24px rgb(27 27 26 / 0.18);
+  --key-lip: #d3d3cd;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -30,6 +31,7 @@
     --ink-hover: #ffffff;
     --mark: rgb(231 180 106 / 0.3);
     --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 24px 48px -24px rgb(0 0 0 / 0.6);
+    --key-lip: #0c0c0b;
     color-scheme: dark;
   }
 }
@@ -159,6 +161,24 @@ p {
 
 kbd {
   font-family: var(--font-mono);
+}
+
+/* Stage keeps a fixed design size and scales it to the parent (capped at 1.25).
+   The container rule is the same formula as the resize observer, so the box is
+   the right height before hydration. */
+.stage-frame {
+  width: 100%;
+  container-type: inline-size;
+  height: calc(var(--stage-h) * 1px * min(1.25, 100cqi / (var(--stage-w) * 1px)));
+}
+.stage-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(var(--stage-w) * 1px);
+  height: calc(var(--stage-h) * 1px);
+  transform-origin: top left;
+  transform: scale(min(1.25, 100cqi / (var(--stage-w) * 1px)));
 }
 
 /* The hero's highlight draws itself once the page has loaded. */
