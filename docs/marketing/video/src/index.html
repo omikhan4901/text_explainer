@@ -1,0 +1,1962 @@
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[{"id":"layer","type":"enum","label":"Layer","default":"all","options":[{"value":"all","label":"Everything"},{"value":"picture","label":"Picture without headlines"},{"value":"text","label":"Headlines only (transparent)"}]}]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Plainly launch video</title>
+    <script src="assets/js/gsap.min.js"></script>
+    <!-- @app-css -->
+    <style>
+      @font-face {
+        font-family: "Geist Variable";
+        font-weight: 100 900;
+        src: url(assets/app/geist-latin-wght-normal-BgDaEnEv.woff2) format("woff2-variations");
+      }
+      @font-face {
+        font-family: "Geist Mono Variable";
+        font-weight: 100 900;
+        src: url(assets/app/geist-mono-latin-wght-normal-XN7g48iV.woff2) format("woff2-variations");
+      }
+      @font-face {
+        font-family: "Source Serif 4";
+        font-weight: 400;
+        src: url(assets/app/source-serif-4-latin-400-normal-DJ5YJwmz.woff2) format("woff2");
+      }
+      /* System fonts named in the app's fallback stacks (never reached here). */
+      @font-face { font-family: "Cascadia Mono"; src: local("Cascadia Mono"); }
+      @font-face { font-family: "SFMono-Regular"; src: local("SFMono-Regular"); }
+      @font-face { font-family: "Apple Color Emoji"; src: local("Apple Color Emoji"); }
+      @font-face { font-family: "Segoe UI Emoji"; src: local("Segoe UI Emoji"); }
+      @font-face { font-family: "Segoe UI Symbol"; src: local("Segoe UI Symbol"); }
+      @font-face {
+        font-family: "Source Serif 4";
+        font-weight: 600;
+        src: url(assets/app/source-serif-4-latin-600-normal-DouSKlru.woff2) format("woff2");
+      }
+
+      :root {
+        --paper: #f5f5f4;
+        --ink: #1b1b1a;
+        --muted: #64645f;
+        --night: #0e0e0d;
+        --saffron: #e7b46a;
+        --mark: rgb(231 180 106 / 0.55);
+        --sel: rgb(231 180 106 / 0.5);
+        --ease: cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        background: var(--paper);
+        overflow: hidden;
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: "Geist Variable", system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      /* The captured interface never animates on its own: the timeline drives it. */
+      .ui,
+      .ui * {
+        transition: none !important;
+        animation: none !important;
+      }
+      .scene {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+      }
+      .night {
+        background: var(--night);
+        color: #ededea;
+      }
+      /* The root is paper already; scenes stay transparent so transitions can overlap. */
+      .paper {
+        background: none;
+      }
+      .layer {
+        position: absolute;
+        inset: 0;
+      }
+
+      /* Headlines: words rise out of a mask; the key words get the saffron highlighter. */
+      .hl {
+        position: absolute;
+        margin: 0;
+        font-family: "Geist Variable", system-ui, sans-serif;
+        font-weight: 600;
+        letter-spacing: -0.035em;
+        line-height: 1.04;
+        color: var(--ink);
+      }
+      .hl .wm {
+        display: inline-block;
+        overflow: hidden;
+        vertical-align: top;
+        padding: 0 0.03em 0.16em;
+        margin: 0 -0.03em -0.16em;
+      }
+      .hl .w {
+        display: inline-block;
+      }
+      mark {
+        background: none;
+        color: inherit;
+      }
+      .hl mark,
+      .mk {
+        background-image: linear-gradient(var(--mark), var(--mark));
+        background-repeat: no-repeat;
+        background-position: 0 86%;
+        background-size: 0% 0.4em;
+        box-decoration-break: clone;
+        -webkit-box-decoration-break: clone;
+        border-radius: 0.1em;
+      }
+      .hl-night {
+        color: #ededea;
+      }
+      .sub {
+        position: absolute;
+        margin: 0;
+        font-size: 40px;
+        line-height: 1.35;
+        letter-spacing: -0.012em;
+        color: var(--muted);
+        font-weight: 450;
+      }
+
+      /* Cursors */
+      .cursor {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 34px;
+        height: 34px;
+        z-index: 50;
+        opacity: 0;
+        filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.25));
+      }
+      .cursor.ibeam {
+        width: 30px;
+        height: 44px;
+      }
+
+      /* Windows of other apps (generic, no real product's look) */
+      .win {
+        position: absolute;
+        background: #fff;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow:
+          0 0 0 1px rgb(27 27 26 / 0.08),
+          0 2px 6px rgb(27 27 26 / 0.05),
+          0 40px 80px -24px rgb(27 27 26 / 0.3);
+      }
+      .win-bar {
+        height: 46px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding-left: 18px;
+        font-size: 15px;
+        font-weight: 500;
+        color: #3a3a37;
+        background: #f7f7f6;
+        border-bottom: 1px solid #e9e9e6;
+      }
+      .win-bar svg {
+        width: 18px;
+        height: 18px;
+        color: #8a8a84;
+      }
+      .win-ctl {
+        margin-left: auto;
+        display: flex;
+        height: 100%;
+      }
+      .win-ctl i {
+        display: block;
+        position: relative;
+        width: 50px;
+        height: 100%;
+      }
+      .win-ctl i::before,
+      .win-ctl i::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        background: #6b6b66;
+      }
+      .win-ctl .min::before {
+        width: 11px;
+        height: 1.2px;
+        margin-left: -5.5px;
+      }
+      .win-ctl .max::before {
+        width: 10px;
+        height: 10px;
+        margin: -5px 0 0 -5px;
+        background: none;
+        border: 1.2px solid #6b6b66;
+        border-radius: 2px;
+      }
+      .win-ctl .cls::before,
+      .win-ctl .cls::after {
+        width: 13px;
+        height: 1.2px;
+        margin-left: -6.5px;
+        transform: rotate(45deg);
+      }
+      .win-ctl .cls::after {
+        transform: rotate(-45deg);
+      }
+      .win-tools {
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 28px;
+        font-size: 13px;
+        color: #6b6b66;
+        background: #fbfbfa;
+        border-bottom: 1px solid #ececea;
+        font-family: "Geist Mono Variable", monospace;
+      }
+      .pdf-bg {
+        background: #e8e8e5;
+        position: absolute;
+        inset: 86px 0 0 0;
+        overflow: hidden;
+      }
+      .pdf-page {
+        position: absolute;
+        left: 50%;
+        top: 34px;
+        width: 860px;
+        margin-left: -430px;
+        background: #fff;
+        padding: 64px 76px 80px;
+        box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+        font-family: "Source Serif 4", Georgia, serif;
+        color: #26261f;
+      }
+      .doc-h {
+        font-family: "Source Serif 4", Georgia, serif;
+        font-weight: 600;
+        font-size: 24px;
+        margin: 0 0 20px;
+      }
+      .doc-p {
+        font-size: 22px;
+        line-height: 1.62;
+        margin: 0 0 18px;
+      }
+      .doc-dim {
+        color: #9a9a92;
+      }
+      .sw {
+        border-radius: 2px;
+      }
+
+      /* Scene 1: jargon */
+      .s1-cam {
+        position: absolute;
+        inset: 0;
+      }
+      .frag {
+        position: absolute;
+        left: 170px;
+        right: 170px;
+        top: 300px;
+      }
+      .frag-k {
+        font-family: "Geist Mono Variable", monospace;
+        font-size: 19px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #8d8d87;
+        margin-bottom: 26px;
+      }
+      .frag-t {
+        margin: 0;
+        font-family: "Source Serif 4", Georgia, serif;
+        font-size: 112px;
+        line-height: 1.06;
+        letter-spacing: -0.015em;
+        color: #ededea;
+      }
+
+      /* Scene 2: re-reading */
+      #s2 {
+        perspective: 1800px;
+      }
+      .s2-cam {
+        position: absolute;
+        inset: 0;
+        transform-style: preserve-3d;
+      }
+      .page {
+        position: absolute;
+        left: 330px;
+        top: 70px;
+        width: 1260px;
+        padding: 56px 80px 64px;
+        background: #fbfbf9;
+        border-radius: 6px;
+        box-shadow: 0 40px 90px -30px rgb(0 0 0 / 0.7);
+        font-family: "Source Serif 4", Georgia, serif;
+        color: #23231d;
+      }
+      .page-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        font-family: "Geist Mono Variable", monospace;
+        font-size: 16px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #8d8d87;
+        margin-bottom: 34px;
+      }
+      .readcount {
+        position: relative;
+        color: var(--ink);
+        letter-spacing: 0.08em;
+      }
+      #rcn {
+        display: inline-block;
+      }
+      #rcn .v {
+        display: none;
+      }
+      .page .doc-p {
+        font-size: 33px;
+        line-height: 1.6;
+        margin: 0 0 26px;
+        position: relative;
+      }
+      .rd {
+        position: absolute;
+        height: 3px;
+        width: 0;
+        background: rgb(27 27 26 / 0.55);
+        border-radius: 2px;
+      }
+
+      /* The desk: the PDF window, the card, the keys */
+      #desk {
+        perspective: 2200px;
+      }
+      .desk-cam {
+        position: absolute;
+        inset: 0;
+        transform-style: preserve-3d;
+      }
+      .cardpos {
+        position: absolute;
+      }
+      .cardpos .zoom {
+        position: relative;
+      }
+      .cardpos .zoom > [role="dialog"] {
+        width: 480px;
+      }
+      .cardpos .stack {
+        position: relative;
+        width: 480px;
+      }
+      .cardpos .stack > .slot {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 480px;
+      }
+      .cardpos .stack > .slot:first-child {
+        position: relative;
+      }
+      .tok {
+        opacity: 0;
+      }
+      .grade-to .v {
+        display: none;
+      }
+      .keys {
+        position: absolute;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: center;
+        gap: 22px;
+        z-index: 60;
+      }
+      .key {
+        height: 124px;
+        min-width: 160px;
+        padding: 0 34px;
+        display: grid;
+        place-items: center;
+        background: #fff;
+        border-radius: 24px;
+        font-size: 36px;
+        font-weight: 550;
+        letter-spacing: -0.01em;
+        color: var(--ink);
+        opacity: 0;
+        box-shadow:
+          0 0 0 1px rgb(27 27 26 / 0.09),
+          0 10px 0 #d6d6d1,
+          0 26px 44px -12px rgb(27 27 26 / 0.35);
+      }
+      .key.wide {
+        min-width: 380px;
+      }
+      .keys.small {
+        gap: 12px;
+      }
+      .keys.small .key {
+        height: 64px;
+        min-width: 76px;
+        padding: 0 18px;
+        border-radius: 14px;
+        font-size: 22px;
+        box-shadow:
+          0 0 0 1px rgb(27 27 26 / 0.09),
+          0 6px 0 #d6d6d1,
+          0 16px 28px -10px rgb(27 27 26 / 0.3);
+      }
+      .keys.small .key.wide {
+        min-width: 170px;
+      }
+      .plus {
+        align-self: center;
+        font-size: 22px;
+        color: var(--muted);
+        opacity: 0;
+      }
+
+      /* Every app */
+      #apps {
+        perspective: 2400px;
+      }
+      .browser-tabs {
+        height: 46px;
+        display: flex;
+        align-items: flex-end;
+        gap: 6px;
+        padding-left: 14px;
+        background: #efefed;
+      }
+      .browser-tab {
+        height: 36px;
+        padding: 0 18px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #fff;
+        border-radius: 10px 10px 0 0;
+        font-size: 14px;
+        color: #3a3a37;
+      }
+      .browser-url {
+        height: 44px;
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        background: #fff;
+        border-bottom: 1px solid #ececea;
+      }
+      .browser-url span {
+        flex: 1;
+        height: 30px;
+        border-radius: 15px;
+        background: #f1f1ef;
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        font-size: 14px;
+        color: #6b6b66;
+      }
+      .article {
+        padding: 34px 48px;
+      }
+      .article .kicker {
+        font-family: "Geist Mono Variable", monospace;
+        font-size: 13px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #8d8d87;
+        margin-bottom: 12px;
+      }
+      .article h3 {
+        font-family: "Source Serif 4", Georgia, serif;
+        font-weight: 600;
+        font-size: 30px;
+        line-height: 1.2;
+        margin: 0 0 18px;
+        letter-spacing: -0.005em;
+      }
+      .article .doc-p {
+        font-size: 20px;
+        line-height: 1.6;
+      }
+      .mail-head {
+        padding: 26px 40px 18px;
+        border-bottom: 1px solid #ececea;
+        font-size: 15px;
+        color: #6b6b66;
+        line-height: 1.7;
+      }
+      .mail-head b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .mail-head .subj {
+        font-size: 24px;
+        color: var(--ink);
+        font-weight: 600;
+        letter-spacing: -0.015em;
+        margin-bottom: 6px;
+      }
+      .mail-body {
+        padding: 26px 40px;
+        font-size: 19px;
+        line-height: 1.65;
+        color: #2c2c28;
+      }
+      .mail-body p {
+        margin: 0 0 14px;
+      }
+
+      /* Words: the Look up box */
+      .typed {
+        font-size: 17px;
+        color: var(--text);
+      }
+      .typed .c {
+        display: none;
+      }
+      .caret {
+        display: inline-block;
+        width: 1.5px;
+        height: 22px;
+        margin-left: 1px;
+        vertical-align: -5px;
+        background: var(--ink);
+      }
+
+      /* Languages ticker */
+      .ticker {
+        position: absolute;
+        height: 60px;
+        font-size: 40px;
+        color: var(--muted);
+      }
+      .ticker-v {
+        position: relative;
+        display: inline-block;
+        width: 300px;
+        height: 1.3em;
+        vertical-align: top;
+        margin-left: 0.25em;
+        color: var(--ink);
+      }
+      .ticker .l {
+        position: absolute;
+        left: 0;
+        top: 0;
+        white-space: nowrap;
+        opacity: 0;
+      }
+
+      /* Outro */
+      .logo {
+        position: absolute;
+        left: 50%;
+        top: 168px;
+        width: 220px;
+        height: 220px;
+        margin-left: -110px;
+      }
+      .credit {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 34px;
+        text-align: center;
+        font-size: 16px;
+        color: #8d8d87;
+        letter-spacing: 0.01em;
+      }
+      .url {
+        position: absolute;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-family: "Geist Mono Variable", monospace;
+        font-size: 34px;
+        color: var(--ink);
+        letter-spacing: -0.01em;
+      }
+
+      /* ---- Set pieces ---------------------------------------------------------------- */
+
+      /* Jargon tunnel: phrases in 3D depth, the camera flying through. */
+      #s1 {
+        perspective: 1000px;
+      }
+      .tunnel {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 0;
+        height: 0;
+        transform-style: preserve-3d;
+      }
+      .tw {
+        position: absolute;
+        left: 0;
+        top: 0;
+        white-space: nowrap;
+        font-family: "Source Serif 4", Georgia, serif;
+        color: #a3a39c;
+        opacity: 0;
+      }
+      .frag {
+        z-index: 5;
+        opacity: 0;
+      }
+
+      /* Highlighter wipes: a saffron stroke leading an ink or paper panel. */
+      .wipe {
+        position: absolute;
+        top: -160px;
+        left: 0;
+        width: 2700px;
+        height: 1400px;
+        z-index: 100;
+        display: flex;
+        pointer-events: none;
+      }
+      .wipe .body {
+        flex: 1;
+      }
+      .wipe .band {
+        width: 150px;
+        background: var(--saffron);
+      }
+      .wipe .band.thin {
+        width: 34px;
+        background: #f0cf9b;
+      }
+      #wipe-ink .body {
+        background: var(--ink);
+      }
+      #wipe-paper .body {
+        background: var(--paper);
+      }
+
+      /* Morph: hard text becomes plain text, word by word. */
+      .mo-box {
+        position: absolute;
+        left: 140px;
+        top: 250px;
+        width: 1260px;
+      }
+      .mo-p {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+      }
+      .mo-src {
+        font-family: "Source Serif 4", Georgia, serif;
+        font-size: 64px;
+        line-height: 1.32;
+        color: #3a3a35;
+      }
+      .mo-dst {
+        font-size: 76px;
+        line-height: 1.24;
+        font-weight: 500;
+        letter-spacing: -0.022em;
+        color: var(--ink);
+      }
+      .mw {
+        display: inline-block;
+        border-radius: 0.1em;
+      }
+      .mo-dst .mw {
+        opacity: 0;
+      }
+      .kicker {
+        position: absolute;
+        font-family: "Geist Mono Variable", monospace;
+        font-size: 19px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .kicker .v {
+        display: none;
+      }
+      .biggrade {
+        position: absolute;
+        right: 130px;
+        top: 228px;
+        text-align: right;
+      }
+      .biggrade .num {
+        font-size: 260px;
+        line-height: 1;
+        font-weight: 600;
+        letter-spacing: -0.06em;
+        font-variant-numeric: tabular-nums;
+        color: var(--ink);
+      }
+      .biggrade .num .v {
+        display: none;
+      }
+      .fact-note {
+        position: absolute;
+        left: 140px;
+        top: 720px;
+        font-size: 40px;
+        font-weight: 500;
+        letter-spacing: -0.015em;
+        color: var(--ink);
+      }
+
+      /* Levels carousel */
+      #levels {
+        perspective: 2200px;
+      }
+      .ring {
+        position: absolute;
+        left: 50%;
+        top: 268px;
+        width: 0;
+        height: 0;
+        transform-style: preserve-3d;
+      }
+      .lv {
+        position: absolute;
+        left: -288px;
+        top: 0;
+        width: 576px;
+        zoom: 1;
+      }
+      .lvnum {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: -112px;
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        gap: 14px;
+        color: var(--ink);
+      }
+      .lvnum .k {
+        font-family: "Geist Mono Variable", monospace;
+        font-size: 18px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .lvnum b {
+        font-size: 84px;
+        line-height: 1;
+        font-weight: 600;
+        letter-spacing: -0.05em;
+      }
+      .lv-ctrl {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 958px;
+        display: flex;
+        justify-content: center;
+      }
+      .lv .slot {
+        zoom: 1.2;
+      }
+      .lv .slot > [role="dialog"] {
+        width: 480px;
+      }
+
+      /* Translate: walls of language names drift behind the card. */
+      .wall {
+        position: absolute;
+        left: 0;
+        white-space: nowrap;
+        font-size: 150px;
+        font-weight: 600;
+        letter-spacing: -0.03em;
+        color: #e9e9e6;
+        line-height: 1;
+      }
+
+      /* Private: a Wi-Fi mark that draws itself and is struck through. */
+      .wifi {
+        position: absolute;
+        left: 50%;
+        top: 96px;
+        width: 220px;
+        height: 220px;
+        margin-left: -110px;
+        overflow: visible;
+      }
+
+      /* Check: facts linked across the two texts. */
+      .panel {
+        position: absolute;
+        z-index: 2;
+        top: 300px;
+        width: 640px;
+        padding: 30px 36px 34px;
+        border-radius: 18px;
+        background: #fff;
+        box-shadow:
+          0 0 0 1px rgb(27 27 26 / 0.07),
+          0 30px 60px -30px rgb(27 27 26 / 0.25);
+      }
+      .panel .k {
+        font-family: "Geist Mono Variable", monospace;
+        font-size: 16px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 16px;
+      }
+      .panel p {
+        margin: 0;
+      }
+      #ck-src p {
+        font-family: "Source Serif 4", Georgia, serif;
+        font-size: 31px;
+        line-height: 1.5;
+        color: #2c2c28;
+      }
+      #ck-dst p {
+        font-size: 34px;
+        line-height: 1.45;
+        font-weight: 450;
+        letter-spacing: -0.01em;
+        color: var(--ink);
+      }
+      .fact {
+        border-radius: 0.12em;
+        background-image: linear-gradient(var(--mark), var(--mark));
+        background-repeat: no-repeat;
+        background-position: 0 0;
+        background-size: 0% 100%;
+      }
+      #ck-lines {
+        position: absolute;
+        inset: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: visible;
+        pointer-events: none;
+      }
+      .ck-warn {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 860px;
+        display: flex;
+        justify-content: center;
+      }
+      .pulse {
+        position: absolute;
+        width: 140px;
+        height: 140px;
+        margin: -70px 0 0 -70px;
+        border-radius: 50%;
+        border: 5px solid var(--saffron);
+        opacity: 0;
+        pointer-events: none;
+        z-index: 80;
+      }
+      .brand-logo {
+        position: absolute;
+        left: 50%;
+        top: 220px;
+        width: 220px;
+        height: 220px;
+        margin-left: -110px;
+      }
+      .brand-word {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 480px;
+        text-align: center;
+        font-size: 270px;
+        line-height: 1;
+        font-weight: 650;
+        letter-spacing: -0.05em;
+        color: #f5f5f4;
+      }
+      /* Layers for editing (see the "layer" variable). The words are the headlines and the lines
+         under them; the cards' own text stays part of the picture. */
+      html[data-layer="picture"] .hl,
+      html[data-layer="picture"] .sub,
+      html[data-layer="picture"] #end-url,
+      html[data-layer="picture"] #credit,
+      html[data-layer="picture"] #ticker,
+      html[data-layer="picture"] #mo-note {
+        visibility: hidden !important;
+      }
+      html[data-layer="text"],
+      html[data-layer="text"] body,
+      html[data-layer="text"] #root,
+      html[data-layer="text"] .scene {
+        background: transparent !important;
+      }
+      /* Text layer: hide everything that is not words, piece by piece, so each scene's own
+         timing (the runtime hides scenes outside their time) still applies to its words. */
+      html[data-layer="text"] .wipe,
+      html[data-layer="text"] #tunnel,
+      html[data-layer="text"] .s1-cam,
+      html[data-layer="text"] .s2-cam,
+      html[data-layer="text"] #brand-cam,
+      html[data-layer="text"] #deskshake,
+      html[data-layer="text"] #keys3,
+      html[data-layer="text"] #mo-k,
+      html[data-layer="text"] #mo-box,
+      html[data-layer="text"] .biggrade,
+      html[data-layer="text"] #ring,
+      html[data-layer="text"] #lv-ctrl,
+      html[data-layer="text"] #app-a,
+      html[data-layer="text"] #app-b,
+      html[data-layer="text"] #ib6,
+      html[data-layer="text"] .wall,
+      html[data-layer="text"] #trcard,
+      html[data-layer="text"] #wifi-shake,
+      html[data-layer="text"] #lookpos,
+      html[data-layer="text"] #wordpos,
+      html[data-layer="text"] #mainpos,
+      html[data-layer="text"] .panel,
+      html[data-layer="text"] #ck-lines,
+      html[data-layer="text"] .ck-warn,
+      html[data-layer="text"] #logo,
+      html[data-layer="text"] .pulse {
+        visibility: hidden !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="plainly" data-start="0" data-width="1920" data-height="1080" data-duration="{{total}}">
+      <!-- 1. Jargon: a tunnel of hard words, four hits in front -->
+      <section id="s1" class="clip scene night" data-start="{{s1.start}}" data-duration="{{s1.dur}}" data-track-index="1">
+        <div class="tunnel" id="tunnel"></div>
+        <div class="s1-cam">
+          <div class="frag" id="f1">
+            <div class="frag-k">Lease agreement · clause 7.2</div>
+            <p class="frag-t">Notwithstanding any provision to the contrary</p>
+          </div>
+          <div class="frag" id="f2">
+            <div class="frag-k">Tax notice</div>
+            <p class="frag-t">Pursuant to Section 12(b)(iii)</p>
+          </div>
+          <div class="frag" id="f3">
+            <div class="frag-k">Discharge summary</div>
+            <p class="frag-t">Idiopathic thrombocytopenic purpura</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Re-reading -->
+      <section id="s2" class="clip scene night" data-start="{{s2.start}}" data-duration="{{s2.dur}}" data-track-index="2">
+        <div class="s2-cam">
+          <div class="page" id="page2">
+            <div class="page-head">
+              <span>Residential lease agreement · page 4</span>
+              <span class="readcount">Read <span id="rcn"><span class="v">1×</span><span class="v">2×</span><span class="v">3×</span></span></span>
+            </div>
+            <p class="doc-p doc-dim">7.1 The term of this Lease shall commence on the Commencement Date and continue for twelve (12) months thereafter.</p>
+            <p class="doc-p" id="clause2">7.2 Notwithstanding any provision of this Agreement to the contrary, the Lessee shall remit payment of the monthly rent of $1,200 no later than the 5th day of each calendar month, failing which a late fee equivalent to 5% of the outstanding amount shall accrue.</p>
+            <p class="doc-p doc-dim">7.3 All payments shall be made by electronic transfer to the account designated by the Lessor in writing.</p>
+          </div>
+        </div>
+        <h2 class="hl hl-night" id="hl-still" style="left: 0; right: 0; top: 862px; text-align: center; font-size: 84px">Still not sure what it says?</h2>
+      </section>
+
+      <!-- 2b. The drop: "Plainly." -->
+      <section id="brand" class="clip scene night" data-start="{{brand.start}}" data-duration="{{brand.dur}}" data-track-index="13">
+        <div class="layer" id="brand-shake">
+          <div class="layer" id="brand-cam">
+            <svg class="brand-logo" id="brand-logo" viewBox="0 0 512 512"><rect x="32" y="32" width="448" height="448" rx="104" fill="#ededea" /><rect x="120" y="146" width="272" height="38" rx="19" fill="#9a9a92" /><rect x="120" y="236" width="80" height="38" rx="19" fill="#9a9a92" /><rect x="226" y="228" width="166" height="56" rx="28" fill="#e7b46a" /><rect x="120" y="328" width="194" height="38" rx="19" fill="#9a9a92" /></svg>
+            <div class="brand-word" id="brand-word">Plainly</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3 and 4. The desk: select, press, the card opens and explains -->
+      <section id="desk" class="clip scene paper" data-start="{{desk.start}}" data-duration="{{desk.dur}}" data-track-index="3">
+        <div class="layer" id="deskshake">
+        <div class="desk-cam" id="deskcam">
+          <div class="win" id="pdfwin" style="left: 100px; top: 140px; width: 1270px; height: 800px">
+            <div class="win-bar">
+              <svg viewBox="0 0 256 256" fill="currentColor"><path d="M224,152a8,8,0,0,1-8,8H192v16h16a8,8,0,0,1,0,16H192v16a8,8,0,0,1-16,0V152a8,8,0,0,1,8-8h32A8,8,0,0,1,224,152ZM92,172a28,28,0,0,1-28,28H56v8a8,8,0,0,1-16,0V152a8,8,0,0,1,8-8H64A28,28,0,0,1,92,172Zm-16,0a12,12,0,0,0-12-12H56v24h8A12,12,0,0,0,76,172Zm88,8a36,36,0,0,1-36,36H112a8,8,0,0,1-8-8V152a8,8,0,0,1,8-8h16A36,36,0,0,1,164,180Zm-16,0a20,20,0,0,0-20-20h-8v40h8A20,20,0,0,0,148,180ZM40,112V40A16,16,0,0,1,56,24h96a8,8,0,0,1,5.66,2.34l56,56A8,8,0,0,1,216,88v24a8,8,0,0,1-16,0V96H152a8,8,0,0,1-8-8V40H56v72a8,8,0,0,1-16,0ZM160,80h28.69L160,51.31Z" /></svg>
+              <span>Lease Agreement.pdf</span>
+              <span class="win-ctl"><i class="min"></i><i class="max"></i><i class="cls"></i></span>
+            </div>
+            <div class="win-tools"><span>4 / 9</span><span>100%</span></div>
+            <div class="pdf-bg">
+              <div class="pdf-page">
+                <p class="doc-h">7. Rent and payment</p>
+                <p class="doc-p doc-dim">7.1 The term of this Lease shall commence on the Commencement Date and continue for twelve (12) months thereafter.</p>
+                <p class="doc-p" id="clause3">7.2 Notwithstanding any provision of this Agreement to the contrary, the Lessee shall remit payment of the monthly rent of $1,200 no later than the 5th day of each calendar month, failing which a late fee equivalent to 5% of the outstanding amount shall accrue.</p>
+                <p class="doc-p doc-dim">7.3 All payments shall be made by electronic transfer to the account designated by the Lessor in writing.</p>
+                <p class="doc-p doc-dim">7.4 The Lessor may revise the rent once in any twelve-month period by written notice of not less than sixty (60) days.</p>
+              </div>
+            </div>
+          </div>
+          <svg class="cursor ibeam" id="ib3" viewBox="0 0 20 30"><path d="M5 2h3.5c.9 0 1.5.4 1.5 1 0-.6.6-1 1.5-1H15M5 28h3.5c.9 0 1.5-.4 1.5-1 0 .6.6 1 1.5 1H15M10 3v24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" /><path d="M5 2h3.5c.9 0 1.5.4 1.5 1 0-.6.6-1 1.5-1H15M5 28h3.5c.9 0 1.5-.4 1.5-1 0 .6.6 1 1.5 1H15M10 3v24" fill="none" stroke="#111" stroke-width="1.8" stroke-linecap="round" /></svg>
+          <div class="cardpos" id="deskcard" style="left: 1150px; top: 196px">
+            <div class="zoom" style="zoom: 1.25"><div class="stack"><div class="slot" id="desk-google"></div><div class="slot" id="desk-explain"></div></div></div>
+            <svg class="cursor arrow" id="ar3" viewBox="0 0 24 24"><path d="M5 2.6v17.6l4.4-4.2 3 6.8 2.7-1.2-3-6.7h6.1z" fill="#111" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" /></svg>
+          </div>
+        </div>
+        </div>
+        <div class="keys" id="keys3" style="top: 840px">
+          <div class="key">Ctrl</div>
+          <div class="key">Shift</div>
+          <div class="key wide">Space</div>
+        </div>
+      </section>
+
+      <!-- 5. Morph: the clause becomes plain English, facts kept -->
+      <section id="morph" class="clip scene paper" data-start="{{morph.start}}" data-duration="{{morph.dur}}" data-track-index="11">
+        <div class="layer" id="mo-cam">
+          <div class="kicker" id="mo-k" style="left: 142px; top: 172px"><span class="v">Lease agreement · clause 7.2</span><span class="v">Plain English · same facts</span></div>
+          <div class="mo-box" id="mo-box">
+            <p class="mo-p mo-src" id="mo-src">…the Lessee shall remit payment of the monthly rent of $1,200 no later than the 5th day of each calendar month…</p>
+            <p class="mo-p mo-dst" id="mo-dst">The tenant (the Lessee) must pay the monthly rent of $1,200 by the 5th day of each month.</p>
+          </div>
+          <div class="biggrade">
+            <div class="kicker" style="position: static; margin-bottom: 4px">Reading grade</div>
+            <div class="num" id="mo-num"></div>
+          </div>
+          <div class="fact-note" id="mo-note">Every number, date and name kept.</div>
+        </div>
+      </section>
+
+      <!-- 6. Levels: three versions on a carousel -->
+      <section id="levels" class="clip scene paper" data-start="{{levels.start}}" data-duration="{{levels.dur}}" data-track-index="12">
+        <h2 class="hl" id="hl-pick" style="left: 0; right: 0; top: 54px; text-align: center; font-size: 84px">Pick how <mark>plain.</mark></h2>
+        <div class="ring" id="ring">
+          <div class="lv" id="lv-s"><div class="lvnum"><span class="k">Grade 17 →</span><b>5</b></div><div class="slot"></div></div>
+          <div class="lv" id="lv-p"><div class="lvnum"><span class="k">Grade 17 →</span><b>9</b></div><div class="slot"></div></div>
+          <div class="lv" id="lv-c"><div class="lvnum"><span class="k">Grade 17 →</span><b>11</b></div><div class="slot"></div></div>
+        </div>
+        <div class="lv-ctrl" id="lv-ctrl">
+          <div class="zoom" id="lv-zoom" style="zoom: 2.1"></div>
+          <svg class="cursor arrow" id="ar5" viewBox="0 0 24 24"><path d="M5 2.6v17.6l4.4-4.2 3 6.8 2.7-1.2-3-6.7h6.1z" fill="#111" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" /></svg>
+        </div>
+      </section>
+
+      <!-- 7. Every app -->
+      <section id="apps" class="clip scene paper" data-start="{{apps.start}}" data-duration="{{apps.dur}}" data-track-index="4">
+        <div class="layer" id="apps-cam">
+          <h2 class="hl" id="hl-apps" style="left: 120px; top: 84px; font-size: 84px; white-space: nowrap">Works wherever you <mark>can select text.</mark></h2>
+          <div class="layer" id="app-a">
+            <div class="win" id="browser" style="left: 120px; top: 250px; width: 1020px; height: 700px">
+              <div class="browser-tabs"><div class="browser-tab">Cash transfers and savings</div></div>
+              <div class="browser-url"><span>journal.example.org/articles/cash-transfers</span></div>
+              <div class="article">
+                <div class="kicker" style="position: static; margin-bottom: 12px; font-size: 13px">Abstract</div>
+                <h3>Unconditional cash transfers and household savings</h3>
+                <p class="doc-p" id="abs">We estimate the effect of a two-year transfer program on savings in 412 villages. <span id="abs-sel">Heteroscedasticity-robust standard errors, clustered at the household level, attenuate the estimated effect by approximately 40%.</span> Results hold across districts and survey rounds.</p>
+              </div>
+            </div>
+            <div class="keys small" id="keys-cc" style="top: 860px; left: 120px; right: auto; width: 1020px"><div class="key">Ctrl</div><div class="plus">+</div><div class="key">C</div><div class="key">C</div></div>
+            <div class="cardpos" id="appcard1" style="left: 1190px; top: 236px"><div class="zoom" style="zoom: 1.2"></div></div>
+          </div>
+          <div class="layer" id="app-b">
+            <div class="win" id="mail" style="left: 120px; top: 250px; width: 1020px; height: 700px">
+              <div class="win-bar"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M224,48H32a8,8,0,0,0-8,8V192a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A8,8,0,0,0,224,48Zm-96,85.15L52.57,64H203.43ZM98.71,128,40,181.81V74.19Zm11.84,10.85,12,11.05a8,8,0,0,0,10.82,0l12-11.05,58,53.15H52.57ZM157.29,128,216,74.18V181.82Z" /></svg><span>Mail</span><span class="win-ctl"><i class="min"></i><i class="max"></i><i class="cls"></i></span></div>
+              <div class="mail-head"><div class="subj">Notice of assessment</div><div><b>Revenue Office</b> · to you · 9:14</div></div>
+              <div class="mail-body">
+                <p>Dear taxpayer,</p>
+                <p id="mail-p"><span id="mail-sel">Pursuant to Section 12(b)(iii), you are required to furnish the requisite particulars within thirty (30) days of receipt of this notice.</span></p>
+                <p class="doc-dim">Failure to comply may result in an assessment based on the information available to this Office.</p>
+                <p class="doc-dim">Yours faithfully, Assessment Unit</p>
+              </div>
+            </div>
+            <div class="keys small" id="keys-mail" style="top: 860px; left: 120px; right: auto; width: 1020px"><div class="key">Ctrl</div><div class="key">Shift</div><div class="key wide">Space</div></div>
+            <div class="cardpos" id="appcard2" style="left: 1190px; top: 236px"><div class="zoom" style="zoom: 1.2"></div></div>
+          </div>
+          <svg class="cursor ibeam" id="ib6" viewBox="0 0 20 30"><path d="M5 2h3.5c.9 0 1.5.4 1.5 1 0-.6.6-1 1.5-1H15M5 28h3.5c.9 0 1.5-.4 1.5-1 0 .6.6 1 1.5 1H15M10 3v24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" /><path d="M5 2h3.5c.9 0 1.5.4 1.5 1 0-.6.6-1 1.5-1H15M5 28h3.5c.9 0 1.5-.4 1.5-1 0 .6.6 1 1.5 1H15M10 3v24" fill="none" stroke="#111" stroke-width="1.8" stroke-linecap="round" /></svg>
+        </div>
+      </section>
+
+      <!-- 8. Translate -->
+      <section id="tr" class="clip scene paper" data-start="{{tr.start}}" data-duration="{{tr.dur}}" data-track-index="5">
+        <div class="layer" id="tr-cam">
+          <div class="wall" id="wall1" style="top: 40px">বাংলা  Español  हिन्दी  العربية  日本語  Français  اردو  Deutsch  简体中文  বাংলা  Español  हिन्दी  العربية  日本語  Français  اردو  Deutsch  简体中文</div>
+          <div class="wall" id="wall2" style="top: 470px">日本語  Deutsch  বাংলা  اردو  Español  简体中文  हिन्दी  Français  العربية  日本語  Deutsch  বাংলা  اردو  Español  简体中文  हिन्दी  Français  العربية</div>
+          <div class="wall" id="wall3" style="top: 900px">Français  العربية  简体中文  বাংলা  हिन्दी  Deutsch  日本語  Español  اردو  Français  العربية  简体中文  বাংলা  हिन्दी  Deutsch  日本語  Español  اردو</div>
+          <h2 class="hl" id="hl-tr" style="left: 140px; top: 360px; width: 820px; font-size: 104px">Translate it, <mark>privately.</mark></h2>
+          <div class="ticker" id="ticker" style="left: 144px; top: 612px">Into <span id="ticker-v" class="ticker-v"></span></div>
+          <div class="cardpos" id="trcard" style="left: 1080px; top: 150px">
+            <div class="zoom" style="zoom: 1.4"><div class="stack"><div class="slot" id="tr-plain"></div><div class="slot" id="tr-bn"></div></div></div>
+            <svg class="cursor arrow" id="ar7" viewBox="0 0 24 24"><path d="M5 2.6v17.6l4.4-4.2 3 6.8 2.7-1.2-3-6.7h6.1z" fill="#111" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" /></svg>
+          </div>
+        </div>
+      </section>
+
+      <!-- 9. Private -->
+      <section id="priv" class="clip scene paper" data-start="{{priv.start}}" data-duration="{{priv.dur}}" data-track-index="6">
+        <div class="layer" id="priv-cam">
+<div class="layer" id="wifi-shake">
+          <svg class="wifi" id="wifi" viewBox="0 0 256 256" fill="none" stroke-linecap="round">
+            <path class="wa" d="M96.9 168.9 A44 44 0 0 1 159.1 168.9" stroke="#1b1b1a" stroke-width="18" />
+            <path class="wa" d="M65.8 137.8 A88 88 0 0 1 190.2 137.8" stroke="#1b1b1a" stroke-width="18" />
+            <path class="wa" d="M34.7 106.7 A132 132 0 0 1 221.3 106.7" stroke="#1b1b1a" stroke-width="18" />
+            <circle id="wdot" cx="128" cy="206" r="13" fill="#1b1b1a" stroke="none" />
+            <path id="wslash-halo" d="M44 40 L212 218" stroke="#f5f5f4" stroke-width="44" />
+            <path id="wslash" d="M44 40 L212 218" stroke="#e7b46a" stroke-width="20" />
+          </svg>
+          </div>
+          <h2 class="hl" id="hl-priv" style="left: 0; right: 0; top: 372px; text-align: center; font-size: 150px">Private <mark>by design.</mark></h2>
+          <p class="sub" id="priv-sub" style="left: 0; right: 0; top: 600px; text-align: center; font-size: 46px">The AI and the dictionary run on your computer.</p>
+          <p class="sub" id="priv-off" style="left: 0; right: 0; top: 680px; text-align: center; font-size: 46px; color: var(--ink)">Works offline, too.</p>
+        </div>
+      </section>
+
+      <!-- 10. Words -->
+      <section id="words" class="clip scene paper" data-start="{{words.start}}" data-duration="{{words.dur}}" data-track-index="7">
+        <div class="layer" id="words-cam">
+          <h2 class="hl" id="hl-words" style="left: 140px; top: 372px; width: 760px; font-size: 104px">Look up any word. <mark>Keep it.</mark></h2>
+          <div class="cardpos" id="lookpos" style="left: 920px; top: 300px"><div class="zoom" style="zoom: 1.45"></div></div>
+          <div class="cardpos" id="wordpos" style="left: 1090px; top: 190px">
+            <div class="zoom" style="zoom: 1.3"></div>
+            <svg class="cursor arrow" id="ar9" viewBox="0 0 24 24"><path d="M5 2.6v17.6l4.4-4.2 3 6.8 2.7-1.2-3-6.7h6.1z" fill="#111" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" /></svg>
+          </div>
+          <div class="cardpos" id="mainpos" style="left: 880px; top: 196px"><div class="win" style="position: relative; width: 936px; height: 612px"><div class="zoom" style="zoom: 0.9"></div></div></div>
+        </div>
+      </section>
+
+      <!-- 11. Check: facts linked across the two texts -->
+      <section id="check" class="clip scene paper" data-start="{{check.start}}" data-duration="{{check.dur}}" data-track-index="8">
+        <div class="layer" id="check-cam">
+          <h2 class="hl" id="hl-check" style="left: 120px; top: 80px; font-size: 84px; white-space: nowrap">It checks <mark>its own work.</mark></h2>
+          <p class="sub" id="ck-sub" style="left: 124px; top: 186px; font-size: 36px">If a number goes missing, the card says so.</p>
+          <svg id="ck-lines" viewBox="0 0 1920 1080"></svg>
+          <div class="panel" id="ck-src" style="left: 110px">
+            <div class="k">What you selected</div>
+            <p>Notwithstanding any provision of this Agreement to the contrary, the Lessee shall remit payment of the monthly rent of <span class="fact" id="fs1">$1,200</span> no later than the <span class="fact" id="fs2">5th</span> day of each calendar month, failing which a late fee equivalent to <span class="fact" id="fs3">5%</span> of the outstanding amount shall accrue.</p>
+          </div>
+          <div class="panel" id="ck-dst" style="left: 1098px">
+            <div class="k">Plain English</div>
+            <p>Whatever else this agreement says, the tenant (the Lessee) must pay the monthly rent of <span class="fact" id="fd1">$1,200</span> by the <span class="fact" id="fd2">5th</span> day of each month. If they don't, a late fee<span id="fd3"></span> is added.</p>
+          </div>
+          <div class="ck-warn"><div class="zoom" id="ck-warnz" style="zoom: 1.9"></div></div>
+        </div>
+      </section>
+
+      <!-- 12. Outro -->
+      <section id="outro" class="clip scene paper" data-start="{{outro.start}}" data-duration="{{outro.dur}}" data-track-index="9">
+        <div class="layer" id="outro-cam">
+          <svg class="logo" id="logo" viewBox="0 0 512 512">
+            <rect id="lg-sq" x="32" y="32" width="448" height="448" rx="104" fill="#1b1b1a" />
+            <rect class="lg-bar" x="120" y="146" width="272" height="38" rx="19" fill="#7c7c75" />
+            <rect class="lg-bar" x="120" y="236" width="80" height="38" rx="19" fill="#7c7c75" />
+            <rect id="lg-mark" x="226" y="228" width="166" height="56" rx="28" fill="#e7b46a" />
+            <rect class="lg-bar" x="120" y="328" width="194" height="38" rx="19" fill="#7c7c75" />
+          </svg>
+          <h2 class="hl" id="hl-end" style="left: 0; right: 0; top: 452px; text-align: center; font-size: 128px">Read anything, <mark>plainly.</mark></h2>
+          <p class="sub" id="end-sub" style="left: 0; right: 0; top: 660px; text-align: center">Free preview for Windows 10 and 11.</p>
+          <div class="url" id="end-url" style="top: 742px">plainly.omikhan.com</div>
+          <div class="credit" id="credit">Music: Happy Beats &amp; Business Moves Vol. 12 by Sascha Ende (ende.app), CC BY 4.0</div>
+        </div>
+      </section>
+
+      <!-- Highlighter wipes between scenes -->
+      <div class="wipe" id="wipe-ink"><div class="band thin"></div><div class="body"></div><div class="band"></div></div>
+      <div class="wipe" id="wipe-paper"><div class="band thin"></div><div class="body"></div><div class="band"></div></div>
+
+      <audio id="soundtrack" src="assets/audio/soundtrack.wav" data-start="0" data-duration="{{total}}" data-track-index="10"></audio>
+    </div>
+
+    <!-- @ui -->
+
+    <!-- @timing -->
+    <script>
+      // Timing comes from the narration (scripts/timing.py, injected by build.mjs): scene
+      // starts and the moment each word is spoken. Picture and sound effects hang off those.
+      const TM = window.TIMING;
+      const S = (id) => TM.scenes[id].start;
+      const E = (id) => TM.scenes[id].start + TM.scenes[id].dur;
+      const key = (w) => w.toLowerCase().replace(/[^a-z0-9]/g, "");
+      /** When `word` is spoken in narration line `line` (nth occurrence). */
+      function W(line, word, nth = 0, end = false) {
+        const hits = TM.words[line].filter((x) => key(x.w) === key(word));
+        if (!hits[nth]) throw new Error(`no word "${word}" #${nth} in line ${line}`);
+        return end ? hits[nth].end : hits[nth].t;
+      }
+      const lineEnd = (line) => TM.words[line][TM.words[line].length - 1].end;
+      // Sound effects are logged here and mixed by scripts/mix.py, so they always match.
+      const SFX = [];
+      const sfx = (t, name, db) => SFX.push([Math.round(t * 1000) / 1000, name, db]);
+      window.__sfx = SFX;
+
+      const EASE = "expo.out";
+      const SEL = "rgba(231,180,106,0.5)";
+      const $ = (s, r = document) => r.querySelector(s);
+      const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+      const ui = (name) => document.getElementById("ui-" + name).content.firstElementChild.cloneNode(true);
+      const mount = (slot, name) => {
+        const el = ui(name);
+        el.classList.add("ui");
+        (typeof slot === "string" ? $(slot) : slot).appendChild(el);
+        return el;
+      };
+      const answerP = (card) => $('[aria-label="The answer"] p', card);
+      const answerText = (card) => answerP(card).textContent.trim();
+
+      function words(el, text = el.textContent, cls = "sw") {
+        el.textContent = "";
+        return (text.match(/\S+\s*/g) || []).map((w) => {
+          const s = document.createElement("span");
+          s.className = cls;
+          s.textContent = w;
+          el.appendChild(s);
+          return s;
+        });
+      }
+      function blockWords(el) {
+        const text = el.textContent.trim();
+        el.textContent = "";
+        return text.split(/\s+/).map((w, i) => {
+          if (i) el.appendChild(document.createTextNode(" "));
+          const s = document.createElement("span");
+          s.className = "mw";
+          s.textContent = w;
+          el.appendChild(s);
+          return s;
+        });
+      }
+      function headline(sel) {
+        const h = $(sel);
+        const ws = [];
+        const marked = [];
+        const wrap = (node, inMark) => {
+          for (const child of [...node.childNodes]) {
+            if (child.nodeType === 3) {
+              const frag = document.createDocumentFragment();
+              for (const part of child.textContent.split(/(\s+)/)) {
+                if (!part) continue;
+                if (/^\s+$/.test(part)) frag.appendChild(document.createTextNode(" "));
+                else {
+                  const m = document.createElement("span");
+                  m.className = "wm";
+                  const w = document.createElement("span");
+                  w.className = "w";
+                  w.textContent = part;
+                  m.appendChild(w);
+                  frag.appendChild(m);
+                  ws.push(w);
+                  if (inMark) marked.push(w);
+                }
+              }
+              child.replaceWith(frag);
+            } else wrap(child, inMark || child.tagName === "MARK");
+          }
+        };
+        wrap(h, false);
+        return { el: h, words: ws, mark: $("mark", h), marked };
+      }
+      function at(el, layer, fx = 0, fy = 0) {
+        const a = el.getBoundingClientRect();
+        const b = layer.getBoundingClientRect();
+        return { x: a.left - b.left + a.width * fx, y: a.top - b.top + a.height * fy, w: a.width, h: a.height };
+      }
+      const countdown = (from, to) => Array.from({ length: from - to + 1 }, (_, i) => String(from - i));
+      const norm = (w) => w.toLowerCase().replace(/[^a-z0-9$%]/g, "");
+      function lcs(a, b) {
+        const dp = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+        for (let i = a.length - 1; i >= 0; i--)
+          for (let j = b.length - 1; j >= 0; j--) dp[i][j] = a[i] && a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+        const pairs = [];
+        let i = 0;
+        let j = 0;
+        while (i < a.length && j < b.length) {
+          if (a[i] && a[i] === b[j]) pairs.push([i++, j++]);
+          else if (dp[i + 1][j] >= dp[i][j + 1]) i++;
+          else j++;
+        }
+        return pairs;
+      }
+      let seed = 20261119;
+      const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      /** A saffron ring at (x, y) in `layer`, for the big hits. */
+      function pulseEl(layer, x, y, color = "var(--saffron)") {
+        const p = document.createElement("div");
+        p.className = "pulse";
+        p.style.left = x + "px";
+        p.style.top = y + "px";
+        p.style.borderColor = color;
+        layer.appendChild(p);
+        return p;
+      }
+
+      // Layer renders for editing: "picture" hides the headlines, "text" keeps only them.
+      const LAYER = (window.__hyperframes && window.__hyperframes.getVariables && window.__hyperframes.getVariables().layer) || "all";
+      document.documentElement.dataset.layer = LAYER;
+
+      function build() {
+        // Phase 1: shape the DOM. ---------------------------------------------------------------
+        const H = {
+          still: headline("#hl-still"),
+          pick: headline("#hl-pick"),
+          apps: headline("#hl-apps"),
+          tr: headline("#hl-tr"),
+          priv: headline("#hl-priv"),
+          words: headline("#hl-words"),
+          check: headline("#hl-check"),
+          end: headline("#hl-end"),
+        };
+        const JARGON = ["hereinafter", "pursuant to", "notwithstanding", "indemnify and hold harmless", "force majeure", "in perpetuity", "idiopathic", "contraindicated", "prophylaxis", "bilateral effusion", "heteroscedasticity", "endogeneity", "asymptotically", "ex ante", "the assessee", "requisite particulars", "forthwith", "in arrears", "lien", "subrogation", "amortization", "accrued liabilities", "covenant", "aforementioned", "inter alia", "mutatis mutandis", "per annum", "remittance", "deductible", "co-insurance", "pre-existing condition", "hereto", "whereas", "the Lessor", "estoppel", "tortious", "fiduciary", "sine qua non", "jurisdiction", "in lieu thereof", "apportionment", "contingent", "statutory", "thereunder"];
+        const tunnel = $("#tunnel");
+        const tws = JARGON.map((w) => {
+          const s = document.createElement("div");
+          s.className = "tw";
+          s.textContent = w;
+          s.style.fontSize = 44 + Math.round(rnd() * 46) + "px";
+          tunnel.appendChild(s);
+          let x = (rnd() * 2 - 1) * 1500;
+          let y = (rnd() * 2 - 1) * 820;
+          if (Math.abs(y) < 520) y += y < 0 ? -380 : 380;
+          return { el: s, x, y, z0: -300 - rnd() * 7200 };
+        });
+
+        const google = mount("#desk-google", "card-google");
+        const explain = mount("#desk-explain", "card-plain");
+        const plainToks = words(answerP(explain), answerText(explain), "tok");
+        const gradeEl = $(".tabular-nums", explain);
+        gradeEl.textContent = "17";
+        const gradeTo = document.createElement("span");
+        gradeTo.className = "font-medium text-text tabular-nums";
+        gradeTo.textContent = " → 9";
+        gradeTo.style.display = "none";
+        gradeEl.after(gradeTo);
+        const aiBtn = $$('[role="tab"]', google).find((b) => /Explain/.test(b.textContent));
+        const selWords = words($("#clause3"));
+
+        const srcW = blockWords($("#mo-src"));
+        const dstW = blockWords($("#mo-dst"));
+        const pairs = lcs(srcW.map((w) => norm(w.textContent)), dstW.map((w) => norm(w.textContent)));
+        const matchedSrc = new Set(pairs.map(([i]) => i));
+        const matchedDst = new Set(pairs.map(([, j]) => j));
+        const factOf = (n) => dstW.find((w) => norm(w.textContent) === n);
+        const facts = { number: factOf("$1200"), date: factOf("5th"), name: factOf("lessee") };
+        Object.values(facts).forEach((w) => w.classList.add("mk"));
+        const num = $("#mo-num");
+        const gradeVals = countdown(17, 9).map((v) => {
+          const s = document.createElement("span");
+          s.className = "v";
+          s.textContent = v;
+          num.appendChild(s);
+          return s;
+        });
+
+        [["#lv-s .slot", "card-simpler"], ["#lv-p .slot", "card-plain"], ["#lv-c .slot", "card-clearer"]].forEach(([s, n]) => mount(s, n));
+        const ctrl = $('[aria-label="Reading level"]', ui("card-plain"));
+        const ctrlWrap = document.createElement("div");
+        ctrlWrap.className = "ui";
+        ctrlWrap.appendChild(ctrl);
+        $("#lv-zoom").appendChild(ctrlWrap);
+        const ctrlBtns = $$("button", ctrl);
+
+        const miniCard = (slotSel, selected, plain) => {
+          const c = mount($(slotSel + " .zoom"), "card-plain");
+          $("p.truncate span", c).textContent = `“${selected}”`;
+          $('[aria-label="What you selected"] p span', c).textContent = selected;
+          const tokens = words(answerP(c), plain, "tok");
+          $(".tabular-nums", c).parentElement.style.visibility = "hidden";
+          return tokens;
+        };
+        const absText = $("#abs-sel").textContent;
+        const mailText = $("#mail-sel").textContent;
+        const m1 = miniCard("#appcard1", absText, "When the researchers allowed for differences between households, the program's measured effect on savings got about 40% smaller.");
+        const m2 = miniCard("#appcard2", mailText, "Under Section 12(b)(iii), you must send the details they asked for within 30 days of getting this letter.");
+        const selA = words($("#abs-sel"));
+        const selM = words($("#mail-sel"));
+
+        const trPlain = mount("#tr-plain", "card-plain");
+        const trBn = mount("#tr-bn", "card-bangla");
+        const bnToks = words(answerP(trBn), answerText(trBn), "tok");
+        const trBtn = $$('[aria-label="What the AI does"] button', trPlain)[1];
+        const langs = ["বাংলা", "Español", "हिन्दी", "العربية", "日本語", "Français", "اردو", "Deutsch", "简体中文"];
+        const lspans = langs.map((l) => {
+          const s = document.createElement("span");
+          s.className = "l";
+          s.textContent = l;
+          $("#ticker-v").appendChild(s);
+          return s;
+        });
+
+        const arcs = $$("#wifi .wa");
+        const slash = $("#wslash");
+        const halo = $("#wslash-halo");
+        [...arcs, slash, halo].forEach((p) => {
+          const L = p.getTotalLength();
+          p.style.strokeDasharray = L;
+          p.style.strokeDashoffset = L;
+        });
+
+        const look = mount("#lookpos .zoom", "lookup");
+        const typed = document.createElement("span");
+        typed.className = "typed";
+        typed.style.flex = "1";
+        const chars = [..."ubiquitous"].map((c) => {
+          const s = document.createElement("span");
+          s.className = "c";
+          s.textContent = c;
+          typed.appendChild(s);
+          return s;
+        });
+        const caret = document.createElement("span");
+        caret.className = "caret";
+        typed.appendChild(caret);
+        $("input", look).replaceWith(typed);
+        const wcard = mount("#wordpos .zoom", "card-word");
+        const save = $('[aria-label="Save to Words"]', wcard);
+        const main = mount("#mainpos .zoom", "main-words");
+        const list = $(".divide-y", main);
+        const row = list.firstElementChild.cloneNode(true);
+        const [term, def] = $$("p", row);
+        term.textContent = "ubiquitous";
+        def.textContent = "being present everywhere at once";
+        $("time", row).textContent = "Nov 19, 2026";
+        list.prepend(row);
+        const count = $$("*", main).find((e) => e.children.length === 0 && /^\d+ words$/.test(e.textContent.trim()));
+        if (count) count.textContent = "5 words";
+
+        const ccard = ui("card-check");
+        const warnRow = $$("div", ccard).find((d) => /Not found in the rewrite/.test(d.textContent) && d.className.includes("border-t"));
+        const warnWrap = document.createElement("div");
+        warnWrap.className = "ui";
+        warnWrap.style.width = "520px";
+        warnWrap.style.borderRadius = "10px";
+        warnWrap.style.overflow = "hidden";
+        warnWrap.appendChild(warnRow);
+        $("#ck-warnz").appendChild(warnWrap);
+
+        const bw = $("#brand-word");
+        const brandChars = [...bw.textContent].map((ch) => {
+          const sp = document.createElement("span");
+          sp.textContent = ch;
+          sp.style.display = "inline-block";
+          return sp;
+        });
+        bw.textContent = "";
+        brandChars.forEach((sp) => bw.appendChild(sp));
+
+        // Phase 2: measure, while nothing is transformed. ------------------------------------------
+        const desk = $("#deskcam");
+        const card = $("#deskcard");
+        const appsCam = $("#apps-cam");
+        const box = $("#mo-box");
+        const sceneCheck = $("#check-cam");
+        const P = {
+          sel3: selWords.map((w) => at(w, desk, 1, 0.5)),
+          ai: at(aiBtn, card, 0.42, 0.55),
+          src: srcW.map((w) => at(w, box)),
+          dst: dstW.map((w) => at(w, box)),
+          ctrl: ctrlBtns.map((b) => at(b, $("#lv-ctrl"), 0.5, 0.62)),
+          selA: selA.map((w) => at(w, appsCam, 1, 0.5)),
+          selM: selM.map((w) => at(w, appsCam, 1, 0.5)),
+          tr: at(trBtn, $("#trcard"), 0.5, 0.62),
+          save: at(save, $("#wordpos"), 0.5, 0.6),
+          fs: ["#fs1", "#fs2", "#fs3"].map((s) => at($(s), sceneCheck, 1, 0.55)),
+          fd: ["#fd1", "#fd2", "#fd3"].map((s) => at($(s), sceneCheck, 0, 0.55)),
+          keys: $$("#keys3 .key").map((k) => at(k, $("#desk"), 0.5, 0.5)),
+          cardC: at(card, desk, 0.5, 0.3),
+          trBtnScene: at(trBtn, $("#tr-cam"), 0.5, 0.6),
+          saveScene: at(save, $("#words-cam"), 0.5, 0.5),
+        };
+        const svg = $("#ck-lines");
+        const srcR = at($("#ck-src"), sceneCheck).x + $("#ck-src").getBoundingClientRect().width;
+        const dstL = at($("#ck-dst"), sceneCheck).x;
+        const mid = (srcR + dstL) / 2;
+        const NS = "http://www.w3.org/2000/svg";
+        const dots = [];
+        const lines = P.fs.map((a, i) => {
+          const b = P.fd[i];
+          const p = document.createElementNS(NS, "path");
+          const ex = i === 2 ? dstL - 30 : b.x;
+          p.setAttribute("d", i === 2 ? `M${a.x} ${a.y} L${srcR} ${a.y} C ${mid} ${a.y}, ${mid} ${b.y}, ${ex} ${b.y}` : `M${a.x} ${a.y} L${srcR} ${a.y} C ${mid} ${a.y}, ${mid} ${b.y}, ${dstL} ${b.y} L${ex} ${b.y}`);
+          p.setAttribute("fill", "none");
+          p.setAttribute("stroke", "#c98f3c");
+          p.setAttribute("stroke-width", "4");
+          p.setAttribute("stroke-linecap", "round");
+          svg.appendChild(p);
+          for (const [x, y] of i === 2 ? [[srcR + 1, a.y]] : [[srcR + 1, a.y], [dstL - 1, b.y]]) {
+            const c = document.createElementNS(NS, "circle");
+            c.setAttribute("cx", x);
+            c.setAttribute("cy", y);
+            c.setAttribute("r", 7);
+            c.setAttribute("fill", "#c98f3c");
+            c.style.opacity = 0;
+            svg.appendChild(c);
+            dots.push([i, c]);
+          }
+          const L = p.getTotalLength();
+          p.style.strokeDasharray = L;
+          p.style.strokeDashoffset = L;
+          return { p, end: { x: ex, y: b.y } };
+        });
+        const miss = document.createElementNS(NS, "g");
+        const end = lines[2].end;
+        miss.innerHTML = `<circle cx="${end.x}" cy="${end.y}" r="17" fill="#8a5300"/><path d="M${end.x} ${end.y - 8} v9" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/><circle cx="${end.x}" cy="${end.y + 7.5}" r="2.1" fill="#fff"/>`;
+        miss.style.opacity = 0;
+        svg.appendChild(miss);
+
+        // Phase 3: the timeline. -------------------------------------------------------------------
+        const tl = gsap.timeline({ paused: true });
+        const hIn = (h, t, stagger = 0.05) => tl.fromTo(h.words, { yPercent: 118, rotation: 4 }, { yPercent: 0, rotation: 0, duration: 0.9, ease: EASE, stagger }, t);
+        /** The highlighter sweeps under the key words as they are spoken, and they kick. */
+        const hMark = (h, t, d = 0.5) => {
+          tl.fromTo(h.mark, { backgroundSize: "0% 0.4em" }, { backgroundSize: "100% 0.4em", duration: d, ease: "power2.inOut" }, t);
+          tl.fromTo(h.marked, { scale: 1.09 }, { scale: 1, duration: 0.6, ease: "elastic.out(1, 0.5)", immediateRender: false, transformOrigin: "50% 80%" }, t + 0.05);
+          sfx(t - 0.04, "swish", -14);
+        };
+        const reveal = (toks, t, per) => tl.to(toks, { opacity: 1, duration: 0.14, ease: "none", stagger: per }, t);
+        /** A card arrives with a spring and a ring. */
+        const cardIn = (el, t, layer, cx, cy) => {
+          tl.fromTo(el, { opacity: 0, scale: 0.86, y: 40, rotationX: 18, transformPerspective: 1600, transformOrigin: "40% 0%" }, { opacity: 1, scale: 1, y: 0, rotationX: 0, duration: 0.75, ease: "back.out(1.5)" }, t);
+          if (layer) pulse(layer, cx, cy, t + 0.05);
+          sfx(t, "pop", -8);
+        };
+        const pulse = (layer, x, y, t, color) => {
+          const p = pulseEl(layer, x, y, color);
+          tl.fromTo(p, { opacity: 0.95, scale: 0.15 }, { opacity: 0, scale: 3.2, duration: 0.75, ease: "power2.out", immediateRender: false }, t);
+        };
+        /** A short shake on a wrapper that nothing else moves. */
+        const shake = (el, t, amp = 7) =>
+          tl.to(el, { keyframes: [{ x: amp, y: -amp * 0.6, duration: 0.05, ease: "sine.out" }, { x: -amp * 0.7, y: amp * 0.45, duration: 0.07, ease: "sine.inOut" }, { x: amp * 0.35, y: -amp * 0.2, duration: 0.07, ease: "sine.inOut" }, { x: 0, y: 0, duration: 0.09, ease: "sine.out" }] }, t);
+        const click = (cur, t, layer, x, y) => {
+          tl.to(cur, { scale: 0.78, duration: 0.07, ease: "power2.out", transformOrigin: "20% 10%" }, t - 0.07);
+          tl.to(cur, { scale: 1, duration: 0.2, ease: "back.out(3)" }, t);
+          if (layer) pulse(layer, x, y, t, "#1b1b1a");
+          sfx(t, "click", -6);
+        };
+        const moveTo = (cur, p, t, d = 0.6) => tl.to(cur, { x: p.x - 6, y: p.y - 4, duration: d, ease: "power3.inOut" }, t);
+        const state = (btn, on, t) => tl.set(btn, { attr: { "data-state": on ? "on" : "off", "aria-checked": on ? "true" : "false" } }, t);
+        const selectRun = (ws, pos, cur, t, d) => {
+          tl.set(cur, { opacity: 1 }, t);
+          ws.forEach((w, i) => {
+            const tt = t + (d * i) / ws.length;
+            tl.set(w, { backgroundColor: SEL }, tt);
+            tl.set(cur, { x: pos[i].x - 10, y: pos[i].y - 22 }, tt);
+          });
+          sfx(t, "rollover", -16);
+        };
+        const keyIn = (k, beat, keyName) => {
+          const small = !!k.closest(".small");
+          tl.fromTo(k, { opacity: 0, y: -70, scale: 1.18, rotation: -4 }, { opacity: 1, y: 0, scale: 1, rotation: 0, duration: 0.2, ease: "power3.in" }, beat - 0.2);
+          tl.to(k, {
+            y: small ? 5 : 9,
+            boxShadow: small ? "0 0 0 1px rgba(27,27,26,0.09), 0 1px 0 #d6d6d1, 0 8px 16px -10px rgba(27,27,26,0.3)" : "0 0 0 1px rgba(27,27,26,0.09), 0 1px 0 #d6d6d1, 0 12px 24px -12px rgba(27,27,26,0.35)",
+            duration: 0.06,
+            ease: "power2.out",
+          }, beat);
+          sfx(beat, keyName, small ? -4 : -1);
+        };
+        const wipeAt = (t, kind) => {
+          const w = kind === "ink" ? "#wipe-ink" : "#wipe-paper";
+          tl.fromTo(w, { x: -2950 }, { x: -520, duration: 0.32, ease: "power2.in", immediateRender: false }, t - 0.32);
+          tl.to(w, { x: 2150, duration: 0.45, ease: "power3.out" }, t);
+          sfx(t - 0.3, "whoosh", -9);
+        };
+        /** Each new scene lands with a small push-in. */
+        const land = (el, t) => tl.fromTo(el, { scale: 1.07 }, { scale: 1, duration: 0.9, ease: EASE, immediateRender: false }, t);
+        tl.set(["#wipe-ink", "#wipe-paper"], { x: -2950, skewX: -12 }, 0);
+
+        // 1. Cold open: fly through the jargon; three lines land in front.
+        const D1 = TM.scenes.s1.dur;
+        const SPEED = 7400 / D1;
+        tws.forEach((w) => {
+          tl.set(w.el, { x: w.x, y: w.y, z: w.z0 }, 0);
+          tl.to(w.el, { z: w.z0 + 7400, duration: D1, ease: "none" }, 0);
+          const tAt = (z) => (z - w.z0) / SPEED;
+          const inA = Math.max(0, tAt(-3400));
+          const inB = Math.max(0.01, tAt(-1800));
+          const outA = tAt(250);
+          const outB = tAt(800);
+          if (inA < D1) tl.fromTo(w.el, { opacity: 0 }, { opacity: 0.4, duration: Math.max(0.01, inB - inA), ease: "none", immediateRender: false }, inA);
+          if (outA < D1) tl.to(w.el, { opacity: 0, duration: Math.max(0.01, outB - outA), ease: "none" }, outA);
+        });
+        const frags = ["#f1", "#f2", "#f3"].map((s) => $(s));
+        const hits = [0.35, 2.2, 3.9];
+        tl.set(frags, { opacity: 0 }, 0);
+        tl.fromTo(".s1-cam", { scale: 1 }, { scale: 1.08, duration: D1 - 0.3, ease: "none" }, 0);
+        hits.forEach((t, i) => {
+          tl.fromTo(frags[i], { opacity: 0, y: 70, scale: 1.08, filter: "blur(20px)" }, { opacity: 1, y: 0, scale: 1, filter: "blur(0px)", duration: 0.7, ease: EASE, immediateRender: false }, t);
+          sfx(t + 0.02, i === 1 ? "impact_heavy2" : "impact_heavy", -6);
+          for (let j = 0; j < i; j++) {
+            const k = i - j;
+            tl.to(frags[j], { opacity: k === 1 ? 0.12 : 0, y: -170 * k - 40, scale: 1 - 0.08 * k, filter: `blur(${4 + 3 * k}px)`, duration: 0.7, ease: EASE }, t);
+          }
+        });
+        tl.to([".s1-cam", "#tunnel"], { scale: 1.6, opacity: 0, filter: "blur(18px)", duration: 0.34, ease: "power3.in" }, D1 - 0.34);
+        sfx(D1 - 0.55, "whoosh_long", -7);
+
+        // 2. Re-reading: a marker runs along the clause, faster each time.
+        const s2 = S("s2");
+        const clause = $("#clause2");
+        const range = document.createRange();
+        range.selectNodeContents(clause);
+        const pb = clause.getBoundingClientRect();
+        const rlines = [...range.getClientRects()]
+          .filter((r) => r.width > 4)
+          .reduce((acc, r) => {
+            const last = acc[acc.length - 1];
+            if (last && Math.abs(last.top - r.top) < 4) last.right = Math.max(last.right, r.right);
+            else acc.push({ top: r.top, bottom: r.bottom, left: r.left, right: r.right });
+            return acc;
+          }, []);
+        const bars = rlines.map((l) => {
+          const b = document.createElement("div");
+          b.className = "rd";
+          b.style.left = l.left - pb.left + "px";
+          b.style.top = l.bottom - pb.top - 4 + "px";
+          clause.appendChild(b);
+          return { el: b, w: l.right - l.left };
+        });
+        const total = bars.reduce((s, b) => s + b.w, 0);
+        const reads = [W("s2", "read") - 0.15, W("s2", "then"), W("s2", "and")];
+        [[reads[0], reads[1] - reads[0] - 0.12], [reads[1], reads[2] - reads[1] - 0.1], [reads[2], 0.6]].forEach(([t0, d], n) => {
+          bars.forEach((b) => tl.set(b.el, { width: 0 }, t0));
+          let t = t0;
+          bars.forEach((b) => {
+            const dd = (d * b.w) / total;
+            tl.to(b.el, { width: b.w, duration: dd, ease: "none" }, t);
+            t += dd;
+          });
+          if (n) sfx(t0, "tick", -9);
+        });
+        const rc = $$("#rcn .v");
+        reads.forEach((t, i) => {
+          if (i > 0) tl.set(rc[i - 1], { display: "none" }, t);
+          tl.set(rc[i], { display: "inline" }, t);
+          if (i) tl.fromTo("#rcn", { scale: 1.5 }, { scale: 1, duration: 0.4, ease: "back.out(3)", immediateRender: false }, t);
+        });
+        tl.fromTo(".s2-cam", { rotationX: 14, rotationY: -6, scale: 0.9, y: 40, transformOrigin: "50% 40%" }, { rotationX: 3, rotationY: -1, scale: 1, y: 0, duration: TM.scenes.s2.dur, ease: "sine.inOut" }, s2);
+        tl.fromTo(".s2-cam", { opacity: 0 }, { opacity: 1, duration: 0.45, ease: "power1.out" }, s2);
+        hIn(H.still, W("s2", "still") - 0.1, 0.07);
+        tl.to(".s2-cam", { filter: "blur(4px)", opacity: 0.4, duration: 0.6, ease: "power2.in" }, E("s2") - 0.9);
+        sfx(E("s2") - 0.85, "riser", -11);
+
+        // 2b. The drop: "Plainly." slams in on the beat.
+        const b0 = S("brand");
+        sfx(b0, "impact_med", -4);
+        sfx(b0, "impact_heavy", -8);
+        // Smash cut: the word is already on screen on the first frame of the beat, then settles.
+        tl.fromTo("#brand-logo", { scale: 0.72, rotation: -12, transformOrigin: "50% 50%" }, { scale: 1, rotation: 0, duration: 0.6, ease: "back.out(1.6)", immediateRender: false }, b0);
+        tl.fromTo("#brand-word", { scale: 1.2, filter: "blur(5px)" }, { scale: 1, filter: "blur(0px)", duration: 0.5, ease: "power3.out", immediateRender: false }, b0);
+        tl.fromTo(brandChars, { x: (i) => (i - (brandChars.length - 1) / 2) * 18 }, { x: 0, duration: 0.5, ease: "power3.out", immediateRender: false }, b0);
+        pulse($("#brand-cam"), 960, 330, b0);
+        shake($("#brand-shake"), b0, 8);
+        tl.fromTo("#brand-cam", { scale: 1 }, { scale: 1.06, duration: TM.scenes.brand.dur, ease: "none" }, b0);
+
+        // 3. Select and press.
+        const d0 = S("desk");
+        wipeAt(d0, "paper");
+        tl.fromTo(desk, { scale: 1.14, rotationY: 9, rotationX: 7, transformOrigin: "40% 50%" }, { scale: 1, rotationY: 0, rotationX: 0, duration: 1.3, ease: EASE }, d0);
+        const ib = $("#ib3");
+        tl.set(ib, { opacity: 0 }, 0);
+        selectRun(selWords, P.sel3, ib, W("desk", "select"), 0.95);
+        const keys3 = $$("#keys3 .key");
+        const keyT = [W("desk", "press"), W("desk", "one"), W("desk", "shortcut")];
+        keyT.forEach((t, i) => {
+          keyIn(keys3[i], t, ["key005", "key012", "key020"][i]);
+          shake($("#deskshake"), t, i === 2 ? 9 : 4);
+        });
+        pulse($("#desk"), P.keys[2].x, P.keys[2].y, keyT[2]);
+        sfx(keyT[2], "impact_med2", -10);
+        tl.set(ib, { opacity: 0 }, keyT[2]);
+        const cardT = W("card", "opens") - 0.15;
+        tl.to(keys3, { opacity: 0, y: 50, scale: 0.9, duration: 0.35, ease: "power2.in", stagger: 0.05 }, cardT - 0.25);
+
+        // 4. The card opens beside the selection; Explain with AI streams the plain version.
+        tl.set("#desk-explain", { opacity: 0 }, 0);
+        cardIn(card, cardT, desk, P.cardC.x, P.cardC.y);
+        tl.to(desk, { x: -260, y: -20, scale: 1.14, duration: 1.8, ease: "power2.inOut" }, cardT + 0.15);
+        const ar = $("#ar3");
+        const clickAi = W("card", "explains");
+        tl.set(ar, { x: -300, y: 330, opacity: 0 }, 0);
+        tl.set(ar, { opacity: 1 }, cardT + 0.4);
+        moveTo(ar, P.ai, clickAi - 0.8, 0.72);
+        click(ar, clickAi, card, P.ai.x, P.ai.y);
+        tl.set("#desk-explain", { opacity: 1 }, clickAi);
+        tl.set("#desk-google", { opacity: 0 }, clickAi);
+        const per = Math.min(0.05, (E("desk") - 1.0 - clickAi) / plainToks.length);
+        reveal(plainToks, clickAi + 0.12, per);
+        tl.set(gradeTo, { display: "inline" }, clickAi + 0.12 + per * plainToks.length + 0.1);
+        tl.to(ar, { opacity: 0, duration: 0.2 }, clickAi + 0.9);
+        tl.to(desk, { scale: 1.24, x: -360, duration: 1.0, ease: "power2.in" }, E("desk") - 1.0);
+
+        // 5. Morph: the words that survive travel to the plain version; the rest fall away.
+        const m0 = S("morph");
+        wipeAt(m0, "ink");
+        land($("#mo-cam"), m0);
+        const go = W("morph", "meaning") - 0.2;
+        const kv = $$("#mo-k .v");
+        tl.set(kv[0], { display: "inline" }, m0);
+        tl.set(kv[0], { display: "none" }, go + 0.6);
+        tl.set(kv[1], { display: "inline" }, go + 0.6);
+        sfx(go, "whoosh_long", -11);
+        srcW.forEach((w, i) => {
+          if (!matchedSrc.has(i)) tl.to(w, { y: 50, rotation: (i % 2 ? 1 : -1) * 6, opacity: 0, filter: "blur(6px)", duration: 0.45, ease: "power2.in" }, go + i * 0.008);
+        });
+        pairs.forEach(([i, j], k) => {
+          const a = P.src[i];
+          const b = P.dst[j];
+          tl.to(srcW[i], { x: b.x - a.x, y: b.y - a.y + (b.h - a.h) * 0.25, scale: 1.08, color: "#1b1b1a", transformOrigin: "0% 50%", duration: 1.0, ease: "expo.inOut" }, go + 0.15 + k * 0.015);
+          tl.to(srcW[i], { opacity: 0, duration: 0.16, ease: "none" }, go + 1.1 + k * 0.015);
+          tl.to(dstW[j], { opacity: 1, duration: 0.16, ease: "none" }, go + 1.08 + k * 0.015);
+        });
+        dstW.forEach((w, j) => {
+          if (!matchedDst.has(j)) tl.fromTo(w, { opacity: 0, y: -30 }, { opacity: 1, y: 0, duration: 0.6, ease: "back.out(2)", immediateRender: false }, go + 0.7 + j * 0.015);
+        });
+        [["number", "number"], ["date", "date"], ["name", "name"]].forEach(([word, k]) => {
+          const t = W("morph", word);
+          tl.fromTo(facts[k], { backgroundSize: "0% 0.4em" }, { backgroundSize: "100% 0.4em", duration: 0.3, ease: "power2.out" }, t);
+          tl.fromTo(facts[k], { scale: 1.18 }, { scale: 1, duration: 0.6, ease: "elastic.out(1, 0.45)", immediateRender: false, transformOrigin: "50% 70%" }, t);
+          sfx(t, "tick", -11);
+        });
+        tl.fromTo("#mo-note", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.8, ease: EASE }, W("morph", "every") - 0.1);
+        const gStart = W("morph", "easier") - 0.1;
+        const gTimes = gradeVals.map((_, i) => gStart + (1.0 * i) / (gradeVals.length - 1));
+        gradeVals.forEach((s, i) => {
+          tl.set(s, { display: "inline" }, i === 0 ? m0 : gTimes[i]);
+          if (i < gradeVals.length - 1) tl.set(s, { display: "none" }, gTimes[i + 1]);
+          if (i) sfx(gTimes[i], "tick", -16);
+        });
+        const gEnd = gTimes[gTimes.length - 1];
+        tl.fromTo("#mo-num", { scale: 1.22 }, { scale: 1, duration: 0.7, ease: "elastic.out(1, 0.4)", immediateRender: false, transformOrigin: "100% 60%" }, gEnd);
+        sfx(gEnd, "impact_med", -9);
+        pulse($("#mo-cam"), 1660, 360, gEnd);
+
+        // 6. Levels: three real cards on a carousel, turned by the app's own switch.
+        const l0 = S("levels");
+        wipeAt(l0, "paper");
+        const lvEls = ["#lv-s", "#lv-p", "#lv-c"].map((s) => $(s));
+        const layout = (f, t, d) => {
+          lvEls.forEach((el, i) => {
+            const k = i - f;
+            const v = { x: k * 700, z: -Math.abs(k) * 520, rotationY: -k * 34, opacity: k === 0 ? 1 : 0.5 };
+            if (d === 0) tl.set(el, v, t);
+            else tl.to(el, { ...v, duration: d, ease: "back.inOut(1.2)" }, t);
+          });
+        };
+        layout(1, 0, 0);
+        tl.fromTo("#ring", { z: -1100, rotationX: 22, rotationY: 30, opacity: 0 }, { z: 0, rotationX: 0, rotationY: 0, opacity: 1, duration: 1.2, ease: EASE }, l0);
+        hIn(H.pick, W("levels", "pick") - 0.1);
+        hMark(H.pick, W("levels", "plain"));
+        tl.fromTo("#lv-zoom", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.7, ease: EASE }, l0 + 0.3);
+        const ar5 = $("#ar5");
+        const tS = W("levels", "simpler");
+        const tC = W("levels", "untangled");
+        tl.set(ar5, { x: P.ctrl[1].x + 220, y: P.ctrl[1].y + 150, opacity: 0 }, 0);
+        tl.set(ar5, { opacity: 1 }, l0 + 0.5);
+        moveTo(ar5, P.ctrl[0], tS - 0.6);
+        click(ar5, tS, $("#lv-ctrl"), P.ctrl[0].x, P.ctrl[0].y);
+        ctrlBtns.forEach((b, i) => state(b, i === 0, tS));
+        layout(0, tS, 0.9);
+        sfx(tS + 0.05, "whoosh", -14);
+        moveTo(ar5, P.ctrl[2], tC - 0.6);
+        click(ar5, tC, $("#lv-ctrl"), P.ctrl[2].x, P.ctrl[2].y);
+        ctrlBtns.forEach((b, i) => state(b, i === 2, tC));
+        layout(2, tC, 0.9);
+        sfx(tC + 0.05, "whoosh", -14);
+
+        // 7. Every app.
+        const a0 = S("apps");
+        wipeAt(a0, "ink");
+        land(appsCam, a0);
+        hIn(H.apps, a0 + 0.1, 0.045);
+        hMark(H.apps, W("apps", "select"));
+        const ib6 = $("#ib6");
+        tl.set(ib6, { opacity: 0 }, 0);
+        const tA = W("apps", "paper") - 0.25;
+        selectRun(selA, P.selA, ib6, tA, 0.6);
+        const cc = $$("#keys-cc .key");
+        tl.set(["#keys-cc .key", "#keys-cc .plus", "#keys-mail .key", "#appcard1", "#appcard2"], { opacity: 0 }, 0);
+        keyIn(cc[0], tA + 0.75, "key007");
+        tl.to("#keys-cc .plus", { opacity: 1, duration: 0.1 }, tA + 0.7);
+        keyIn(cc[1], tA + 0.95, "key015");
+        tl.to(cc[1], { y: 0, duration: 0.06 }, tA + 1.08);
+        tl.to(cc[1], { y: 5, duration: 0.05 }, tA + 1.22);
+        sfx(tA + 1.22, "key016", -4);
+        tl.to(["#keys-cc .key", "#keys-cc .plus"], { opacity: 0, y: 30, duration: 0.25 }, tA + 1.4);
+        tl.set(ib6, { opacity: 0 }, tA + 1.45);
+        cardIn("#appcard1", tA + 1.45);
+        reveal(m1, tA + 1.6, 0.022);
+        const tB = W("apps", "letter") - 0.45;
+        tl.to("#app-a", { x: -1100, opacity: 0, filter: "blur(10px)", duration: 0.6, ease: "expo.inOut" }, tB);
+        tl.fromTo("#app-b", { x: 1100, opacity: 0, filter: "blur(10px)" }, { x: 0, opacity: 1, filter: "blur(0px)", duration: 0.6, ease: "expo.inOut" }, tB);
+        tl.set("#app-b", { opacity: 0 }, 0);
+        sfx(tB, "whoosh", -12);
+        selectRun(selM, P.selM, ib6, tB + 0.6, 0.4);
+        const mk = $$("#keys-mail .key");
+        mk.forEach((k, i) => keyIn(k, tB + 1.1 + i * 0.08, ["key009", "key021", "key003"][i]));
+        tl.to("#keys-mail .key", { opacity: 0, y: 30, duration: 0.25 }, tB + 1.45);
+        tl.set(ib6, { opacity: 0 }, tB + 1.5);
+        cardIn("#appcard2", tB + 1.5);
+        reveal(m2, tB + 1.62, 0.02);
+
+        // 8. Translate.
+        const t0 = S("tr");
+        wipeAt(t0, "paper");
+        tl.fromTo("#wall1", { x: 0 }, { x: -1100, duration: TM.scenes.tr.dur, ease: "none" }, t0);
+        tl.fromTo("#wall2", { x: -1500 }, { x: -400, duration: TM.scenes.tr.dur, ease: "none" }, t0);
+        tl.fromTo("#wall3", { x: -300 }, { x: -1400, duration: TM.scenes.tr.dur, ease: "none" }, t0);
+        tl.fromTo("#trcard", { opacity: 0, y: 60, rotationY: -24, transformPerspective: 1800 }, { opacity: 1, y: 0, rotationY: 0, duration: 0.9, ease: "back.out(1.4)" }, t0);
+        tl.set("#tr-bn", { opacity: 0 }, 0);
+        const ar7 = $("#ar7");
+        const tT = W("tr", "translates");
+        tl.set(ar7, { x: 380, y: 700, opacity: 0 }, 0);
+        tl.set(ar7, { opacity: 1 }, t0 + 0.3);
+        moveTo(ar7, P.tr, tT - 0.7, 0.6);
+        click(ar7, tT, $("#trcard"), P.tr.x, P.tr.y);
+        tl.set("#tr-bn", { opacity: 1 }, tT);
+        tl.set("#tr-plain", { opacity: 0 }, tT);
+        reveal(bnToks, tT + 0.18, 0.05);
+        tl.to(ar7, { x: P.tr.x + 60, y: P.tr.y + 300, opacity: 0, duration: 0.6, ease: "power2.in" }, tT + 0.6);
+        hIn(H.tr, t0 + 0.25);
+        hMark(H.tr, W("tr", "too"));
+        tl.fromTo("#ticker", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: EASE }, W("tr", "into") - 0.1);
+        const langT = [W("tr", "bangla"), W("tr", "spanish"), W("tr", "hindi")];
+        const more = W("tr", "more");
+        lspans.forEach((s, i) => {
+          const t = i < 3 ? langT[i] : more + 0.1 + (i - 3) * 0.32;
+          const next = i < 2 ? langT[i + 1] : i === 2 ? more + 0.1 : t + 0.32;
+          tl.fromTo(s, { opacity: 0, yPercent: 60 }, { opacity: 1, yPercent: 0, duration: 0.22, ease: "back.out(2)" }, t);
+          if (i < lspans.length - 1) tl.to(s, { opacity: 0, yPercent: -60, duration: 0.12, ease: "power2.in" }, next - 0.13);
+        });
+
+        // 9. Private.
+        const p0 = S("priv");
+        tl.to("#tr-cam", { opacity: 0, scale: 0.96, filter: "blur(12px)", duration: 0.5, ease: "power2.in" }, p0 - 0.5);
+        sfx(p0 - 0.45, "whoosh", -13);
+        tl.fromTo("#wdot", { scale: 0, transformOrigin: "50% 50%" }, { scale: 1, duration: 0.5, ease: "back.out(3)" }, p0);
+        arcs.forEach((p, i) => tl.to(p, { strokeDashoffset: 0, duration: 0.5, ease: "power2.out" }, p0 + 0.1 + i * 0.12));
+        hIn(H.priv, p0 + 0.2, 0.07);
+        hMark(H.priv, W("priv", "own"), 0.6);
+        tl.fromTo("#priv-sub", { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.8, ease: EASE }, W("priv", "ai") - 0.1);
+        const tOff = W("priv", "offline") - 0.1;
+        tl.to([halo, slash], { strokeDashoffset: 0, duration: 0.3, ease: "power3.in" }, tOff);
+        shake($("#wifi-shake"), tOff + 0.3, 8);
+        sfx(tOff + 0.28, "impact_med2", -9);
+        tl.fromTo("#priv-off", { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.8, ease: EASE }, tOff);
+        tl.fromTo("#priv-cam", { scale: 1.03 }, { scale: 1.08, duration: TM.scenes.priv.dur, ease: "none" }, p0);
+
+        // 10. Words.
+        const w0 = S("words");
+        wipeAt(w0, "ink");
+        tl.set(["#wordpos", "#mainpos", "#ar9"], { opacity: 0 }, 0);
+        cardIn("#lookpos", w0 + 0.05);
+        chars.forEach((c, i) => {
+          tl.set(c, { display: "inline" }, w0 + 0.3 + i * 0.075);
+          sfx(w0 + 0.3 + i * 0.075, "type" + i, -8);
+        });
+        const enter = w0 + 1.25;
+        sfx(enter, "key030", -4);
+        tl.to("#lookpos", { opacity: 0, scale: 0.96, duration: 0.2, ease: "power2.in" }, enter);
+        cardIn("#wordpos", enter + 0.1);
+        hIn(H.words, W("words", "look") - 0.1);
+        const tKeep = W("words", "keep");
+        hMark(H.words, tKeep);
+        const ar9 = $("#ar9");
+        tl.set(ar9, { x: 260, y: 560 }, 0);
+        tl.set(ar9, { opacity: 1 }, enter + 0.4);
+        moveTo(ar9, P.save, tKeep - 0.7, 0.6);
+        click(ar9, tKeep, $("#wordpos"), P.save.x, P.save.y);
+        sfx(tKeep + 0.02, "switch", -13);
+        tl.set($("path", save), { attr: { d: "M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Z" } }, tKeep);
+        tl.set(save, { color: "#1b1b1a" }, tKeep);
+        const tWin = Math.max(tKeep + 0.7, W("words", "remembering") - 0.2);
+        tl.to("#wordpos", { opacity: 0, x: 120, y: 160, scale: 0.4, duration: 0.42, ease: "power3.in" }, tWin - 0.3);
+        sfx(tWin - 0.3, "whoosh", -14);
+        tl.fromTo("#mainpos", { opacity: 0, y: 90, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 0.8, ease: "back.out(1.4)", immediateRender: false }, tWin);
+        sfx(tWin, "pop2", -12);
+        tl.fromTo(row, { backgroundColor: "rgba(231,180,106,0.5)" }, { backgroundColor: "rgba(231,180,106,0)", duration: 1.6, ease: "power1.in" }, tWin + 0.6);
+
+        // 11. Check: each fact is traced into the rewrite; 5% has nowhere to land.
+        const c0 = S("check");
+        wipeAt(c0, "paper");
+        tl.fromTo(["#ck-src", "#ck-dst"], { opacity: 0, y: 50, rotationX: 10, transformPerspective: 1600 }, { opacity: 1, y: 0, rotationX: 0, duration: 0.8, ease: "back.out(1.3)", stagger: 0.1 }, c0 + 0.05);
+        hIn(H.check, c0 + 0.15);
+        hMark(H.check, W("check", "own"));
+        tl.fromTo("#ck-sub", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.7, ease: EASE }, W("check", "if") - 0.1);
+        const lt = [W("check", "own") + 0.25, W("check", "own") + 0.75, W("check", "missing") - 0.1];
+        lt.forEach((t, i) => {
+          tl.to($("#fs" + (i + 1)), { backgroundSize: "100% 100%", duration: 0.2, ease: "power2.out" }, t);
+          tl.to(lines[i].p, { strokeDashoffset: 0, duration: 0.5, ease: "power2.inOut" }, t + 0.06);
+          dots.filter(([k]) => k === i).forEach(([, c], n) => tl.to(c, { opacity: 1, duration: 0.1 }, t + 0.12 + n * 0.38));
+          if (i < 2) {
+            tl.to($("#fd" + (i + 1)), { backgroundSize: "100% 100%", duration: 0.2, ease: "power2.out" }, t + 0.5);
+            sfx(t + 0.5, "tick", -10);
+          }
+        });
+        tl.to(lines[2].p, { stroke: "#8a5300", duration: 0.15 }, lt[2] + 0.55);
+        tl.fromTo(miss, { opacity: 0, scale: 0.3, transformOrigin: `${end.x}px ${end.y}px` }, { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(3)" }, lt[2] + 0.56);
+        pulse(sceneCheck, end.x, end.y, lt[2] + 0.58, "#8a5300");
+        shake($("#ck-dst"), lt[2] + 0.6, 6);
+        sfx(lt[2] + 0.56, "bong", -11);
+        const tWarn = W("check", "tells") - 0.1;
+        tl.fromTo("#ck-warnz", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: "back.out(1.6)" }, tWarn);
+        land(sceneCheck, c0);
+
+        // 12. Outro.
+        const o0 = S("outro");
+        wipeAt(o0, "ink");
+        tl.fromTo("#logo", { scale: 0.3, rotation: -25, opacity: 0, transformOrigin: "50% 50%" }, { scale: 1, rotation: 0, opacity: 1, duration: 0.9, ease: "back.out(1.8)" }, o0);
+        sfx(o0 + 0.05, "impact_heavy", -6);
+        pulse($("#outro-cam"), 960, 278, o0 + 0.1);
+        tl.fromTo(".lg-bar", { scaleX: 0, transformOrigin: "0% 50%" }, { scaleX: 1, duration: 0.55, ease: EASE, stagger: 0.12 }, o0 + 0.3);
+        tl.fromTo("#lg-mark", { scaleX: 0, transformOrigin: "0% 50%" }, { scaleX: 1, duration: 0.45, ease: "power2.inOut" }, W("outro", "plainly") - 0.1);
+        sfx(W("outro", "plainly") - 0.1, "swish", -12);
+        hIn(H.end, W("outro", "read") - 0.1);
+        hMark(H.end, W("outro", "plainly", 1));
+        const tEnd = lineEnd("outro") + 0.2;
+        tl.fromTo("#end-sub", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.8, ease: EASE }, tEnd);
+        tl.fromTo("#end-url", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.8, ease: EASE }, tEnd + 0.15);
+        tl.fromTo("#credit", { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "none" }, tEnd + 0.5);
+        tl.fromTo("#outro-cam", { scale: 1.04 }, { scale: 1, duration: TM.scenes.outro.dur, ease: "power1.out" }, o0);
+        // The music's last downbeat: one hit, the logo answers, then it rings out.
+        const fin = TM.musicEnd;
+        sfx(fin, "impact_heavy", -5);
+        sfx(fin, "bell", -12);
+        pulse($("#outro-cam"), 960, 278, fin);
+        tl.fromTo("#logo", { scale: 1.1 }, { scale: 1, duration: 0.9, ease: "elastic.out(1, 0.45)", immediateRender: false }, fin);
+        tl.fromTo("#lg-mark", { scaleX: 1.12 }, { scaleX: 1, duration: 0.8, ease: "elastic.out(1, 0.4)", immediateRender: false, transformOrigin: "0% 50%" }, fin);
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["plainly"] = tl;
+      }
+
+      document.fonts.ready.then(build);
+    </script>
+  </body>
+</html>

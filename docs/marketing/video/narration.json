@@ -1,0 +1,19 @@
+{
+  "voice": "af_heart",
+  "speed": 0.94,
+  "sentence_gap": 0.34,
+  "lines": [
+    { "scene": "s1", "text": "Some writing seems designed to keep you out." },
+    { "scene": "s2", "text": "You read it once. Then again. And you're still not sure what it says." },
+    { "scene": "desk", "text": "Plainly fixes that. Select the text, in any app, and press one shortcut." },
+    { "scene": "card", "text": "A small card opens right beside it, and explains it in plain words." },
+    { "scene": "morph", "text": "Same meaning. Every number, date and name kept. Just a lot easier to read." },
+    { "scene": "levels", "text": "Need it simpler? Or just untangled? You pick how plain." },
+    { "scene": "apps", "text": "It works wherever you can select text. A paper in your browser. A letter in your inbox." },
+    { "scene": "tr", "text": "It translates, too. Into Bangla, Spanish, Hindi, and many more." },
+    { "scene": "priv", "text": "The AI runs on your own computer, so what you read with it stays there. It even works offline." },
+    { "scene": "words", "text": "Look up any word, and keep the ones worth remembering." },
+    { "scene": "check", "text": "And it checks its own work. If a number goes missing, the card tells you." },
+    { "scene": "outro", "text": "Plainly. Read anything, plainly." }
+  ]
+}

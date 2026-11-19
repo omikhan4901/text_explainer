@@ -1,0 +1,13 @@
+# Generated: rebuilt by the scripts (see plan.md "Rebuild").
+work/
+out/
+.venv/
+models/
+composition/index.html
+composition/snapshots/
+composition/renders/
+composition/assets/audio/
+composition/assets/app/
+composition/assets/js/CustomEase.min.js
+composition/ui/*.png
+audio/vo/
