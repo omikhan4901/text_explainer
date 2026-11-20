@@ -124,8 +124,12 @@ jobs:
             $base = 0
             if ($old.body -match '<!-- downloads: total=(\d+) base=(\d+) -->') { $total = [int]$Matches[1]; $base = [int]$Matches[2] }
             $count = [int](($old.assets | Where-Object { $_.name -eq "Plainly-x64-setup.exe" } | Select-Object -First 1).downloadCount)
+            Write-Host "Old release: installer downloads $count, counted before it $total, its count when counting began $base"
             $total += [math]::Max(0, $count - $base)
-          } catch { }
+          } catch {
+            # Never fail the build over the counter, but say so: a silent 0 would look like no downloads.
+            Write-Host "::warning::Could not read the old download count: $_"
+          }
           $notes += "`n<!-- downloads: total=$total base=0 -->"
           Write-Host "Installer downloads carried over: $total"
           # Move the pre-release to this commit: remove the old one (and its tag), make it again.
