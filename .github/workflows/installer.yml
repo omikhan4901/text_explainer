@@ -115,6 +115,19 @@ jobs:
 
           SHA-256: $hash
           "@
+          # Recreating the release resets GitHub's download counter, so carry the installer's
+          # count over in a hidden note (scripts/downloads.sh reads it): total so far plus this
+          # file's downloads since counting began (base). Update checks (latest.json) don't count.
+          $total = 0
+          try {
+            $old = gh release view latest-build --json body,assets | ConvertFrom-Json
+            $base = 0
+            if ($old.body -match '<!-- downloads: total=(\d+) base=(\d+) -->') { $total = [int]$Matches[1]; $base = [int]$Matches[2] }
+            $count = [int](($old.assets | Where-Object { $_.name -eq "Plainly-x64-setup.exe" } | Select-Object -First 1).downloadCount)
+            $total += [math]::Max(0, $count - $base)
+          } catch { }
+          $notes += "`n<!-- downloads: total=$total base=0 -->"
+          Write-Host "Installer downloads carried over: $total"
           # Move the pre-release to this commit: remove the old one (and its tag), make it again.
           # (The first time there is none, and that's fine.)
           try { gh release delete latest-build --cleanup-tag --yes } catch { }
